@@ -41,7 +41,7 @@ export default function AdminModeration() {
         borderRight: '1px solid #F4F4F5',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '24px 32px', borderBottom: '1px solid #E4E4E7' }}>
+        <div style={{ padding: '24px', borderBottom: '1px solid #E4E4E7' }}>
           <h2 style={{ margin: '0 0 4px', fontSize: '18px', color: '#1A4B77' }}>
             Moderación
           </h2>
@@ -57,7 +57,7 @@ export default function AdminModeration() {
               onClick={() => { setSelectedLote(lote); setDeletedIds(new Set()); }}
               style={{
                 width: '100%',
-                padding: '16px 32px',
+                padding: '16px 24px',
                 background: selectedLote.id === lote.id ? '#FFFFFF' : 'transparent',
                 border: 'none',
                 borderBottom: '1px solid #F4F4F5',
@@ -140,7 +140,7 @@ export default function AdminModeration() {
           <div style={{
             display: 'grid',
             gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: '8px',
+            gap: '16px',
           }}>
             {Array.from({ length: selectedLote.fotos }).map((_, i) => {
               const isDeleted = deletedIds.has(i);

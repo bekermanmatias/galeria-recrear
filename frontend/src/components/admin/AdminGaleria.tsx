@@ -107,8 +107,8 @@ export default function AdminGaleria() {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-        gap: '4px',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+        gap: '24px',
       }}>
         {filteredPhotos.map((photo) => (
           <div
@@ -118,6 +118,7 @@ export default function AdminGaleria() {
               aspectRatio: '1',
               background: '#F4F4F5',
               cursor: 'pointer',
+              borderRadius: '8px',
               overflow: 'hidden'
             }}
             onClick={() => setSelectedPhoto(photo.url)}
