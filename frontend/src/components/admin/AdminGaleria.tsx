@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Image as ImageIcon, Download, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
+import SearchableSelect from '../ui/SearchableSelect';
 
 const PHOTOS = Array.from({ length: 48 }, (_, i) => ({
   id: i,
@@ -48,44 +49,27 @@ export default function AdminGaleria() {
           </button>
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
-          <select
+          <SearchableSelect
             value={filtroColegio}
-            onChange={(e) => setFiltroColegio(e.target.value)}
-            style={{
-              padding: '8px 16px', border: '1px solid #E4E4E7', borderRadius: '6px',
-              fontSize: '13px', color: '#09090B', outline: 'none'
-            }}
-          >
-            <option value="Todos">Todos los colegios</option>
-            <option value="Escuela Normal">Escuela Normal</option>
-            <option value="Colegio San Luis">Colegio San Luis</option>
-          </select>
-          <select
+            onChange={setFiltroColegio}
+            options={['Todos', 'Escuela Normal', 'Colegio San Luis']}
+            placeholder="Todos los colegios"
+            style={{ minWidth: '180px' }}
+          />
+          <SearchableSelect
             value={filtroTurno}
-            onChange={(e) => setFiltroTurno(e.target.value)}
-            style={{
-              padding: '8px 16px', border: '1px solid #E4E4E7', borderRadius: '6px',
-              fontSize: '13px', color: '#09090B', outline: 'none'
-            }}
-          >
-            <option value="Todos">Todos los turnos</option>
-            <option value="Mañana">Mañana</option>
-            <option value="Tarde">Tarde</option>
-            <option value="Noche">Noche</option>
-          </select>
-          <select
+            onChange={setFiltroTurno}
+            options={['Todos', 'Mañana', 'Tarde', 'Noche']}
+            placeholder="Todos los turnos"
+            style={{ minWidth: '160px' }}
+          />
+          <SearchableSelect
             value={filtroActividad}
-            onChange={(e) => setFiltroActividad(e.target.value)}
-            style={{
-              padding: '8px 16px', border: '1px solid #E4E4E7', borderRadius: '6px',
-              fontSize: '13px', color: '#09090B', outline: 'none'
-            }}
-          >
-            <option value="Todos">Todas las actividades</option>
-            <option value="Cabalgata">Cabalgata</option>
-            <option value="Pileta">Pileta</option>
-            <option value="Hotel">Hotel</option>
-          </select>
+            onChange={setFiltroActividad}
+            options={['Todos', 'Cabalgata', 'Pileta', 'Hotel']}
+            placeholder="Todas las actividades"
+            style={{ minWidth: '180px' }}
+          />
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F4F4F5', padding: '4px 8px', borderRadius: '6px' }}>
             <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>Desde:</span>
             <input
