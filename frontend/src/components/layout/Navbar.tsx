@@ -42,25 +42,25 @@ export default function Navbar({ role }: NavbarProps) {
         
         {(role === 'coordinator' || role === 'admin') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span className="hide-on-mobile" style={{ fontSize: '14px', fontWeight: 500, color: '#1A4B77', background: '#F4F4F5', padding: '6px 12px', borderRadius: '6px' }}>
-              {role === 'coordinator' ? 'Coordinador' : 'Administrador'}
-            </span>
             <div style={{ position: 'relative' }} ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: '6px',
-                  background: menuOpen ? '#F4F4F5' : 'transparent', border: 'none', cursor: 'pointer',
-                  color: '#1A4B77', padding: '6px 8px', borderRadius: '99px',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  background: menuOpen ? '#F8FAFC' : 'transparent', border: 'none', cursor: 'pointer',
+                  padding: '4px 8px', borderRadius: '8px',
                   transition: 'background 0.2s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F5')}
+                onMouseEnter={e => (e.currentTarget.style.background = '#F8FAFC')}
                 onMouseLeave={e => !menuOpen && (e.currentTarget.style.background = 'transparent')}
               >
-                <div style={{ width: '28px', height: '28px', background: '#E4E4E7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <User size={16} color="#3F3F46" />
+                <div style={{ width: '32px', height: '32px', background: '#F1F5F9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <User size={18} color="#64748B" />
                 </div>
-                <ChevronDown size={14} color="#71717A" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                <span className="hide-on-mobile" style={{ fontSize: '14px', fontWeight: 500, color: '#475569' }}>
+                  {role === 'coordinator' ? 'Coordinador' : 'Administrador'}
+                </span>
+                <ChevronDown size={16} color="#94A3B8" style={{ transform: menuOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', marginLeft: '4px' }} />
               </button>
               
               {menuOpen && (
