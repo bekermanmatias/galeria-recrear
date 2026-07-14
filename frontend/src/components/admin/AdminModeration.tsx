@@ -358,30 +358,31 @@ export default function AdminModeration() {
 
       {selectedPhoto !== null && (
         <Lightbox 
-          src={`https://picsum.photos/seed/mod${selectedLote.id}${lightboxImage.index}/1200/1200`} 
-          isDeleted={lightboxImage.isDeleted}
-          onClose={() => setLightboxImage(null)} 
+          src={`https://picsum.photos/seed/mod${selectedLote.id}${selectedPhoto}/1200/1200`} 
+          isDeleted={deletedIds.has(selectedPhoto)}
+          onClose={() => setSelectedPhoto(null)} 
           actions={
             <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
               <button 
-                onClick={() => handleToggleDelete(selectedLote.id, lightboxImage.index)}
+                onClick={() => toggleDelete(selectedPhoto)}
                 style={{ 
-                  background: lightboxImage.isDeleted ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
+                  background: deletedIds.has(selectedPhoto) ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
                   border: 'none', 
-                  color: lightboxImage.isDeleted ? '#4ADE80' : '#F87171', 
+                  color: deletedIds.has(selectedPhoto) ? '#4ADE80' : '#F87171', 
                   cursor: 'pointer', padding: '8px', borderRadius: '8px',
                   display: 'flex', alignItems: 'center', gap: '8px'
                 }}
               >
-                {lightboxImage.isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
+                {deletedIds.has(selectedPhoto) ? <RotateCcw size={20} /> : <Trash2 size={20} />}
                 <span style={{ fontSize: '13px', fontWeight: 500 }}>
-                  {lightboxImage.isDeleted ? 'Restaurar' : 'Descartar'}
+                  {deletedIds.has(selectedPhoto) ? 'Restaurar' : 'Descartar'}
                 </span>
               </button>
             </>
           }
         />
       )}
+    </div>
   );
 }
