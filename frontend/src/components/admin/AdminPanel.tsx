@@ -25,20 +25,21 @@ export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>('moderacion');
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
+    <div style={{ fontFamily: "'Inter', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#F8FAFC' }}>
       <Navbar role="admin" />
-      
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        
+
         {/* Sidebar Nav */}
         <aside style={{
-          width: '260px',
+          width: '220px',
           borderRight: '1px solid #E4E4E7',
           display: 'flex',
           flexDirection: 'column',
-          background: '#FAFAFA',
+          background: '#FFFFFF',
+          flexShrink: 0,
         }}>
-          <div style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -47,21 +48,23 @@ export default function AdminPanel() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabId)}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    width: '100%', padding: '12px 16px',
-                    background: isActive ? '#FFFFFF' : 'transparent',
-                    border: '1px solid',
-                    borderColor: isActive ? '#E4E4E7' : 'transparent',
+                    display: 'flex', alignItems: 'center', gap: '10px',
+                    width: '100%', padding: '10px 14px',
+                    background: isActive ? '#EFF6FF' : 'transparent',
+                    border: 'none',
                     borderRadius: '8px',
-                    color: isActive ? '#1A4B77' : '#71717A',
-                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? '#1D4ED8' : '#4B5563',
+                    fontWeight: isActive ? 600 : 400,
                     fontSize: '14px',
                     cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                    transition: 'all 0.15s',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
                   }}
+                  onMouseEnter={e => !isActive && (e.currentTarget.style.background = '#F9FAFB')}
+                  onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Icon size={18} />
+                  <Icon size={17} strokeWidth={isActive ? 2 : 1.5} />
                   {tab.label}
                 </button>
               );
@@ -70,7 +73,7 @@ export default function AdminPanel() {
         </aside>
 
         {/* Dynamic Content Area */}
-        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#F8FAFC' }}>
           {activeTab === 'moderacion' && <AdminModeration />}
           {activeTab === 'galeria' && <AdminGaleria />}
           {activeTab === 'colegios' && <AdminColegios />}
