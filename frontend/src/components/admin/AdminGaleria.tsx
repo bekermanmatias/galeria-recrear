@@ -230,6 +230,21 @@ function LightboxViewer({ src, onClose }: { src: string, onClose: () => void }) 
         >
           <ZoomIn size={20} />
         </button>
+        <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+        <button 
+          onClick={() => {
+            const link = document.createElement('a');
+            link.href = src;
+            link.download = `recrear-${Date.now()}.jpg`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          }}
+          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}
+        >
+          <Download size={20} />
+          <span style={{ fontSize: '13px', fontWeight: 500 }}>Descargar</span>
+        </button>
       </div>
     </div>
   );
