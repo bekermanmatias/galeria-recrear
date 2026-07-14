@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, MouseEvent as ReactMouseEvent, WheelEvent as ReactWheelEvent } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { X, ZoomIn, ZoomOut, Download } from 'lucide-react';
 
 interface LightboxProps {
@@ -15,7 +15,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
 
-  const handleWheel = (e: ReactWheelEvent) => {
+  const handleWheel = (e: React.WheelEvent) => {
     setZoom(prev => {
       const newZoom = e.deltaY < 0 ? Math.min(prev + 0.25, 4) : Math.max(prev - 0.25, 0.5);
       if (newZoom <= 1) {
@@ -25,7 +25,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
     });
   };
 
-  const handleMouseDown = (e: ReactMouseEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) {
       // If not zoomed in, maybe we just close if they click the background, but the image itself stops propagation.
       return;
@@ -35,7 +35,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
     dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
   };
 
-  const handleMouseMove = (e: ReactMouseEvent) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging || zoom <= 1) return;
     setPan({
       x: e.clientX - dragStart.current.x,
