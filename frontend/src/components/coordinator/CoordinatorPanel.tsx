@@ -23,6 +23,7 @@ export default function CoordinatorPanel() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addFiles = (newFiles: FileList) => {
@@ -158,7 +159,7 @@ export default function CoordinatorPanel() {
               maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
             }}>
               {files.map(f => (
-                <div key={f.id} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5' }}>
+                <div key={f.id} onClick={() => setSelectedPhoto(f.preview)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', cursor: 'pointer' }}>
                   <img src={f.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     onClick={e => { e.stopPropagation(); removeFile(f.id); }}
@@ -234,6 +235,38 @@ export default function CoordinatorPanel() {
           {uploading ? 'Procesando...' : 'Subir material'}
         </button>
       </main>
+
+      {/* Lightbox */}
+      {selectedPhoto && (
+        <div 
+          onClick={() => setSelectedPhoto(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex', alignItems: 'center', justifyItems: 'center',
+            cursor: 'zoom-out', padding: '40px'
+          }}
+        >
+          <img 
+            src={selectedPhoto} 
+            alt="Vista completa" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            onClick={(e) => e.stopPropagation()} 
+          />
+          <button 
+            onClick={() => setSelectedPhoto(null)}
+            style={{
+              position: 'absolute', top: '24px', right: '24px',
+              background: 'rgba(255, 255, 255, 0.1)', border: 'none',
+              borderRadius: '50%', width: '48px', height: '48px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'white'
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
