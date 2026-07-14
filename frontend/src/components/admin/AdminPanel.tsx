@@ -27,7 +27,7 @@ export default function AdminPanel() {
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
       <Navbar role="admin" />
       
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

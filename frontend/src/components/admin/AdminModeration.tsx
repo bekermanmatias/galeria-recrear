@@ -58,7 +58,7 @@ export default function AdminModeration() {
               style={{
                 width: '100%',
                 padding: '16px 24px',
-                background: selectedLote.id === lote.id ? '#FFFFFF' : 'transparent',
+                background: selectedLote.id === lote.id ? '#F0F9FF' : 'transparent',
                 border: 'none',
                 borderBottom: '1px solid #F4F4F5',
                 borderLeft: `2px solid ${selectedLote.id === lote.id ? '#1A4B77' : 'transparent'}`,
@@ -78,8 +78,8 @@ export default function AdminModeration() {
                 <span style={{ fontSize: '12px', color: '#71717A' }}>{lote.turno}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: 500 }}>{lote.fotos} FOTOS</span>
-                <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: 500 }}>{lote.fecha.toUpperCase()}</span>
+                <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>{lote.fotos} fotos</span>
+                <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>{lote.fecha}</span>
               </div>
             </button>
           ))}
@@ -102,8 +102,8 @@ export default function AdminModeration() {
             <h2 style={{ margin: '0 0 4px', fontSize: '20px', color: '#1A4B77' }}>
               {selectedLote.actividad} - Turno {selectedLote.turno} <span style={{ fontSize: '15px', color: '#A1A1AA', fontWeight: 400 }}>({selectedLote.fecha})</span>
             </h2>
-            <p style={{ margin: 0, fontSize: '12px', color: '#A1A1AA', fontWeight: 500 }}>
-              {photos.length} FOTOS VÁLIDAS • {deletedIds.size} DESCARTADAS
+            <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA', fontWeight: 500 }}>
+              {photos.length} fotos válidas • {deletedIds.size} descartadas
             </p>
           </div>
           
@@ -111,7 +111,7 @@ export default function AdminModeration() {
             onClick={handleAprobar}
             disabled={aprobarLoading}
             style={{
-              padding: '12px 24px',
+              padding: '16px 32px',
               background: '#1A4B77',
               color: '#FFFFFF',
               border: 'none',
