@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut, Search, Filter, Eye } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut, Search, Filter, Eye, ChevronDown } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
   { id: 1, colegio: 'Escuela Normal', turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -12,6 +12,14 @@ export default function AdminModeration() {
   const [aprobarLoading, setAprobarLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [mobileLotesOpen, setMobileLotesOpen] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const currentLote = LOTES_PENDIENTES.find(l => l.id === selectedLote.id) || LOTES_PENDIENTES[0];
 
@@ -49,46 +57,63 @@ export default function AdminModeration() {
         borderRight: '1px solid #E5E7EB',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ 
-          padding: '16px', 
-          borderBottom: '1px solid #E5E7EB', 
-          display: 'flex', 
-          flexDirection: 'column',
-          justifyContent: 'center',
-          height: '132px',
-          boxSizing: 'border-box'
-        }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {isMobile && (
+          <button 
+            onClick={() => setMobileLotesOpen(!mobileLotesOpen)}
+            style={{ padding: '16px', background: '#F8FAFC', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
+          >
             <div>
-              <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
-                Moderación
-              </h2>
-              <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
-                {LOTES_PENDIENTES.length} lotes pendientes
-              </p>
+              <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>Moderación</h2>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>{LOTES_PENDIENTES.length} lotes pendientes</p>
             </div>
-            
-            <div style={{ position: 'relative' }}>
-            <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-            <input 
-              type="text" 
-              placeholder="Buscar lote..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '8px 12px 8px 32px',
-                borderRadius: '6px',
-                border: '1px solid #E2E8F0',
-                fontSize: '13px',
-                outline: 'none',
-                color: '#1E293B',
-                boxSizing: 'border-box'
-              }}
-            />
+            <ChevronDown size={20} color="#64748B" style={{ transform: mobileLotesOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+          </button>
+        )}
+
+        {(!isMobile || mobileLotesOpen) && (
+          <>
+            <div style={{ 
+              padding: '16px', 
+              borderBottom: '1px solid #E5E7EB', 
+              display: 'flex', 
+              flexDirection: 'column',
+              justifyContent: 'center',
+              height: isMobile ? 'auto' : '132px',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {!isMobile && (
+                  <div>
+                    <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
+                      Moderación
+                    </h2>
+                    <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
+                      {LOTES_PENDIENTES.length} lotes pendientes
+                    </p>
+                  </div>
+                )}
+                
+                <div style={{ position: 'relative' }}>
+                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar lote..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px 8px 32px',
+                    borderRadius: '6px',
+                    border: '1px solid #E2E8F0',
+                    fontSize: '13px',
+                    outline: 'none',
+                    color: '#1E293B',
+                    boxSizing: 'border-box'
+                  }}
+                />
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filteredLotes.map(lote => {
@@ -123,6 +148,8 @@ export default function AdminModeration() {
             )
           })}
         </div>
+        </>
+      )}
       </aside>
 
       {/* Main Content */}
@@ -130,16 +157,16 @@ export default function AdminModeration() {
         
         {/* Topbar */}
         <header style={{
-          padding: '0 24px',
+          padding: isMobile ? '16px' : '0 24px',
           borderBottom: '1px solid #E5E7EB',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'center',
           background: '#FFFFFF',
-          height: '132px',
+          height: isMobile ? 'auto' : '132px',
           boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap: '16px' }}>
             <div>
               <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77', fontWeight: 700, letterSpacing: '-0.02em' }}>
                 {currentLote.colegio.toUpperCase()}
@@ -148,15 +175,15 @@ export default function AdminModeration() {
                 {currentLote.actividad} • Turno {currentLote.turno} • {currentLote.fecha}
               </div>
               
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ minWidth: '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#475569', fontWeight: 500 }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#475569', fontWeight: 500 }}>
                   {currentLote.fotos} en total
                 </span>
-                <span style={{ minWidth: '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#16A34A', fontWeight: 500 }}>
+                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#16A34A', fontWeight: 500 }}>
                   {currentLote.fotos - deletedIds.size} aprobadas
                 </span>
                 {deletedIds.size > 0 && (
-                  <span style={{ minWidth: '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#EF4444', fontWeight: 500 }}>
+                  <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#EF4444', fontWeight: 500 }}>
                     {deletedIds.size} descartadas
                   </span>
                 )}
@@ -187,7 +214,7 @@ export default function AdminModeration() {
                 {aprobarLoading ? 'Aprobando...' : (
                   <>
                     <Check size={18} strokeWidth={2.5} />
-                    Aprobar Lote
+                    {isMobile ? 'Aprobar' : 'Aprobar Lote'}
                   </>
                 )}
               </button>
