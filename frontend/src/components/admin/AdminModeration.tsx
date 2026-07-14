@@ -59,15 +59,14 @@ export default function AdminModeration() {
                 onClick={() => { setSelectedLote(lote); setDeletedIds(new Set()); }}
                 style={{
                   width: '100%',
-                  padding: '12px',
-                  background: isActive ? '#FFFFFF' : 'transparent',
-                  border: isActive ? '1px solid #E5E7EB' : '1px solid transparent',
-                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  background: isActive ? '#F1F5F9' : 'transparent',
+                  border: 'none',
+                  borderLeft: isActive ? '3px solid #2563EB' : '3px solid transparent',
                   textAlign: 'left',
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column', gap: '6px',
                   transition: 'all 0.2s',
-                  boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -109,7 +108,10 @@ export default function AdminModeration() {
                 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <span style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
-                    {selectedLote.fotos} fotos en total
+                    {selectedLote.fotos} en total
+                  </span>
+                  <span style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
+                    {selectedLote.fotos - deletedIds.size} aprobadas
                   </span>
                   {deletedIds.size > 0 && (
                     <span style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
