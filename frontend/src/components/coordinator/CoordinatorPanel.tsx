@@ -368,6 +368,7 @@ function SelectField({
       <div 
         onClick={() => { setIsOpen(true); setSearch(''); }}
         style={{
+          position: 'relative',
           width: '100%',
           padding: '12px 32px 12px 16px',
           border: `1px solid ${isOpen ? '#1A4B77' : '#E4E4E7'}`,
