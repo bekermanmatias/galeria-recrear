@@ -101,16 +101,11 @@ export default function AdminModeration() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '12px' }}>
-                <span style={{ fontSize: '11px', fontWeight: 700, color: '#94A3B8', letterSpacing: '0.05em', textTransform: 'uppercase' }}>
-                  {currentLote.colegio}
-                </span>
-                <h2 style={{ margin: 0, fontSize: '24px', color: '#1A4B77', fontWeight: 700, lineHeight: 1.1 }}>
-                  {currentLote.actividad}
-                </h2>
-                <span style={{ fontSize: '14px', color: '#64748B' }}>
-                  Turno {currentLote.turno} • {currentLote.fecha}
-                </span>
+              <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77', fontWeight: 700, letterSpacing: '-0.02em' }}>
+                {currentLote.colegio.toUpperCase()}
+              </h2>
+              <div style={{ marginBottom: '16px', fontSize: '15px', color: '#64748B', fontWeight: 500 }}>
+                {currentLote.actividad} • Turno {currentLote.turno} • {currentLote.fecha}
               </div>
               
               <div style={{ display: 'flex', gap: '8px' }}>
