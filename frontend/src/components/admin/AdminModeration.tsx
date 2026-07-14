@@ -62,7 +62,7 @@ export default function AdminModeration() {
                   padding: '12px 16px',
                   background: isActive ? '#F1F5F9' : 'transparent',
                   border: 'none',
-                  borderLeft: isActive ? '3px solid #2563EB' : '3px solid transparent',
+                  borderLeft: isActive ? '3px solid #1A4B77' : '3px solid transparent',
                   textAlign: 'left',
                   cursor: 'pointer',
                   display: 'flex', flexDirection: 'column', gap: '6px',
@@ -70,7 +70,7 @@ export default function AdminModeration() {
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: isActive ? '#2563EB' : '#334155' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: isActive ? '#1A4B77' : '#334155' }}>
                     {lote.actividad}
                   </span>
                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E' }} title="Pendiente" />
@@ -158,7 +158,7 @@ export default function AdminModeration() {
             <div style={{ 
               width: `${(photos.length / selectedLote.fotos) * 100}%`, 
               height: '100%', 
-              background: '#2563EB', 
+              background: '#1A4B77', 
               transition: 'width 0.3s ease' 
             }} />
           </div>
