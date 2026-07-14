@@ -73,10 +73,10 @@ export default function AdminCargaManual() {
       <div style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>
-            Carga Manual (Administrador)
+            Subir material
           </h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>
-            Sube fotos de manera manual asignándoles etiquetas. No pasarán por moderación.
+            Seleccioná el turno, la actividad y arrastrá las fotos.
           </p>
         </div>
 
@@ -140,7 +140,7 @@ export default function AdminCargaManual() {
             Hacé clic o arrastrá las fotos acá
           </p>
           <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>
-            JPG, PNG, HEIC. Subida manual del Administrador.
+            JPG, PNG, HEIC. Se subirán en calidad original.
           </p>
         </div>
 
