@@ -98,8 +98,8 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
                 className="show-on-mobile" 
                 onClick={onMenuToggle}
                 style={{ 
-                  background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  padding: '4px', alignItems: 'center'
                 }}
               >
                 <Menu size={24} color="#1A4B77" />
