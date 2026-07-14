@@ -12,8 +12,10 @@ export default function AdminModeration() {
   const [aprobarLoading, setAprobarLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
 
+  const currentLote = LOTES_PENDIENTES.find(l => l.id === selectedLote.id) || LOTES_PENDIENTES[0];
+
   // Generate mock photos
-  const photos = Array.from({ length: selectedLote.fotos }, (_, i) => i)
+  const photos = Array.from({ length: currentLote.fotos }, (_, i) => i)
     .filter(id => !deletedIds.has(id));
 
   const toggleDelete = (id: number) => {
@@ -100,18 +102,18 @@ export default function AdminModeration() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <h2 style={{ margin: '0 0 12px', fontSize: '24px', color: '#1A4B77', fontWeight: 600 }}>
-                {selectedLote.colegio} | {selectedLote.actividad} ({selectedLote.turno}) | {selectedLote.fecha}
+                {currentLote.colegio} | {currentLote.actividad} ({currentLote.turno}) | {currentLote.fecha}
               </h2>
               
               <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
-                  {selectedLote.fotos} en total
+                <span style={{ minWidth: '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#475569', fontWeight: 500 }}>
+                  {currentLote.fotos} en total
                 </span>
-                <span style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
-                  {selectedLote.fotos - deletedIds.size} aprobadas
+                <span style={{ minWidth: '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#16A34A', fontWeight: 500 }}>
+                  {currentLote.fotos - deletedIds.size} aprobadas
                 </span>
                 {deletedIds.size > 0 && (
-                  <span style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                  <span style={{ minWidth: '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: '4px 12px', borderRadius: '16px', fontSize: '13px', color: '#EF4444', fontWeight: 500 }}>
                     {deletedIds.size} descartadas
                   </span>
                 )}
@@ -157,7 +159,7 @@ export default function AdminModeration() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
             gap: '24px',
           }}>
-            {Array.from({ length: selectedLote.fotos }).map((_, i) => {
+            {Array.from({ length: currentLote.fotos }).map((_, i) => {
               const isDeleted = deletedIds.has(i);
               return (
                 <div
