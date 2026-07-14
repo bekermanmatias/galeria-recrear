@@ -52,6 +52,7 @@ export default function AdminPanel() {
                     background: isActive ? '#FFFFFF' : 'transparent',
                     border: '1px solid',
                     borderColor: isActive ? '#E4E4E7' : 'transparent',
+                    borderLeft: isActive ? '3px solid #1A4B77' : '1px solid transparent',
                     borderRadius: '8px',
                     color: isActive ? '#1A4B77' : '#71717A',
                     fontWeight: isActive ? 600 : 500,

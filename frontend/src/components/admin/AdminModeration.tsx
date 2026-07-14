@@ -37,10 +37,9 @@ export default function AdminModeration() {
       {/* Sidebar de Lotes */}
       <aside style={{
         width: '320px',
-        borderRight: '1px solid #E4E4E7',
-        display: 'flex',
-        flexDirection: 'column',
         background: '#FAFAFA',
+        borderRight: '1px solid #F4F4F5',
+        display: 'flex', flexDirection: 'column',
       }}>
         <div style={{ padding: '24px', borderBottom: '1px solid #E4E4E7' }}>
           <h2 style={{ margin: '0 0 4px', fontSize: '18px', color: '#1A4B77' }}>
@@ -61,7 +60,7 @@ export default function AdminModeration() {
                 padding: '16px 24px',
                 background: selectedLote.id === lote.id ? '#FFFFFF' : 'transparent',
                 border: 'none',
-                borderBottom: '1px solid #E4E4E7',
+                borderBottom: '1px solid #F4F4F5',
                 borderLeft: `2px solid ${selectedLote.id === lote.id ? '#1A4B77' : 'transparent'}`,
                 textAlign: 'left',
                 cursor: 'pointer',
@@ -70,12 +69,17 @@ export default function AdminModeration() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: '14px', fontWeight: 500, color: '#1A4B77' }}>{lote.actividad}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1A4B77' }}>{lote.actividad}</span>
+                  {lote.fecha.includes('Ayer') && (
+                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#F59E0B' }} title="Pendiente hace más de 24hs" />
+                  )}
+                </div>
                 <span style={{ fontSize: '12px', color: '#71717A' }}>{lote.turno}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: '12px', color: '#A1A1AA' }}>{lote.fotos} fotos</span>
-                <span style={{ fontSize: '12px', color: '#A1A1AA' }}>{lote.fecha}</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: 500 }}>{lote.fotos} FOTOS</span>
+                <span style={{ fontSize: '11px', color: '#A1A1AA', fontWeight: 500 }}>{lote.fecha.toUpperCase()}</span>
               </div>
             </button>
           ))}
@@ -88,7 +92,7 @@ export default function AdminModeration() {
         {/* Topbar */}
         <header style={{
           padding: '24px 32px',
-          borderBottom: '1px solid #E4E4E7',
+          borderBottom: '1px solid #F4F4F5',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
@@ -96,10 +100,10 @@ export default function AdminModeration() {
         }}>
           <div>
             <h2 style={{ margin: '0 0 4px', fontSize: '20px', color: '#1A4B77' }}>
-              {selectedLote.actividad} - Turno {selectedLote.turno} <span style={{ fontSize: '15px', color: '#71717A', fontWeight: 400 }}>({selectedLote.fecha})</span>
+              {selectedLote.actividad} - Turno {selectedLote.turno} <span style={{ fontSize: '15px', color: '#A1A1AA', fontWeight: 400 }}>({selectedLote.fecha})</span>
             </h2>
-            <p style={{ margin: 0, fontSize: '13px', color: '#71717A' }}>
-              {photos.length} fotos válidas • {deletedIds.size} descartadas
+            <p style={{ margin: 0, fontSize: '12px', color: '#A1A1AA', fontWeight: 500 }}>
+              {photos.length} FOTOS VÁLIDAS • {deletedIds.size} DESCARTADAS
             </p>
           </div>
           
@@ -172,9 +176,9 @@ export default function AdminModeration() {
                     style={{
                       position: 'absolute', inset: 0,
                       background: isDeleted ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.4)',
-                      opacity: isDeleted ? 1 : 0,
-                      transition: 'opacity 0.2s',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      opacity: (i === 0 && !isDeleted) ? 1 : (isDeleted ? 1 : 0),
+                      transition: 'opacity 0.2s',
                     }}
                   >
                     <button
@@ -182,19 +186,13 @@ export default function AdminModeration() {
                       style={{
                         width: '40px', height: '40px',
                         background: isDeleted ? '#EF4444' : '#FFFFFF',
-                        border: 'none', borderRadius: '50%',
+                        border: 'none', borderRadius: '50%', cursor: 'pointer',
                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        cursor: 'pointer',
-                        transform: 'scale(0.9)', transition: 'transform 0.1s',
+                        color: isDeleted ? '#FFFFFF' : '#EF4444',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
                       }}
-                      onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.8)')}
-                      onMouseUp={e => (e.currentTarget.style.transform = 'scale(0.9)')}
                     >
-                      {isDeleted ? (
-                        <RotateCcw size={18} color="#FFFFFF" strokeWidth={2.5} />
-                      ) : (
-                        <Trash2 size={18} color="#EF4444" strokeWidth={2} />
-                      )}
+                      {isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
                     </button>
                   </div>
                 </div>
