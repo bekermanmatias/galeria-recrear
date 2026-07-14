@@ -25,7 +25,7 @@ export default function Navbar({ role }: NavbarProps) {
         <img 
           src="/logo-recrear.png" 
           alt="Galería Recrear" 
-          style={{ height: '44px', width: 'auto', objectFit: 'contain' }} 
+          style={{ height: '64px', width: 'auto', objectFit: 'contain' }} 
         />
         <div className="hide-on-mobile" style={{ height: '32px', width: '1px', background: '#E4E4E7' }} />
         <span className="hide-on-mobile" style={{ fontSize: '18px', fontWeight: 600, color: '#1A4B77', letterSpacing: '-0.02em' }}>
