@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Check, Trash2 } from 'lucide-react';
+import { LayoutGrid, Check, Trash2, RotateCcw } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
   { id: 1, turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -188,7 +188,7 @@ export default function AdminModeration() {
                       onMouseUp={e => (e.currentTarget.style.transform = 'scale(0.9)')}
                     >
                       {isDeleted ? (
-                        <Check size={20} color="#FFFFFF" strokeWidth={2.5} />
+                        <RotateCcw size={18} color="#FFFFFF" strokeWidth={2.5} />
                       ) : (
                         <Trash2 size={18} color="#EF4444" strokeWidth={2} />
                       )}
