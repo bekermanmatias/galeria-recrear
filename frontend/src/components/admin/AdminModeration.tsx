@@ -11,6 +11,7 @@ export default function AdminModeration() {
   const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
   const [aprobarLoading, setAprobarLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const currentLote = LOTES_PENDIENTES.find(l => l.id === selectedLote.id) || LOTES_PENDIENTES[0];
 
@@ -34,6 +35,11 @@ export default function AdminModeration() {
     setDeletedIds(new Set());
   };
 
+  const filteredLotes = LOTES_PENDIENTES.filter(lote => 
+    lote.actividad.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    lote.colegio.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#FFFFFF' }}>
       {/* Sidebar de Lotes */}
@@ -43,17 +49,39 @@ export default function AdminModeration() {
         borderRight: '1px solid #E5E7EB',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid #E5E7EB' }}>
-          <h2 style={{ margin: '0 0 4px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
-            Moderación
-          </h2>
-          <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
-            {LOTES_PENDIENTES.length} lotes pendientes
-          </p>
+        <div style={{ padding: '20px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <div>
+            <h2 style={{ margin: '0 0 4px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
+              Moderación
+            </h2>
+            <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
+              {LOTES_PENDIENTES.length} lotes pendientes
+            </p>
+          </div>
+          
+          <div style={{ position: 'relative' }}>
+            <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            <input 
+              type="text" 
+              placeholder="Buscar colegio o actividad..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 12px 8px 32px',
+                borderRadius: '6px',
+                border: '1px solid #E2E8F0',
+                fontSize: '13px',
+                outline: 'none',
+                color: '#1E293B',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {LOTES_PENDIENTES.map(lote => {
+          {filteredLotes.map(lote => {
             const isActive = selectedLote.id === lote.id;
             return (
               <button
