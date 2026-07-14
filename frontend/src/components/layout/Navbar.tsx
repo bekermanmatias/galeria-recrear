@@ -6,7 +6,7 @@ interface NavbarProps {
   onMenuToggle?: () => void;
 }
 
-export default function Navbar({ role }: NavbarProps) {
+export default function Navbar({ role, onMenuToggle }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
