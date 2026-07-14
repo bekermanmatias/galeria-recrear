@@ -3,32 +3,50 @@ import { Image as ImageIcon, Download, Search } from 'lucide-react';
 
 const PHOTOS = Array.from({ length: 48 }, (_, i) => ({
   id: i,
-  url: `/placeholder-photo-${i}.jpg`, // Just a visual mock
+  url: `/placeholder-photo-${i}.jpg`, 
   colegio: i % 2 === 0 ? 'Escuela Normal' : 'Colegio San Luis',
   actividad: i % 3 === 0 ? 'Pileta' : 'Cabalgata',
   turno: i % 2 === 0 ? 'Mañana' : 'Tarde',
+  fecha: i % 2 === 0 ? '2026-07-14' : '2026-07-15',
 }));
 
 export default function AdminGaleria() {
   const [filtroColegio, setFiltroColegio] = useState('Todos');
   const [filtroTurno, setFiltroTurno] = useState('Todos');
   const [filtroActividad, setFiltroActividad] = useState('Todos');
+  const [filtroFechaInicio, setFiltroFechaInicio] = useState('');
+  const [filtroFechaFin, setFiltroFechaFin] = useState('');
   
   const filteredPhotos = PHOTOS.filter(p => {
     const matchColegio = filtroColegio === 'Todos' || p.colegio === filtroColegio;
     const matchTurno = filtroTurno === 'Todos' || p.turno === filtroTurno;
     const matchActividad = filtroActividad === 'Todos' || p.actividad === filtroActividad;
-    return matchColegio && matchTurno && matchActividad;
+    const matchFechaInicio = !filtroFechaInicio || p.fecha >= filtroFechaInicio;
+    const matchFechaFin = !filtroFechaFin || p.fecha <= filtroFechaFin;
+    
+    return matchColegio && matchTurno && matchActividad && matchFechaInicio && matchFechaFin;
   });
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Galería</h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Vista global de todas las fotos aprobadas en el sistema.</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '24px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Galería</h2>
+            <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Vista global de todas las fotos aprobadas en el sistema.</p>
+          </div>
+          <button
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 16px', background: '#F4F4F5', color: '#1A4B77',
+              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', transition: 'background 0.2s',
+            }}
+          >
+            <Download size={16} /> Descargar Lote
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px' }}>
           <select
             value={filtroColegio}
             onChange={(e) => setFiltroColegio(e.target.value)}
@@ -67,16 +85,22 @@ export default function AdminGaleria() {
             <option value="Pileta">Pileta</option>
             <option value="Hotel">Hotel</option>
           </select>
-          <button
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 16px', background: '#F4F4F5', color: '#1A4B77',
-              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-              cursor: 'pointer', transition: 'background 0.2s',
-            }}
-          >
-            <Download size={16} /> Descargar Lote
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F4F4F5', padding: '4px 8px', borderRadius: '6px' }}>
+            <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>Desde:</span>
+            <input
+              type="date"
+              value={filtroFechaInicio}
+              onChange={(e) => setFiltroFechaInicio(e.target.value)}
+              style={{ padding: '4px', border: 'none', background: 'transparent', fontSize: '13px', outline: 'none', color: '#09090B' }}
+            />
+            <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>Hasta:</span>
+            <input
+              type="date"
+              value={filtroFechaFin}
+              onChange={(e) => setFiltroFechaFin(e.target.value)}
+              style={{ padding: '4px', border: 'none', background: 'transparent', fontSize: '13px', outline: 'none', color: '#09090B' }}
+            />
+          </div>
         </div>
       </div>
 
