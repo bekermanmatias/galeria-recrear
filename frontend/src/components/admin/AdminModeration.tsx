@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut, Search, Filter, Eye } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
   { id: 1, turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -33,56 +33,56 @@ export default function AdminModeration() {
   };
 
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#FFFFFF' }}>
       {/* Sidebar de Lotes */}
       <aside style={{
-        width: '370px',
-        background: '#FAFAFA',
-        borderRight: '1px solid #F4F4F5',
+        width: '220px',
+        background: '#F8FAFC',
+        borderRight: '1px solid #E5E7EB',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '24px', borderBottom: '1px solid #E4E4E7' }}>
-          <h2 style={{ margin: '0 0 4px', fontSize: '18px', color: '#1A4B77' }}>
+        <div style={{ padding: '20px 16px', borderBottom: '1px solid #E5E7EB' }}>
+          <h2 style={{ margin: '0 0 4px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
             Moderación
           </h2>
-          <p style={{ margin: 0, fontSize: '13px', color: '#71717A' }}>
+          <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
             {LOTES_PENDIENTES.length} lotes pendientes
           </p>
         </div>
 
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {LOTES_PENDIENTES.map(lote => (
-            <button
-              key={lote.id}
-              onClick={() => { setSelectedLote(lote); setDeletedIds(new Set()); }}
-              style={{
-                width: '100%',
-                padding: '16px 24px',
-                background: selectedLote.id === lote.id ? '#F0F9FF' : 'transparent',
-                border: 'none',
-                borderBottom: '1px solid #F4F4F5',
-                borderLeft: `2px solid ${selectedLote.id === lote.id ? '#1A4B77' : 'transparent'}`,
-                textAlign: 'left',
-                cursor: 'pointer',
-                display: 'flex', flexDirection: 'column', gap: '4px',
-                transition: 'background 0.2s',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: '#1A4B77' }}>{lote.actividad}</span>
-                  {lote.fecha.includes('Ayer') && (
-                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#F59E0B' }} title="Pendiente hace más de 24hs" />
-                  )}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          {LOTES_PENDIENTES.map(lote => {
+            const isActive = selectedLote.id === lote.id;
+            return (
+              <button
+                key={lote.id}
+                onClick={() => { setSelectedLote(lote); setDeletedIds(new Set()); }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  background: isActive ? '#FFFFFF' : 'transparent',
+                  border: isActive ? '1px solid #E5E7EB' : '1px solid transparent',
+                  borderRadius: '8px',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex', flexDirection: 'column', gap: '6px',
+                  transition: 'all 0.2s',
+                  boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: isActive ? '#2563EB' : '#334155' }}>
+                    {lote.actividad}
+                  </span>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E' }} title="Pendiente" />
                 </div>
-                <span style={{ fontSize: '12px', color: '#71717A' }}>{lote.turno}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>{lote.fotos} fotos</span>
-                <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>{lote.fecha}</span>
-              </div>
-            </button>
-          ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>{lote.fotos} fotos</span>
+                  <span style={{ fontSize: '12px', color: '#64748B' }}>{lote.fecha}</span>
+                </div>
+              </button>
+            )
+          })}
         </div>
       </aside>
 
@@ -91,110 +91,220 @@ export default function AdminModeration() {
         
         {/* Topbar */}
         <header style={{
-          padding: '24px 32px',
-          borderBottom: '1px solid #F4F4F5',
+          padding: '16px 24px',
+          borderBottom: '1px solid #E5E7EB',
           display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
+          flexDirection: 'column',
+          gap: '16px',
           background: '#FFFFFF',
         }}>
-          <div>
-            <h2 style={{ margin: '0 0 4px', fontSize: '20px', color: '#1A4B77' }}>
-              {selectedLote.actividad} - Turno {selectedLote.turno} <span style={{ fontSize: '15px', color: '#A1A1AA', fontWeight: 400 }}>({selectedLote.fecha})</span>
-            </h2>
-            <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA', fontWeight: 500 }}>
-              {photos.length} fotos válidas • {deletedIds.size} descartadas
-            </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ margin: '0 0 4px', fontSize: '28px', fontWeight: 600, color: '#1E293B', letterSpacing: '-0.02em' }}>
+                {selectedLote.actividad}
+              </h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '16px', color: '#64748B' }}>Turno {selectedLote.turno}</span>
+                <span style={{ color: '#E5E7EB' }}>|</span>
+                
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
+                    {selectedLote.fotos} fotos en total
+                  </span>
+                  {deletedIds.size > 0 && (
+                    <span style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                      {deletedIds.size} descartadas
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ position: 'relative' }}>
+                <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar foto..." 
+                  style={{
+                    padding: '10px 12px 10px 36px',
+                    borderRadius: '8px',
+                    border: '1px solid #E5E7EB',
+                    fontSize: '13px',
+                    width: '200px',
+                    outline: 'none',
+                    fontFamily: 'inherit'
+                  }}
+                />
+              </div>
+              <button style={{
+                padding: '10px 16px',
+                background: '#FFFFFF',
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                color: '#475569',
+                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: '8px'
+              }}>
+                <Filter size={16} />
+                Filtrar
+              </button>
+              <button
+                onClick={handleAprobar}
+                disabled={aprobarLoading}
+                style={{
+                  padding: '10px 24px',
+                  background: '#22C55E',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  fontFamily: 'inherit',
+                  cursor: aprobarLoading ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  boxShadow: '0 1px 2px rgba(34, 197, 94, 0.2)',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => !aprobarLoading && (e.currentTarget.style.transform = 'translateY(-1px)')}
+                onMouseLeave={e => !aprobarLoading && (e.currentTarget.style.transform = 'none')}
+              >
+                {aprobarLoading ? 'Aprobando...' : (
+                  <>
+                    <Check size={18} strokeWidth={2.5} />
+                    Aprobar Lote
+                  </>
+                )}
+              </button>
+            </div>
           </div>
           
-          <button
-            onClick={handleAprobar}
-            disabled={aprobarLoading}
-            style={{
-              padding: '16px 32px',
-              background: '#1A4B77',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: 500,
-              fontFamily: 'inherit',
-              cursor: aprobarLoading ? 'default' : 'pointer',
-              display: 'flex', alignItems: 'center', gap: '8px',
-              transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => !aprobarLoading && (e.currentTarget.style.background = '#133656')}
-            onMouseLeave={e => !aprobarLoading && (e.currentTarget.style.background = '#1A4B77')}
-          >
-            {aprobarLoading ? 'Aprobando...' : (
-              <>
-                <Check size={16} strokeWidth={2.5} />
-                Aprobar Lote
-              </>
-            )}
-          </button>
+          {/* Progress Bar visual */}
+          <div style={{ width: '100%', height: '4px', background: '#F1F5F9', borderRadius: '2px', overflow: 'hidden' }}>
+            <div style={{ 
+              width: `${(photos.length / selectedLote.fotos) * 100}%`, 
+              height: '100%', 
+              background: '#2563EB', 
+              transition: 'width 0.3s ease' 
+            }} />
+          </div>
         </header>
 
         {/* Gallery Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-            gap: '16px',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: '24px',
           }}>
             {Array.from({ length: selectedLote.fotos }).map((_, i) => {
               const isDeleted = deletedIds.has(i);
               return (
                 <div
                   key={i}
-                  onClick={() => setSelectedPhoto(i)}
                   style={{
                     position: 'relative',
                     aspectRatio: '1',
-                    background: '#F4F4F5',
-                    border: isDeleted ? '2px solid #EF4444' : 'none',
-                    opacity: isDeleted ? 0.5 : 1,
-                    transition: 'all 0.2s',
+                    background: '#F8FAFC',
+                    borderRadius: '8px',
+                    overflow: 'hidden',
+                    opacity: isDeleted ? 0.4 : 1,
+                    transition: 'all 0.2s ease',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
                   }}
                   onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'scale(1.02)';
+                    e.currentTarget.style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1)';
                     const overlay = e.currentTarget.querySelector('.overlay') as HTMLElement;
                     if (overlay) overlay.style.opacity = '1';
                   }}
                   onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'none';
+                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.05)';
                     const overlay = e.currentTarget.querySelector('.overlay') as HTMLElement;
-                    if (overlay) overlay.style.opacity = isDeleted ? '1' : '0';
+                    if (overlay) overlay.style.opacity = '0';
                   }}
                 >
-                  {/* Photo mock */}
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isDeleted ? 0.3 : 1 }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                      <img src={`https://picsum.photos/seed/mod${selectedLote.id}${i}/400/400`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   
-                  {/* Hover Overlay */}
-                  <div
-                    className="overlay"
-                    style={{
-                      position: 'absolute', inset: 0,
-                      background: isDeleted ? 'rgba(239, 68, 68, 0.1)' : 'rgba(0,0,0,0.4)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      opacity: (i === 0 && !isDeleted) ? 1 : (isDeleted ? 1 : 0),
-                      transition: 'opacity 0.2s',
-                    }}
-                  >
-                    <button
-                      onClick={(e) => { e.stopPropagation(); toggleDelete(i); }}
+                  {isDeleted && (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.5)', padding: '12px', borderRadius: '50%', color: 'white' }}>
+                        <Trash2 size={32} />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!isDeleted && (
+                    <div
+                      className="overlay"
                       style={{
-                        width: '40px', height: '40px',
-                        background: isDeleted ? '#EF4444' : '#FFFFFF',
-                        border: 'none', borderRadius: '50%', cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: isDeleted ? '#FFFFFF' : '#EF4444',
-                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        position: 'absolute', inset: 0,
+                        background: 'rgba(0,0,0,0.3)',
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        padding: '12px',
                       }}
                     >
-                      {isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
-                    </button>
-                  </div>
+                      <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
+                        <input type="checkbox" style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                      </div>
+                      
+                      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedPhoto(i); }}
+                          title="Ver en grande"
+                          style={{
+                            width: '40px', height: '40px',
+                            background: '#FFFFFF', border: 'none', borderRadius: '50%', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#1E293B', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <Eye size={20} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleDelete(i); }}
+                          title="Descartar foto"
+                          style={{
+                            width: '40px', height: '40px',
+                            background: '#EF4444', border: 'none', borderRadius: '50%', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {isDeleted && (
+                    <div
+                      className="overlay"
+                      style={{
+                        position: 'absolute', inset: 0,
+                        opacity: 0,
+                        transition: 'opacity 0.2s',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center'
+                      }}
+                    >
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleDelete(i); }}
+                          title="Restaurar foto"
+                          style={{
+                            width: '48px', height: '48px',
+                            background: '#22C55E', border: 'none', borderRadius: '50%', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            color: '#FFFFFF', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)'
+                          }}
+                        >
+                          <RotateCcw size={24} />
+                        </button>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -202,7 +312,6 @@ export default function AdminModeration() {
         </div>
       </main>
 
-      {/* Lightbox */}
       {selectedPhoto !== null && (
         <LightboxViewer
           index={selectedPhoto}
@@ -258,7 +367,6 @@ function LightboxViewer({ index, loteId, isDeleted, onClose, onToggleDelete }: {
         <X size={24} />
       </button>
 
-      {/* Toolbar */}
       <div 
         onClick={(e) => e.stopPropagation()}
         style={{
@@ -283,13 +391,24 @@ function LightboxViewer({ index, loteId, isDeleted, onClose, onToggleDelete }: {
         >
           <ZoomIn size={20} />
         </button>
-        
+
         <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+
         <button 
           onClick={onToggleDelete}
-          style={{ background: isDeleted ? '#EF4444' : 'transparent', border: 'none', color: isDeleted ? 'white' : '#EF4444', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+          style={{ 
+            background: isDeleted ? '#22C55E' : '#EF4444', 
+            border: 'none', color: 'white', cursor: 'pointer', 
+            padding: '8px 16px', borderRadius: '8px',
+            display: 'flex', alignItems: 'center', gap: '6px',
+            fontWeight: 500, fontSize: '13px'
+          }}
         >
-          {isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
+          {isDeleted ? (
+            <><RotateCcw size={16} /> Restaurar</>
+          ) : (
+            <><Trash2 size={16} /> Descartar</>
+          )}
         </button>
       </div>
     </div>
