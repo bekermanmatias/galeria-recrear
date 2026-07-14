@@ -172,15 +172,15 @@ export default function AdminModeration() {
                 {currentLote.actividad} • {isMobile ? currentLote.fecha : `Turno ${currentLote.turno} • ${currentLote.fecha}`}
               </div>
               
-              <div style={{ display: 'flex', gap: '8px', flexWrap: 'nowrap', width: '100%' }}>
-                <span style={{ flex: 1, minWidth: 0, textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: isMobile ? 'nowrap' : 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                <span style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#475569', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {currentLote.fotos} {isMobile ? 'total' : 'en total'}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#16A34A', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#16A34A', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {currentLote.fotos - deletedIds.size} {isMobile ? 'aprob.' : 'aprobadas'}
                 </span>
                 {deletedIds.size > 0 && (
-                  <span style={{ flex: 1, minWidth: 0, textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#EF4444', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  <span style={{ flex: isMobile ? 1 : 'none', minWidth: isMobile ? 0 : '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: isMobile ? '2px 4px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#EF4444', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {deletedIds.size} {isMobile ? 'desc.' : 'descartadas'}
                   </span>
                 )}
