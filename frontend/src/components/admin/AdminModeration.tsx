@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Check, Trash2, RotateCcw, X } from 'lucide-react';
+import { LayoutGrid, Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
   { id: 1, turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -205,33 +205,90 @@ export default function AdminModeration() {
 
       {/* Lightbox */}
       {selectedPhoto !== null && (
-        <div 
-          onClick={() => setSelectedPhoto(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex', alignItems: 'center', justifyItems: 'center',
-            cursor: 'zoom-out', padding: '40px'
-          }}
-        >
-          {/* Mock full image using the photo ID */}
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F4F5' }} onClick={(e) => e.stopPropagation()}>
-             <LayoutGrid size={120} color="#A1A1AA" strokeWidth={1} />
-          </div>
-          <button 
-            onClick={() => setSelectedPhoto(null)}
-            style={{
-              position: 'absolute', top: '24px', right: '24px',
-              background: 'rgba(255, 255, 255, 0.1)', border: 'none',
-              borderRadius: '50%', width: '48px', height: '48px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'white'
-            }}
-          >
-            <X size={24} />
-          </button>
-        </div>
+        <LightboxViewer
+          index={selectedPhoto}
+          isDeleted={deletedIds.has(selectedPhoto)}
+          onClose={() => setSelectedPhoto(null)}
+          onToggleDelete={() => toggleDelete(selectedPhoto)}
+        />
       )}
+    </div>
+  );
+}
+
+function LightboxViewer({ index, isDeleted, onClose, onToggleDelete }: { index: number, isDeleted: boolean, onClose: () => void, onToggleDelete: () => void }) {
+  const [zoom, setZoom] = useState(1);
+  return (
+    <div 
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0, 0, 0, 0.9)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <div 
+        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'default' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{
+          width: '600px', height: '600px', background: '#F4F4F5', 
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out',
+          opacity: isDeleted ? 0.5 : 1
+        }}>
+          <LayoutGrid size={120} color="#A1A1AA" strokeWidth={1} />
+        </div>
+      </div>
+
+      <button 
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: '24px', right: '24px',
+          background: 'rgba(255, 255, 255, 0.1)', border: 'none',
+          borderRadius: '50%', width: '48px', height: '48px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: 'white', zIndex: 10
+        }}
+      >
+        <X size={24} />
+      </button>
+
+      {/* Toolbar */}
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', bottom: '32px',
+          background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
+          padding: '8px', borderRadius: '12px',
+          display: 'flex', gap: '8px', zIndex: 10
+        }}
+      >
+        <button 
+          onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
+          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+        >
+          <ZoomOut size={20} />
+        </button>
+        <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button 
+          onClick={() => setZoom(z => Math.min(3, z + 0.5))}
+          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+        >
+          <ZoomIn size={20} />
+        </button>
+        
+        <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+        <button 
+          onClick={onToggleDelete}
+          style={{ background: isDeleted ? '#EF4444' : 'transparent', border: 'none', color: isDeleted ? 'white' : '#EF4444', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+        >
+          {isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
+        </button>
+      </div>
     </div>
   );
 }

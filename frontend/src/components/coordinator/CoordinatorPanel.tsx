@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, X, Check, ChevronDown } from 'lucide-react';
+import { Upload, X, Check, ChevronDown, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import Navbar from '../layout/Navbar';
 
 const TURNOS = ['Mañana', 'Tarde', 'Noche'];
@@ -159,7 +159,7 @@ export default function CoordinatorPanel() {
               maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
             }}>
               {files.map(f => (
-                <div key={f.id} onClick={() => setSelectedPhoto(f.preview)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', cursor: 'pointer' }}>
+                <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', cursor: 'pointer' }}>
                   <img src={f.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     onClick={e => { e.stopPropagation(); removeFile(f.id); }}
@@ -238,35 +238,98 @@ export default function CoordinatorPanel() {
 
       {/* Lightbox */}
       {selectedPhoto && (
-        <div 
-          onClick={() => setSelectedPhoto(null)}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            background: 'rgba(0, 0, 0, 0.9)',
-            display: 'flex', alignItems: 'center', justifyItems: 'center',
-            cursor: 'zoom-out', padding: '40px'
+        <LightboxViewer
+          src={files.find(f => f.id === selectedPhoto)?.preview || ''}
+          onClose={() => setSelectedPhoto(null)}
+          onDelete={() => {
+            removeFile(selectedPhoto);
+            setSelectedPhoto(null);
           }}
-        >
-          <img 
-            src={selectedPhoto} 
-            alt="Vista completa" 
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            onClick={(e) => e.stopPropagation()} 
-          />
-          <button 
-            onClick={() => setSelectedPhoto(null)}
-            style={{
-              position: 'absolute', top: '24px', right: '24px',
-              background: 'rgba(255, 255, 255, 0.1)', border: 'none',
-              borderRadius: '50%', width: '48px', height: '48px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'white'
-            }}
-          >
-            <X size={24} />
-          </button>
-        </div>
+        />
       )}
+    </div>
+  );
+}
+
+function LightboxViewer({ src, onClose, onDelete }: { src: string, onClose: () => void, onDelete?: () => void }) {
+  const [zoom, setZoom] = useState(1);
+  return (
+    <div 
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 1000,
+        background: 'rgba(0, 0, 0, 0.9)',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <div 
+        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'default' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img 
+          src={src} 
+          alt="Vista completa" 
+          style={{ 
+            maxWidth: '100%', maxHeight: '100%', 
+            objectFit: 'contain', 
+            transform: `scale(${zoom})`,
+            transition: 'transform 0.2s ease-out'
+          }}
+        />
+      </div>
+
+      <button 
+        onClick={onClose}
+        style={{
+          position: 'absolute', top: '24px', right: '24px',
+          background: 'rgba(255, 255, 255, 0.1)', border: 'none',
+          borderRadius: '50%', width: '48px', height: '48px',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          cursor: 'pointer', color: 'white', zIndex: 10
+        }}
+      >
+        <X size={24} />
+      </button>
+
+      {/* Toolbar */}
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute', bottom: '32px',
+          background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
+          padding: '8px', borderRadius: '12px',
+          display: 'flex', gap: '8px', zIndex: 10
+        }}
+      >
+        <button 
+          onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
+          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+        >
+          <ZoomOut size={20} />
+        </button>
+        <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
+          {Math.round(zoom * 100)}%
+        </span>
+        <button 
+          onClick={() => setZoom(z => Math.min(3, z + 0.5))}
+          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+        >
+          <ZoomIn size={20} />
+        </button>
+        
+        {onDelete && (
+          <>
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+            <button 
+              onClick={onDelete}
+              style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+            >
+              <Trash2 size={20} />
+            </button>
+          </>
+        )}
+      </div>
     </div>
   );
 }
