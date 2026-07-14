@@ -1,17 +1,12 @@
-version: '3.8'
-
 services:
   frontend:
     build:
       context: ./frontend
     ports:
-      - "5173:5173"
+      - "4321:4321"
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
     networks:
       - app-network
 
@@ -19,17 +14,18 @@ services:
     build:
       context: ./backend
     ports:
-      - "3000:3000"
+      - "3001:3000"
     volumes:
       - ./backend:/app
       - /app/node_modules
     environment:
       - PORT=3000
+      - NODE_ENV=development
       - DB_HOST=db
       - DB_PORT=5432
       - DB_USER=postgres
       - DB_PASSWORD=postgres
-      - DB_NAME=foodiedb
+      - DB_NAME=galeria_recrear
     depends_on:
       - db
     networks:
@@ -42,7 +38,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=foodiedb
+      - POSTGRES_DB=galeria_recrear
     volumes:
       - pgdata:/var/lib/postgresql/data
     networks:
