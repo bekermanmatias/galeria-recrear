@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut, Search, Filter, Eye } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
-  { id: 1, turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
-  { id: 2, turno: 'Tarde', actividad: 'Pileta', fotos: 42, fecha: 'Hoy, 14:15' },
+  { id: 1, colegio: 'Escuela Normal', turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
+  { id: 2, colegio: 'Colegio San José', turno: 'Tarde', actividad: 'Pileta', fotos: 42, fecha: 'Hoy, 14:15' },
 ];
 
 export default function AdminModeration() {
@@ -99,26 +99,22 @@ export default function AdminModeration() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>
-                {selectedLote.actividad}
+              <h2 style={{ margin: '0 0 12px', fontSize: '24px', color: '#1A4B77', fontWeight: 600 }}>
+                {selectedLote.colegio} | {selectedLote.actividad} ({selectedLote.turno}) | {selectedLote.fecha}
               </h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '14px', color: '#71717A' }}>Turno {selectedLote.turno}</span>
-                <span style={{ color: '#E5E7EB' }}>|</span>
-                
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
-                    {selectedLote.fotos} en total
+              
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <span style={{ background: '#F8FAFC', border: '1px solid #E5E7EB', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#475569', fontWeight: 500 }}>
+                  {selectedLote.fotos} en total
+                </span>
+                <span style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
+                  {selectedLote.fotos - deletedIds.size} aprobadas
+                </span>
+                {deletedIds.size > 0 && (
+                  <span style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
+                    {deletedIds.size} descartadas
                   </span>
-                  <span style={{ background: '#F0FDF4', border: '1px solid #BBF7D0', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#16A34A', fontWeight: 500 }}>
-                    {selectedLote.fotos - deletedIds.size} aprobadas
-                  </span>
-                  {deletedIds.size > 0 && (
-                    <span style={{ background: '#FEF2F2', border: '1px solid #FECACA', padding: '2px 8px', borderRadius: '16px', fontSize: '12px', color: '#EF4444', fontWeight: 500 }}>
-                      {deletedIds.size} descartadas
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
             </div>
             
