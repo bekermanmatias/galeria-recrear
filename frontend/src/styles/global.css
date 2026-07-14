@@ -69,8 +69,15 @@
 @media (max-width: 600px) {
   .navbar-container {
     padding: 12px 16px;
-    flex-wrap: wrap;
-    gap: 12px;
+  }
+}
+
+.hide-on-mobile {
+  display: block;
+}
+@media (max-width: 600px) {
+  .hide-on-mobile {
+    display: none !important;
   }
 }
 

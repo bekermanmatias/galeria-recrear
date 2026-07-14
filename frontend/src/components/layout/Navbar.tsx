@@ -27,8 +27,8 @@ export default function Navbar({ role }: NavbarProps) {
           alt="Galería Recrear" 
           style={{ height: '44px', width: 'auto', objectFit: 'contain' }} 
         />
-        <div style={{ height: '32px', width: '1px', background: '#E4E4E7' }} />
-        <span style={{ fontSize: '18px', fontWeight: 600, color: '#1A4B77', letterSpacing: '-0.02em' }}>
+        <div className="hide-on-mobile" style={{ height: '32px', width: '1px', background: '#E4E4E7' }} />
+        <span className="hide-on-mobile" style={{ fontSize: '18px', fontWeight: 600, color: '#1A4B77', letterSpacing: '-0.02em' }}>
           Portal de Fotos
         </span>
       </div>
@@ -42,7 +42,7 @@ export default function Navbar({ role }: NavbarProps) {
         
         {(role === 'coordinator' || role === 'admin') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ fontSize: '14px', fontWeight: 500, color: '#1A4B77', background: '#F4F4F5', padding: '6px 12px', borderRadius: '6px' }}>
+            <span className="hide-on-mobile" style={{ fontSize: '14px', fontWeight: 500, color: '#1A4B77', background: '#F4F4F5', padding: '6px 12px', borderRadius: '6px' }}>
               {role === 'coordinator' ? 'Coordinador' : 'Administrador'}
             </span>
             <div style={{ position: 'relative' }} ref={menuRef}>
