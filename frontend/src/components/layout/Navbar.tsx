@@ -89,7 +89,7 @@ export default function Navbar({ role }: NavbarProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                     <LogOut size={14} /> Cerrar sesión
-                  </div>
+                  </button>
                 </div>
               )}
             </div>
