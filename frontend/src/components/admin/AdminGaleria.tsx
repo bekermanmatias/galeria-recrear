@@ -130,8 +130,8 @@ export default function AdminGaleria() {
               if (overlay) overlay.style.opacity = '0';
             }}
           >
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <ImageIcon size={32} color="#A1A1AA" strokeWidth={1} />
+            <div style={{ width: '100%', height: '100%' }}>
+              <img src={photo.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
 
             <div
