@@ -154,7 +154,7 @@ export default function AdminModeration() {
         
         {/* Topbar */}
         <header style={{
-          padding: isMobile ? '16px' : '0 24px',
+          padding: isMobile ? '12px 16px' : '0 24px',
           borderBottom: '1px solid #E5E7EB',
           display: 'flex',
           flexDirection: 'column',
@@ -163,54 +163,54 @@ export default function AdminModeration() {
           height: isMobile ? 'auto' : '132px',
           boxSizing: 'border-box'
         }}>
-          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'flex-start', gap: '16px' }}>
-            <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77', fontWeight: 700, letterSpacing: '-0.02em' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px' }}>
+            <div style={{ flex: 1 }}>
+              <h2 style={{ margin: '0 0 4px', fontSize: isMobile ? '18px' : '24px', color: '#1A4B77', fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>
                 {currentLote.colegio.toUpperCase()}
               </h2>
-              <div style={{ marginBottom: '16px', fontSize: '15px', color: '#64748B', fontWeight: 500 }}>
-                {currentLote.actividad} • Turno {currentLote.turno} • {currentLote.fecha}
+              <div style={{ marginBottom: isMobile ? '8px' : '16px', fontSize: isMobile ? '13px' : '15px', color: '#64748B', fontWeight: 500 }}>
+                {currentLote.actividad} • {isMobile ? currentLote.fecha : `Turno ${currentLote.turno} • ${currentLote.fecha}`}
               </div>
               
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#475569', fontWeight: 500 }}>
+                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F8FAFC', border: '1px solid #E5E7EB', padding: isMobile ? '2px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#475569', fontWeight: 600 }}>
                   {currentLote.fotos} en total
                 </span>
-                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#16A34A', fontWeight: 500 }}>
+                <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#F0FDF4', border: '1px solid #BBF7D0', padding: isMobile ? '2px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#16A34A', fontWeight: 600 }}>
                   {currentLote.fotos - deletedIds.size} aprobadas
                 </span>
                 {deletedIds.size > 0 && (
-                  <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: isMobile ? '4px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '12px' : '13px', color: '#EF4444', fontWeight: 500 }}>
+                  <span style={{ minWidth: isMobile ? 'auto' : '110px', textAlign: 'center', background: '#FEF2F2', border: '1px solid #FECACA', padding: isMobile ? '2px 8px' : '4px 12px', borderRadius: '16px', fontSize: isMobile ? '11px' : '13px', color: '#EF4444', fontWeight: 600 }}>
                     {deletedIds.size} descartadas
                   </span>
                 )}
               </div>
             </div>
             
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start', flexShrink: 0 }}>
               <button
                 onClick={handleAprobar}
                 disabled={aprobarLoading}
                 style={{
-                  padding: '10px 24px',
+                  padding: isMobile ? '8px 12px' : '10px 24px',
                   background: '#22C55E',
                   color: '#FFFFFF',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '14px',
+                  fontSize: isMobile ? '13px' : '14px',
                   fontWeight: 600,
                   fontFamily: 'inherit',
                   cursor: aprobarLoading ? 'default' : 'pointer',
-                  display: 'flex', alignItems: 'center', gap: '8px',
+                  display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px',
                   boxShadow: '0 1px 2px rgba(34, 197, 94, 0.2)',
                   transition: 'all 0.2s',
                 }}
                 onMouseEnter={e => !aprobarLoading && (e.currentTarget.style.transform = 'translateY(-1px)')}
                 onMouseLeave={e => !aprobarLoading && (e.currentTarget.style.transform = 'none')}
               >
-                {aprobarLoading ? 'Aprobando...' : (
+                {aprobarLoading ? (isMobile ? '...' : 'Aprobando...') : (
                   <>
-                    <Check size={18} strokeWidth={2.5} />
+                    <Check size={isMobile ? 16 : 18} strokeWidth={2.5} />
                     {isMobile ? 'Aprobar' : 'Aprobar Lote'}
                   </>
                 )}
