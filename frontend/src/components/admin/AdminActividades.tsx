@@ -75,10 +75,10 @@ export default function AdminActividades() {
         </button>
       </div>
 
-      <div style={{ background: '#FFFFFF', border: '1px solid #E4E4E7', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ background: '#FFFFFF' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ background: '#FAFAFA', borderBottom: '1px solid #E4E4E7' }}>
+            <tr style={{ borderBottom: '1px solid #E4E4E7' }}>
               <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase', width: '20%' }}>Código</th>
               <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Nombre</th>
               <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase', textAlign: 'right' }}>Acciones</th>
