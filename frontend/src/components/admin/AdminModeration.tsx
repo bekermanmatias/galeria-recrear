@@ -49,9 +49,9 @@ export default function AdminModeration() {
         borderRight: '1px solid #E5E7EB',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '20px 16px', borderBottom: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <div>
-            <h2 style={{ margin: '0 0 4px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
+            <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
               Moderación
             </h2>
             <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
@@ -63,7 +63,7 @@ export default function AdminModeration() {
             <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
-              placeholder="Buscar colegio o actividad..." 
+              placeholder="Buscar lote..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
@@ -99,15 +99,15 @@ export default function AdminModeration() {
                   transition: 'all 0.2s',
                 }}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <span style={{ fontSize: '14px', fontWeight: 600, color: isActive ? '#1A4B77' : '#334155' }}>
-                    {lote.actividad}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%', gap: '8px' }}>
+                  <span style={{ fontSize: '13px', fontWeight: 600, color: isActive ? '#1A4B77' : '#334155', lineHeight: 1.2 }}>
+                    {lote.colegio}
                   </span>
-                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E' }} title="Pendiente" />
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#22C55E', flexShrink: 0, marginTop: '2px' }} title="Pendiente" />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                  <span style={{ fontSize: '12px', color: '#64748B' }}>{lote.fotos} fotos</span>
-                  <span style={{ fontSize: '12px', color: '#64748B' }}>{lote.fecha}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: '8px' }}>
+                  <span style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{lote.actividad}</span>
+                  <span style={{ fontSize: '12px', color: '#64748B', flexShrink: 0 }}>{lote.fotos} fotos</span>
                 </div>
               </button>
             )
