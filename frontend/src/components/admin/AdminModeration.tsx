@@ -49,17 +49,26 @@ export default function AdminModeration() {
         borderRight: '1px solid #E5E7EB',
         display: 'flex', flexDirection: 'column',
       }}>
-        <div style={{ padding: '16px', borderBottom: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-          <div>
-            <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
-              Moderación
-            </h2>
-            <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
-              {LOTES_PENDIENTES.length} lotes pendientes
-            </p>
-          </div>
-          
-          <div style={{ position: 'relative' }}>
+        <div style={{ 
+          padding: '16px', 
+          borderBottom: '1px solid #E5E7EB', 
+          display: 'flex', 
+          flexDirection: 'column',
+          justifyContent: 'center',
+          height: '132px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <div>
+              <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>
+                Moderación
+              </h2>
+              <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>
+                {LOTES_PENDIENTES.length} lotes pendientes
+              </p>
+            </div>
+            
+            <div style={{ position: 'relative' }}>
             <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
             <input 
               type="text" 
@@ -77,6 +86,7 @@ export default function AdminModeration() {
                 boxSizing: 'border-box'
               }}
             />
+            </div>
           </div>
         </div>
 
@@ -120,12 +130,14 @@ export default function AdminModeration() {
         
         {/* Topbar */}
         <header style={{
-          padding: '16px 24px',
+          padding: '0 24px',
           borderBottom: '1px solid #E5E7EB',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
+          justifyContent: 'center',
           background: '#FFFFFF',
+          height: '132px',
+          boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
