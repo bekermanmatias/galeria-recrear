@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, ChevronLeft, ChevronRight, Image, Download } from 'lucide-react';
+import { X, ChevronLeft, ChevronRight, Image, Download, ZoomIn, ZoomOut } from 'lucide-react';
 import Navbar from '../layout/Navbar';
 
 const DIAS = ['Día 1', 'Día 2', 'Día 3', 'Día 4'];
@@ -13,6 +13,7 @@ export default function ParentPortal() {
   const [selectedDay, setSelectedDay] = useState('Día 1');
   const [selectedTurno, setSelectedTurno] = useState('Todos');
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1);
 
   // Simulate different photo counts per day
   const photoCount = selectedDay === 'Día 1' ? 18 : selectedDay === 'Día 2' ? 24 : selectedDay === 'Día 3' ? 15 : 21;
@@ -184,6 +185,9 @@ export default function ParentPortal() {
               height: '80vh',
               background: PHOTO_COLORS[(lightbox + selectedDay.charCodeAt(4)) % PHOTO_COLORS.length],
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transform: `scale(${zoom})`,
+              transition: 'transform 0.2s ease-out',
+              cursor: zoom > 1 ? 'grab' : 'default',
             }}
           >
             <Image size={64} color="#71717A" strokeWidth={1} />
@@ -208,20 +212,47 @@ export default function ParentPortal() {
             <ChevronRight size={32} strokeWidth={1.5} />
           </button>
 
-          {/* Download hint */}
-          <button style={{
-            position: 'absolute', bottom: '32px',
-            display: 'flex', alignItems: 'center', gap: '8px',
-            color: '#FFFFFF', fontSize: '13px',
-            background: 'none', border: '1px solid #3F3F46', padding: '10px 20px',
-            borderRadius: '99px', cursor: 'pointer', transition: 'background 0.2s',
-          }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          {/* Toolbar */}
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: 'absolute', bottom: '32px',
+              background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
+              padding: '8px', borderRadius: '12px',
+              display: 'flex', gap: '8px', zIndex: 10
+            }}
           >
-            <Download size={14} />
-            Descargar original
-          </button>
+            <button 
+              onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
+              style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+            >
+              <ZoomOut size={20} />
+            </button>
+            <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
+              {Math.round(zoom * 100)}%
+            </span>
+            <button 
+              onClick={() => setZoom(z => Math.min(3, z + 0.5))}
+              style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
+            >
+              <ZoomIn size={20} />
+            </button>
+            
+            <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+            
+            <button style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              color: '#FFFFFF', fontSize: '13px',
+              background: 'transparent', border: 'none', padding: '8px 16px',
+              borderRadius: '8px', cursor: 'pointer', transition: 'background 0.2s',
+            }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              <Download size={16} />
+              Descargar
+            </button>
+          </div>
         </div>
       )}
     </div>
