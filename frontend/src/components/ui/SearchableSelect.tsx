@@ -49,7 +49,7 @@ export default function SearchableSelect({
           cursor: 'pointer',
           borderRadius: '6px',
           display: 'flex', alignItems: 'center', boxSizing: 'border-box',
-          minHeight: label ? '44px' : '36px',
+          height: label ? '44px' : '36px',
           color: value ? '#09090B' : '#71717A',
         }}
       >
