@@ -12,7 +12,7 @@ export default function AdminModeration() {
   const [aprobarLoading, setAprobarLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
   const [mobileLotesOpen, setMobileLotesOpen] = useState(false);
 
   useEffect(() => {
