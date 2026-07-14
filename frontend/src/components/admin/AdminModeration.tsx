@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, Check, Trash2, RotateCcw } from 'lucide-react';
+import { LayoutGrid, Check, Trash2, RotateCcw, X } from 'lucide-react';
 
 const LOTES_PENDIENTES = [
   { id: 1, turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -10,6 +10,7 @@ export default function AdminModeration() {
   const [selectedLote, setSelectedLote] = useState(LOTES_PENDIENTES[0]);
   const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
   const [aprobarLoading, setAprobarLoading] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
 
   // Generate mock photos
   const photos = Array.from({ length: selectedLote.fotos }, (_, i) => i)
@@ -142,6 +143,7 @@ export default function AdminModeration() {
               return (
                 <div
                   key={i}
+                  onClick={() => setSelectedPhoto(i)}
                   style={{
                     position: 'relative',
                     aspectRatio: '1',
@@ -175,7 +177,7 @@ export default function AdminModeration() {
                     }}
                   >
                     <button
-                      onClick={() => toggleDelete(i)}
+                      onClick={(e) => { e.stopPropagation(); toggleDelete(i); }}
                       style={{
                         width: '40px', height: '40px',
                         background: isDeleted ? '#EF4444' : '#FFFFFF',
@@ -200,6 +202,36 @@ export default function AdminModeration() {
           </div>
         </div>
       </main>
+
+      {/* Lightbox */}
+      {selectedPhoto !== null && (
+        <div 
+          onClick={() => setSelectedPhoto(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex', alignItems: 'center', justifyItems: 'center',
+            cursor: 'zoom-out', padding: '40px'
+          }}
+        >
+          {/* Mock full image using the photo ID */}
+          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F4F4F5' }} onClick={(e) => e.stopPropagation()}>
+             <LayoutGrid size={120} color="#A1A1AA" strokeWidth={1} />
+          </div>
+          <button 
+            onClick={() => setSelectedPhoto(null)}
+            style={{
+              position: 'absolute', top: '24px', right: '24px',
+              background: 'rgba(255, 255, 255, 0.1)', border: 'none',
+              borderRadius: '50%', width: '48px', height: '48px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'white'
+            }}
+          >
+            <X size={24} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

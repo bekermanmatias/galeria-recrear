@@ -16,6 +16,7 @@ export default function AdminGaleria() {
   const [filtroActividad, setFiltroActividad] = useState('Todos');
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('');
   const [filtroFechaFin, setFiltroFechaFin] = useState('');
+  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   
   const filteredPhotos = PHOTOS.filter(p => {
     const matchColegio = filtroColegio === 'Todos' || p.colegio === filtroColegio;
@@ -119,6 +120,7 @@ export default function AdminGaleria() {
               cursor: 'pointer',
               overflow: 'hidden'
             }}
+            onClick={() => setSelectedPhoto(photo.url)}
             onMouseEnter={e => {
               const overlay = e.currentTarget.querySelector('.overlay') as HTMLElement;
               if (overlay) overlay.style.opacity = '1';
@@ -149,6 +151,38 @@ export default function AdminGaleria() {
           </div>
         ))}
       </div>
+
+      {/* Lightbox */}
+      {selectedPhoto && (
+        <div 
+          onClick={() => setSelectedPhoto(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 1000,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex', alignItems: 'center', justifyItems: 'center',
+            cursor: 'zoom-out', padding: '40px'
+          }}
+        >
+          <img 
+            src={selectedPhoto} 
+            alt="Vista completa" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            onClick={(e) => e.stopPropagation()} 
+          />
+          <button 
+            onClick={() => setSelectedPhoto(null)}
+            style={{
+              position: 'absolute', top: '24px', right: '24px',
+              background: 'rgba(255, 255, 255, 0.1)', border: 'none',
+              borderRadius: '50%', width: '48px', height: '48px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'white'
+            }}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
