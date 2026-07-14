@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 interface Actividad {
   id: string;
@@ -18,6 +18,7 @@ export default function AdminActividades() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const openModal = (act?: Actividad) => {
     if (act) {
@@ -53,6 +54,11 @@ export default function AdminActividades() {
     }
   };
 
+  const filteredActividades = actividades.filter(a => 
+    a.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    a.codigo.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px', overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -60,19 +66,36 @@ export default function AdminActividades() {
           <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Actividades</h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Gestión de actividades y sus códigos de etiqueta.</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '10px 16px', background: '#1A4B77', color: 'white',
-            border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-            cursor: 'pointer', transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#133656')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#1A4B77')}
-        >
-          <Plus size={16} /> Nueva Actividad
-        </button>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717A' }} />
+            <input
+              type="text"
+              placeholder="Buscar actividad..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                padding: '10px 16px 10px 36px', border: '1px solid #E4E4E7',
+                borderRadius: '6px', fontSize: '13px', outline: 'none', width: '250px'
+              }}
+              onFocus={e => e.target.style.borderColor = '#1A4B77'}
+              onBlur={e => e.target.style.borderColor = '#E4E4E7'}
+            />
+          </div>
+          <button
+            onClick={() => openModal()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 16px', background: '#1A4B77', color: 'white',
+              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#133656')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#1A4B77')}
+          >
+            <Plus size={16} /> Nueva Actividad
+          </button>
+        </div>
       </div>
 
       <div style={{ background: '#FFFFFF' }}>
@@ -85,16 +108,24 @@ export default function AdminActividades() {
             </tr>
           </thead>
           <tbody>
-            {actividades.map(act => (
+            {filteredActividades.length === 0 ? (
+              <tr>
+                <td colSpan={3} style={{ padding: '32px', textAlign: 'center', color: '#71717A', fontSize: '14px' }}>
+                  No se encontraron actividades con "{searchQuery}"
+                </td>
+              </tr>
+            ) : (
+              filteredActividades.map(act => (
               <tr key={act.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{act.codigo}</td>
                 <td style={{ padding: '16px 24px', fontSize: '14px' }}>{act.nombre}</td>
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                   <button onClick={() => openModal(act)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
                   <button onClick={() => handleDelete(act.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

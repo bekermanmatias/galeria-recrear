@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 interface Usuario {
   id: string;
@@ -19,6 +19,7 @@ export default function AdminUsuarios() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<{nombre: string, email: string, rol: string}>({ nombre: '', email: '', rol: 'coordinator' });
+  const [searchQuery, setSearchQuery] = useState('');
 
   const openModal = (user?: Usuario) => {
     if (user) {
@@ -64,6 +65,12 @@ export default function AdminUsuarios() {
     }
   };
 
+  const filteredUsuarios = usuarios.filter(u => 
+    u.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    roleLabel(u.rol).toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px', overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -71,19 +78,36 @@ export default function AdminUsuarios() {
           <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Usuarios</h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Gestión de accesos y roles del sistema.</p>
         </div>
-        <button
-          onClick={() => openModal()}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '10px 16px', background: '#1A4B77', color: 'white',
-            border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-            cursor: 'pointer', transition: 'background 0.2s',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#133656')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#1A4B77')}
-        >
-          <Plus size={16} /> Nuevo Usuario
-        </button>
+        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717A' }} />
+            <input
+              type="text"
+              placeholder="Buscar usuario..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              style={{
+                padding: '10px 16px 10px 36px', border: '1px solid #E4E4E7',
+                borderRadius: '6px', fontSize: '13px', outline: 'none', width: '250px'
+              }}
+              onFocus={e => e.target.style.borderColor = '#1A4B77'}
+              onBlur={e => e.target.style.borderColor = '#E4E4E7'}
+            />
+          </div>
+          <button
+            onClick={() => openModal()}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              padding: '10px 16px', background: '#1A4B77', color: 'white',
+              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
+              cursor: 'pointer', transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#133656')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#1A4B77')}
+          >
+            <Plus size={16} /> Nuevo Usuario
+          </button>
+        </div>
       </div>
 
       <div style={{ background: '#FFFFFF' }}>
@@ -97,7 +121,14 @@ export default function AdminUsuarios() {
             </tr>
           </thead>
           <tbody>
-            {usuarios.map(u => (
+            {filteredUsuarios.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{ padding: '32px', textAlign: 'center', color: '#71717A', fontSize: '14px' }}>
+                  No se encontraron usuarios con "{searchQuery}"
+                </td>
+              </tr>
+            ) : (
+              filteredUsuarios.map(u => (
               <tr key={u.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{u.nombre}</td>
                 <td style={{ padding: '16px 24px', fontSize: '14px', color: '#71717A' }}>{u.email}</td>
@@ -113,9 +144,10 @@ export default function AdminUsuarios() {
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                   <button onClick={() => openModal(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
                   <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>
