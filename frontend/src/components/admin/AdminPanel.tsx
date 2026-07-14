@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, School, Calendar, Users, Upload as UploadIcon, List, Image } from 'lucide-react';
+import { LayoutGrid, School, Calendar, Users, Upload as UploadIcon, List, Image, ChevronRight, ChevronLeft } from 'lucide-react';
 import Navbar from '../layout/Navbar';
 import AdminModeration from './AdminModeration';
 import AdminColegios from './AdminColegios';
@@ -24,21 +24,25 @@ const TABS = [
 export default function AdminPanel() {
   const [activeTab, setActiveTab] = useState<TabId>('moderacion');
 
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
       <Navbar role="admin" />
       
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         
-        {/* Sidebar Nav */}
+        {/* Dark Sidebar Nav */}
         <aside style={{
-          width: '260px',
-          borderRight: '1px solid #E4E4E7',
+          width: isSidebarExpanded ? '240px' : '72px',
+          background: '#1A4B77',
           display: 'flex',
           flexDirection: 'column',
-          background: '#FAFAFA',
+          transition: 'width 0.2s ease',
+          flexShrink: 0,
+          color: 'white',
         }}>
-          <div style={{ padding: '24px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ padding: '24px 12px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
             {TABS.map(tab => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -46,27 +50,53 @@ export default function AdminPanel() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as TabId)}
+                  title={!isSidebarExpanded ? tab.label : undefined}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: '12px',
-                    width: '100%', padding: '12px 16px',
-                    background: isActive ? '#FFFFFF' : 'transparent',
-                    border: '1px solid',
-                    borderColor: isActive ? '#E4E4E7' : 'transparent',
-                    borderLeft: isActive ? '3px solid #1A4B77' : '1px solid transparent',
+                    display: 'flex', alignItems: 'center', 
+                    gap: isSidebarExpanded ? '12px' : '0',
+                    width: '100%', 
+                    padding: isSidebarExpanded ? '12px 16px' : '12px',
+                    justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
+                    background: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                    border: 'none',
                     borderRadius: '8px',
-                    color: isActive ? '#1A4B77' : '#71717A',
-                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                    fontWeight: 500,
                     fontSize: '14px',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
-                    boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap'
                   }}
+                  onMouseEnter={e => !isActive && (e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)')}
+                  onMouseLeave={e => !isActive && (e.currentTarget.style.background = 'transparent')}
                 >
-                  <Icon size={18} />
-                  {tab.label}
+                  <Icon size={20} style={{ flexShrink: 0 }} />
+                  {isSidebarExpanded && tab.label}
                 </button>
               );
             })}
+          </div>
+
+          <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: isSidebarExpanded ? 'flex-end' : 'center' }}>
+            <button
+              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
+              title={isSidebarExpanded ? 'Colapsar menú' : 'Expandir menú'}
+              style={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                border: 'none',
+                borderRadius: '8px',
+                width: '40px', height: '40px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'white', cursor: 'pointer',
+                transition: 'background 0.2s',
+                flexShrink: 0
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+            >
+              {isSidebarExpanded ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
+            </button>
           </div>
         </aside>
 
