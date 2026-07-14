@@ -96,7 +96,7 @@ export default function AdminModeration() {
         }}>
           <div>
             <h2 style={{ margin: '0 0 4px', fontSize: '20px', color: '#1A4B77' }}>
-              Revisión: {selectedLote.actividad} ({selectedLote.turno})
+              {selectedLote.actividad} - Turno {selectedLote.turno} <span style={{ fontSize: '15px', color: '#71717A', fontWeight: 400 }}>({selectedLote.fecha})</span>
             </h2>
             <p style={{ margin: 0, fontSize: '13px', color: '#71717A' }}>
               {photos.length} fotos válidas • {deletedIds.size} descartadas
