@@ -76,9 +76,31 @@
 .hide-on-mobile {
   display: block;
 }
-@media (max-width: 600px) {
+.show-on-mobile {
+  display: none;
+}
+
+@media (max-width: 768px) {
   .hide-on-mobile {
     display: none !important;
+  }
+  .show-on-mobile {
+    display: flex !important;
+  }
+  
+  .admin-sidebar {
+    display: none !important;
+  }
+  
+  .moderation-container {
+    flex-direction: column !important;
+  }
+  
+  .moderation-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid var(--border);
+    max-height: 40vh;
   }
 }
 

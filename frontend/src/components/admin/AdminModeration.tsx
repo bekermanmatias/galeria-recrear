@@ -41,9 +41,9 @@ export default function AdminModeration() {
   );
 
   return (
-    <div style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#FFFFFF' }}>
+    <div className="moderation-container" style={{ display: 'flex', flex: 1, overflow: 'hidden', background: '#FFFFFF' }}>
       {/* Sidebar de Lotes */}
-      <aside style={{
+      <aside className="moderation-sidebar" style={{
         width: '220px',
         background: '#F8FAFC',
         borderRight: '1px solid #E5E7EB',

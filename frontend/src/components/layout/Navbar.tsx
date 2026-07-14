@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
-import { LogOut, Settings, User, ChevronDown } from 'lucide-react';
+import { LogOut, Settings, User, ChevronDown, Menu } from 'lucide-react';
 
 interface NavbarProps {
   role: 'parent' | 'coordinator' | 'admin';
+  onMenuToggle?: () => void;
 }
 
 export default function Navbar({ role }: NavbarProps) {
@@ -42,7 +43,7 @@ export default function Navbar({ role }: NavbarProps) {
         
         {(role === 'coordinator' || role === 'admin') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ position: 'relative' }} ref={menuRef}>
+            <div className="hide-on-mobile" style={{ position: 'relative' }} ref={menuRef}>
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
                 style={{
@@ -88,10 +89,22 @@ export default function Navbar({ role }: NavbarProps) {
                   onMouseEnter={e => (e.currentTarget.style.background = '#FEF2F2')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'none')}>
                     <LogOut size={14} /> Cerrar sesión
-                  </button>
+                  </div>
                 </div>
               )}
             </div>
+            {onMenuToggle && (
+              <button 
+                className="show-on-mobile" 
+                onClick={onMenuToggle}
+                style={{ 
+                  background: 'transparent', border: 'none', cursor: 'pointer', padding: '8px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center'
+                }}
+              >
+                <Menu size={24} color="#1A4B77" />
+              </button>
+            )}
           </div>
         )}
       </div>
