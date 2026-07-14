@@ -248,10 +248,6 @@ export default function AdminModeration() {
                         padding: '12px',
                       }}
                     >
-                      <div style={{ position: 'absolute', top: '12px', left: '12px' }}>
-                        <input type="checkbox" style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
-                      </div>
-                      
                       <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyItems: 'center', justifyContent: 'center', gap: '8px' }}>
                         <button
                           onClick={(e) => { e.stopPropagation(); setSelectedPhoto(i); }}
