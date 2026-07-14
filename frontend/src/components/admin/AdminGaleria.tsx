@@ -11,14 +11,21 @@ const PHOTOS = Array.from({ length: 48 }, (_, i) => ({
 
 export default function AdminGaleria() {
   const [filtroColegio, setFiltroColegio] = useState('Todos');
+  const [filtroTurno, setFiltroTurno] = useState('Todos');
+  const [filtroActividad, setFiltroActividad] = useState('Todos');
   
-  const filteredPhotos = PHOTOS.filter(p => filtroColegio === 'Todos' || p.colegio === filtroColegio);
+  const filteredPhotos = PHOTOS.filter(p => {
+    const matchColegio = filtroColegio === 'Todos' || p.colegio === filtroColegio;
+    const matchTurno = filtroTurno === 'Todos' || p.turno === filtroTurno;
+    const matchActividad = filtroActividad === 'Todos' || p.actividad === filtroActividad;
+    return matchColegio && matchTurno && matchActividad;
+  });
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px', overflowY: 'auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Galería Total</h2>
+          <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Galería</h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Vista global de todas las fotos aprobadas en el sistema.</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -33,6 +40,32 @@ export default function AdminGaleria() {
             <option value="Todos">Todos los colegios</option>
             <option value="Escuela Normal">Escuela Normal</option>
             <option value="Colegio San Luis">Colegio San Luis</option>
+          </select>
+          <select
+            value={filtroTurno}
+            onChange={(e) => setFiltroTurno(e.target.value)}
+            style={{
+              padding: '8px 16px', border: '1px solid #E4E4E7', borderRadius: '6px',
+              fontSize: '13px', color: '#09090B', outline: 'none'
+            }}
+          >
+            <option value="Todos">Todos los turnos</option>
+            <option value="Mañana">Mañana</option>
+            <option value="Tarde">Tarde</option>
+            <option value="Noche">Noche</option>
+          </select>
+          <select
+            value={filtroActividad}
+            onChange={(e) => setFiltroActividad(e.target.value)}
+            style={{
+              padding: '8px 16px', border: '1px solid #E4E4E7', borderRadius: '6px',
+              fontSize: '13px', color: '#09090B', outline: 'none'
+            }}
+          >
+            <option value="Todos">Todas las actividades</option>
+            <option value="Cabalgata">Cabalgata</option>
+            <option value="Pileta">Pileta</option>
+            <option value="Hotel">Hotel</option>
           </select>
           <button
             style={{

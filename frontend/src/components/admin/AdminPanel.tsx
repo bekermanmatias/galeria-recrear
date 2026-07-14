@@ -13,7 +13,7 @@ type TabId = 'moderacion' | 'colegios' | 'actividades' | 'turnos' | 'usuarios' |
 
 const TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
-  { id: 'galeria', label: 'Galería Total', icon: Image },
+  { id: 'galeria', label: 'Galería', icon: Image },
   { id: 'colegios', label: 'Colegios', icon: School },
   { id: 'actividades', label: 'Actividades', icon: List },
   { id: 'turnos', label: 'Turnos', icon: Calendar },
