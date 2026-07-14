@@ -4,6 +4,7 @@ import Navbar from '../layout/Navbar';
 
 const TURNOS = ['Mañana', 'Tarde', 'Noche'];
 const ACTIVIDADES = ['Cabalgata', 'Hotel', 'Pileta', 'Excursión', 'Cena'];
+const COLEGIOS = ['Colegio San Luis', 'Instituto Belgrano', 'Escuela Normal', 'Colegio Nacional'];
 
 interface UploadFile {
   id: string;
@@ -13,6 +14,7 @@ interface UploadFile {
 }
 
 export default function CoordinatorPanel() {
+  const [colegio, setColegio] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [turno, setTurno] = useState('');
   const [actividad, setActividad] = useState('');
@@ -52,7 +54,7 @@ export default function CoordinatorPanel() {
   };
 
   const simulateUpload = async () => {
-    if (!fecha || !turno || !actividad || files.length === 0) return;
+    if (!colegio || !fecha || !turno || !actividad || files.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     for (let i = 0; i <= 100; i += 10) {
@@ -64,7 +66,7 @@ export default function CoordinatorPanel() {
     setFiles([]);
   };
 
-  const canUpload = fecha && turno && actividad && files.length > 0 && !uploading;
+  const canUpload = colegio && fecha && turno && actividad && files.length > 0 && !uploading;
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FFFFFF' }}>
@@ -82,7 +84,14 @@ export default function CoordinatorPanel() {
         </div>
 
         {/* Selects */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+          <SelectField
+            label="Colegio"
+            value={colegio}
+            onChange={setColegio}
+            options={COLEGIOS}
+            placeholder="Seleccionar colegio..."
+          />
           <DateField
             label="Fecha"
             value={fecha}
