@@ -99,11 +99,11 @@ export default function AdminModeration() {
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <h2 style={{ margin: '0 0 4px', fontSize: '28px', fontWeight: 600, color: '#1E293B', letterSpacing: '-0.02em' }}>
+              <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>
                 {selectedLote.actividad}
               </h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <span style={{ fontSize: '16px', color: '#64748B' }}>Turno {selectedLote.turno}</span>
+                <span style={{ fontSize: '14px', color: '#71717A' }}>Turno {selectedLote.turno}</span>
                 <span style={{ color: '#E5E7EB' }}>|</span>
                 
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -151,16 +151,6 @@ export default function AdminModeration() {
                 )}
               </button>
             </div>
-          </div>
-          
-          {/* Progress Bar visual */}
-          <div style={{ width: '100%', height: '4px', background: '#F1F5F9', borderRadius: '2px', overflow: 'hidden' }}>
-            <div style={{ 
-              width: `${(photos.length / selectedLote.fotos) * 100}%`, 
-              height: '100%', 
-              background: '#1A4B77', 
-              transition: 'width 0.3s ease' 
-            }} />
           </div>
         </header>
 
