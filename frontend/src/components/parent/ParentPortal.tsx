@@ -1,15 +1,12 @@
 import { useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Image, Download } from 'lucide-react';
+import Navbar from '../layout/Navbar';
 
 const DIAS = ['Día 1', 'Día 2', 'Día 3', 'Día 4'];
 const TURNOS = ['Todos', 'Mañana', 'Tarde', 'Noche'];
 
 const PHOTO_COLORS = [
-  '#C7D2FE', '#A5F3FC', '#BBF7D0', '#FDE68A', '#FECACA',
-  '#DDD6FE', '#BAE6FD', '#A7F3D0', '#FEF08A', '#FBCFE8',
-  '#E0E7FF', '#CFFAFE', '#D1FAE5', '#FEF3C7', '#FEE2E2',
-  '#EDE9FE', '#E0F2FE', '#ECFDF5', '#FFFBEB', '#FFF1F2',
-  '#F3E8FF', '#DBEAFE', '#DCFCE7', '#FEF9C3', '#FFE4E6',
+  '#E4E4E7', '#F4F4F5', '#D4D4D8', '#A1A1AA', // Grayscale placeholders
 ];
 
 export default function ParentPortal() {
@@ -30,71 +27,40 @@ export default function ParentPortal() {
 
   return (
     <div
-      style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#F8FAFC' }}
+      style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FFFFFF' }}
       onKeyDown={handleKeyDown as any}
       tabIndex={0}
     >
       {/* Header */}
-      <header style={{
-        background: '#FFFFFF',
-        borderBottom: '1px solid #E2E8F0',
-        padding: '0 20px',
-      }}>
-        <div style={{ maxWidth: '960px', margin: '0 auto' }}>
-          <div style={{
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <div style={{
-                width: '28px', height: '28px', background: '#4F46E5',
-                borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Image size={14} color="white" />
-              </div>
-              <div>
-                <span style={{ fontWeight: 700, fontSize: '15px', color: '#0F172A' }}>Galería Recrear</span>
-              </div>
-            </div>
-            <span style={{
-              fontSize: '12px', color: '#64748B',
-              background: '#F1F5F9', padding: '4px 10px',
-              borderRadius: '99px',
-            }}>
-              Viaje de Egresados 2024
-            </span>
-          </div>
-        </div>
-      </header>
+      <Navbar role="parent" />
 
       {/* Filters */}
       <div style={{
-        background: '#FFFFFF',
-        borderBottom: '1px solid #E2E8F0',
         position: 'sticky', top: 0, zIndex: 10,
-        padding: '12px 20px',
+        padding: '12px 24px',
+        background: 'rgba(255, 255, 255, 0.9)',
+        backdropFilter: 'blur(8px)',
+        borderBottom: '1px solid #F4F4F5',
       }}>
-        <div style={{ maxWidth: '960px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           {/* Day pills */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none' }}>
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '12px', scrollbarWidth: 'none' }}>
             {DIAS.map(dia => (
               <button
                 key={dia}
                 onClick={() => setSelectedDay(dia)}
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: '99px',
-                  border: `1px solid ${selectedDay === dia ? '#4F46E5' : '#E2E8F0'}`,
-                  background: selectedDay === dia ? '#4F46E5' : '#FFFFFF',
-                  color: selectedDay === dia ? '#FFFFFF' : '#64748B',
+                  padding: '8px 16px',
+                  borderRadius: '4px',
+                  background: selectedDay === dia ? '#1A4B77' : '#F4F4F5',
+                  color: selectedDay === dia ? '#FFFFFF' : '#3F3F46',
+                  border: 'none',
                   fontSize: '13px',
                   fontWeight: 500,
                   fontFamily: 'inherit',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.15s',
+                  transition: 'background 0.2s',
                 }}
               >
                 {dia}
@@ -102,23 +68,23 @@ export default function ParentPortal() {
             ))}
           </div>
           {/* Turno sub-pills */}
-          <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
+          <div style={{ display: 'flex', gap: '24px', overflowX: 'auto', scrollbarWidth: 'none' }}>
             {TURNOS.map(turno => (
               <button
                 key={turno}
                 onClick={() => setSelectedTurno(turno)}
                 style={{
-                  padding: '4px 12px',
-                  borderRadius: '99px',
-                  border: `1px solid ${selectedTurno === turno ? '#818CF8' : '#E2E8F0'}`,
-                  background: selectedTurno === turno ? '#EEF2FF' : '#FFFFFF',
-                  color: selectedTurno === turno ? '#4F46E5' : '#94A3B8',
-                  fontSize: '12px',
+                  padding: '4px 0',
+                  background: 'none',
+                  color: selectedTurno === turno ? '#1A4B77' : '#A1A1AA',
+                  border: 'none',
+                  borderBottom: `2px solid ${selectedTurno === turno ? '#1A4B77' : 'transparent'}`,
+                  fontSize: '13px',
                   fontWeight: 500,
                   fontFamily: 'inherit',
                   cursor: 'pointer',
                   whiteSpace: 'nowrap',
-                  transition: 'all 0.15s',
+                  transition: 'all 0.2s',
                 }}
               >
                 {turno}
@@ -129,20 +95,11 @@ export default function ParentPortal() {
       </div>
 
       {/* Gallery */}
-      <main style={{ maxWidth: '960px', margin: '0 auto', padding: '20px' }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          marginBottom: '14px',
-        }}>
-          <h1 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#374151' }}>
-            {selectedDay} · {selectedTurno !== 'Todos' ? selectedTurno : 'Todos los turnos'}
-          </h1>
-          <span style={{ fontSize: '12px', color: '#94A3B8' }}>{photos.length} fotos</span>
-        </div>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px 64px' }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-          gap: '10px',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+          gap: '2px', // Very tight gap for modern look
         }}>
           {photos.map(i => (
             <div
@@ -150,24 +107,16 @@ export default function ParentPortal() {
               onClick={() => setLightbox(i)}
               style={{
                 aspectRatio: '1',
-                borderRadius: '10px',
-                overflow: 'hidden',
                 background: PHOTO_COLORS[(i + selectedDay.charCodeAt(4)) % PHOTO_COLORS.length],
                 cursor: 'pointer',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                transition: 'transform 0.15s, box-shadow 0.15s',
+                transition: 'opacity 0.2s',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
+                opacity: 0.9,
               }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'scale(1.02)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.12)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)';
-              }}
+              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+              onMouseLeave={e => e.currentTarget.style.opacity = '0.9'}
             >
-              <Image size={24} color="#64748B" style={{ opacity: 0.35 }} />
+              <Image size={32} color="#A1A1AA" strokeWidth={1.5} />
             </div>
           ))}
         </div>
@@ -179,36 +128,33 @@ export default function ParentPortal() {
           onClick={() => setLightbox(null)}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.85)',
+            background: '#000000',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 100,
-            backdropFilter: 'blur(4px)',
           }}
         >
           {/* Close */}
           <button
             onClick={() => setLightbox(null)}
             style={{
-              position: 'absolute', top: '16px', right: '16px',
-              background: 'rgba(255,255,255,0.12)',
-              border: 'none', borderRadius: '50%',
-              width: '36px', height: '36px',
+              position: 'absolute', top: '24px', right: '24px',
+              background: 'none',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: 'white', transition: 'background 0.15s',
+              cursor: 'pointer', color: '#A1A1AA', transition: 'color 0.2s',
             }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.2)')}
-            onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.12)')}
+            onMouseEnter={e => (e.currentTarget.style.color = '#FFFFFF')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#A1A1AA')}
           >
-            <X size={18} color="white" />
+            <X size={24} strokeWidth={1.5} />
           </button>
 
           {/* Counter */}
           <div style={{
-            position: 'absolute', top: '20px', left: '50%',
-            transform: 'translateX(-50%)',
-            color: 'rgba(255,255,255,0.6)', fontSize: '12px',
+            position: 'absolute', top: '28px', left: '24px',
+            color: '#A1A1AA', fontSize: '13px', letterSpacing: '0.05em',
           }}>
-            {lightbox + 1} / {photos.length}
+            {String(lightbox + 1).padStart(2, '0')} / {String(photos.length).padStart(2, '0')}
           </div>
 
           {/* Prev */}
@@ -216,31 +162,31 @@ export default function ParentPortal() {
             onClick={e => { e.stopPropagation(); setLightbox(Math.max(0, lightbox - 1)); }}
             disabled={lightbox === 0}
             style={{
-              position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)',
-              background: lightbox === 0 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
-              border: 'none', borderRadius: '50%',
-              width: '44px', height: '44px',
+              position: 'absolute', left: '24px', top: '50%', transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: lightbox === 0 ? 'default' : 'pointer',
-              transition: 'background 0.15s',
+              color: lightbox === 0 ? '#3F3F46' : '#FFFFFF',
+              transition: 'transform 0.2s',
             }}
+            onMouseEnter={e => lightbox !== 0 && (e.currentTarget.style.transform = 'translateY(-50%) translateX(-4px)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(-50%)')}
           >
-            <ChevronLeft size={22} color={lightbox === 0 ? 'rgba(255,255,255,0.2)' : 'white'} />
+            <ChevronLeft size={32} strokeWidth={1.5} />
           </button>
 
           {/* Photo */}
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              width: 'min(90vw, 600px)',
-              aspectRatio: '4/3',
-              borderRadius: '12px',
+              width: 'min(90vw, 1000px)',
+              height: '80vh',
               background: PHOTO_COLORS[(lightbox + selectedDay.charCodeAt(4)) % PHOTO_COLORS.length],
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             }}
           >
-            <Image size={48} color="#64748B" style={{ opacity: 0.3 }} />
+            <Image size={64} color="#71717A" strokeWidth={1} />
           </div>
 
           {/* Next */}
@@ -248,27 +194,34 @@ export default function ParentPortal() {
             onClick={e => { e.stopPropagation(); setLightbox(Math.min(photos.length - 1, lightbox + 1)); }}
             disabled={lightbox === photos.length - 1}
             style={{
-              position: 'absolute', right: '16px', top: '50%', transform: 'translateY(-50%)',
-              background: lightbox === photos.length - 1 ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.12)',
-              border: 'none', borderRadius: '50%',
-              width: '44px', height: '44px',
+              position: 'absolute', right: '24px', top: '50%', transform: 'translateY(-50%)',
+              background: 'none',
+              border: 'none',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: lightbox === photos.length - 1 ? 'default' : 'pointer',
-              transition: 'background 0.15s',
+              color: lightbox === photos.length - 1 ? '#3F3F46' : '#FFFFFF',
+              transition: 'transform 0.2s',
             }}
+            onMouseEnter={e => lightbox !== photos.length - 1 && (e.currentTarget.style.transform = 'translateY(-50%) translateX(4px)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = 'translateY(-50%)')}
           >
-            <ChevronRight size={22} color={lightbox === photos.length - 1 ? 'rgba(255,255,255,0.2)' : 'white'} />
+            <ChevronRight size={32} strokeWidth={1.5} />
           </button>
 
           {/* Download hint */}
-          <div style={{
-            position: 'absolute', bottom: '20px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            color: 'rgba(255,255,255,0.4)', fontSize: '12px',
-          }}>
-            <Download size={13} />
-            Clic derecho para guardar
-          </div>
+          <button style={{
+            position: 'absolute', bottom: '32px',
+            display: 'flex', alignItems: 'center', gap: '8px',
+            color: '#FFFFFF', fontSize: '13px',
+            background: 'none', border: '1px solid #3F3F46', padding: '10px 20px',
+            borderRadius: '99px', cursor: 'pointer', transition: 'background 0.2s',
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'none')}
+          >
+            <Download size={14} />
+            Descargar original
+          </button>
         </div>
       )}
     </div>

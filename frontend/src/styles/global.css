@@ -2,20 +2,21 @@
 
 @layer base {
   :root {
-    --background: #F8FAFC;
-    --foreground: #0F172A;
-    --muted: #F1F5F9;
-    --muted-foreground: #64748B;
-    --border: #E2E8F0;
-    --primary: #4F46E5;
+    /* Stark Monochrome Palette */
+    --background: #FFFFFF;
+    --foreground: #09090B;       /* Zinc 950 */
+    --muted: #FAFAFA;            /* Zinc 50 */
+    --muted-foreground: #71717A; /* Zinc 500 */
+    --border: #E4E4E7;           /* Zinc 200 */
+    --primary: #09090B;          /* Pitch black for primary actions */
     --primary-foreground: #FFFFFF;
-    --success: #16A34A;
+    --success: #18181B;          /* Darker gray for success to keep it monochromatic */
     --success-foreground: #FFFFFF;
-    --destructive: #DC2626;
+    --destructive: #EF4444;      /* Red 500 (used sparingly for delete actions only) */
     --destructive-foreground: #FFFFFF;
     --card: #FFFFFF;
-    --card-foreground: #0F172A;
-    --ring: #4F46E5;
+    --card-foreground: #09090B;
+    --ring: #09090B;
   }
 
   * {
@@ -27,6 +28,7 @@
     background-color: var(--background);
     color: var(--foreground);
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   body {

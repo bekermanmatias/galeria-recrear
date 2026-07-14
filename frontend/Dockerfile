@@ -10,5 +10,4 @@ COPY . .
 
 EXPOSE 4321
 
-# Usar ruta completa al binario para evitar problemas de PATH en Alpine
-CMD ["node_modules/.bin/astro", "dev", "--host"]
+CMD ["npm", "run", "dev", "--", "--host"]

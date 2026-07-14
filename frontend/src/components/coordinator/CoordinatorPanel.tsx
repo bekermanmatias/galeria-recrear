@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, CloudUpload, X, CheckCircle2, LogOut, ChevronDown, Image } from 'lucide-react';
+import { Upload, X, Check, ChevronDown } from 'lucide-react';
+import Navbar from '../layout/Navbar';
 
 const TURNOS = ['Mañana', 'Tarde', 'Noche'];
 const ACTIVIDADES = ['Cabalgata', 'Hotel', 'Pileta', 'Excursión', 'Cena'];
@@ -62,70 +63,38 @@ export default function CoordinatorPanel() {
     setFiles([]);
   };
 
-  const completedCount = Math.round((uploadProgress / 100) * files.length);
   const canUpload = turno && actividad && files.length > 0 && !uploading;
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#F8FAFC' }}>
-      {/* Header */}
-      <header style={{
-        background: '#FFFFFF',
-        borderBottom: '1px solid #E2E8F0',
-        padding: '0 20px',
-        height: '56px',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{
-            width: '28px', height: '28px', background: '#4F46E5',
-            borderRadius: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Image size={14} color="white" />
-          </div>
-          <span style={{ fontWeight: 700, fontSize: '15px', color: '#0F172A' }}>Galería Recrear</span>
-        </div>
-        <button style={{
-          display: 'flex', alignItems: 'center', gap: '6px',
-          background: 'none', border: 'none', cursor: 'pointer',
-          color: '#64748B', fontSize: '13px', fontFamily: 'inherit',
-          padding: '6px 8px', borderRadius: '6px', transition: 'background 0.15s',
-        }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#F1F5F9')}
-          onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-        >
-          <LogOut size={14} />
-          Cerrar sesión
-        </button>
-      </header>
+    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FFFFFF' }}>
+      <Navbar role="coordinator" />
 
       {/* Content */}
-      <main style={{ maxWidth: '480px', margin: '0 auto', padding: '24px 20px 40px' }}>
-        <div style={{ marginBottom: '24px' }}>
-          <h1 style={{ margin: '0 0 4px', fontSize: '20px', fontWeight: 700, color: '#0F172A' }}>
-            Cargar fotos
-          </h1>
-          <p style={{ margin: 0, fontSize: '13px', color: '#64748B' }}>
-            Seleccioná el turno y la actividad antes de subir
+      <main style={{ maxWidth: '720px', margin: '0 auto', padding: '40px 24px' }}>
+        <div style={{ marginBottom: '32px' }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: '32px', fontWeight: 600, letterSpacing: '-0.03em', color: '#1A4B77' }}>
+            Subir material
+          </h2>
+          <p style={{ margin: 0, fontSize: '15px', color: '#71717A' }}>
+            Seleccioná el turno, la actividad y arrastrá las fotos.
           </p>
         </div>
 
         {/* Selects */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '20px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
           <SelectField
             label="Turno"
             value={turno}
             onChange={setTurno}
             options={TURNOS}
-            placeholder="Seleccionar..."
+            placeholder="Seleccionar turno..."
           />
           <SelectField
             label="Actividad"
             value={actividad}
             onChange={setActividad}
             options={ACTIVIDADES}
-            placeholder="Seleccionar..."
+            placeholder="Seleccionar actividad..."
           />
         </div>
 
@@ -136,14 +105,13 @@ export default function CoordinatorPanel() {
           onDragLeave={() => setIsDragging(false)}
           onClick={() => fileInputRef.current?.click()}
           style={{
-            border: `2px dashed ${isDragging ? '#4F46E5' : '#CBD5E1'}`,
-            borderRadius: '12px',
-            background: isDragging ? '#EEF2FF' : '#F1F5F9',
-            padding: '40px 20px',
+            border: `1px solid ${isDragging ? '#1A4B77' : '#E4E4E7'}`,
+            background: isDragging ? '#FAFAFA' : '#FFFFFF',
+            padding: '64px 24px',
             textAlign: 'center',
             cursor: 'pointer',
             transition: 'all 0.2s ease',
-            marginBottom: files.length > 0 ? '16px' : '20px',
+            marginBottom: '32px',
           }}
         >
           <input
@@ -154,48 +122,40 @@ export default function CoordinatorPanel() {
             style={{ display: 'none' }}
             onChange={e => e.target.files && addFiles(e.target.files)}
           />
-          <div style={{
-            width: '48px', height: '48px',
-            background: '#FFFFFF',
-            borderRadius: '12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 12px',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
-          }}>
-            <CloudUpload size={24} color={isDragging ? '#4F46E5' : '#94A3B8'} />
-          </div>
-          <p style={{ margin: '0 0 4px', fontWeight: 600, fontSize: '14px', color: '#0F172A' }}>
-            Arrastrá tus fotos o tocá acá
+          <Upload size={32} strokeWidth={1} color={isDragging ? '#1A4B77' : '#A1A1AA'} style={{ margin: '0 auto 16px' }} />
+          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: '15px', color: '#1A4B77' }}>
+            Hacé clic o arrastrá las fotos acá
           </p>
-          <p style={{ margin: 0, fontSize: '12px', color: '#94A3B8' }}>
-            JPG, PNG, HEIC · Hasta 50 fotos
+          <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>
+            JPG, PNG, HEIC. Se subirán en calidad original.
           </p>
         </div>
 
         {/* File preview list */}
         {files.length > 0 && (
-          <div style={{ marginBottom: '20px' }}>
-            <p style={{ margin: '0 0 8px', fontSize: '12px', fontWeight: 500, color: '#64748B' }}>
-              {files.length} {files.length === 1 ? 'foto seleccionada' : 'fotos seleccionadas'}
-            </p>
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
+              <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1A4B77' }}>Archivos seleccionados</h3>
+              <span style={{ fontSize: '13px', color: '#71717A' }}>{files.length} fotos</span>
+            </div>
             <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px',
-              maxHeight: '140px', overflowY: 'auto',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px',
+              maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
             }}>
               {files.map(f => (
-                <div key={f.id} style={{ position: 'relative', aspectRatio: '1', borderRadius: '6px', overflow: 'hidden' }}>
+                <div key={f.id} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5' }}>
                   <img src={f.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     onClick={e => { e.stopPropagation(); removeFile(f.id); }}
                     style={{
-                      position: 'absolute', top: '2px', right: '2px',
-                      width: '18px', height: '18px',
-                      background: 'rgba(0,0,0,0.6)', border: 'none',
+                      position: 'absolute', top: '4px', right: '4px',
+                      width: '20px', height: '20px',
+                      background: 'rgba(0,0,0,0.5)', border: 'none',
                       borderRadius: '50%', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
-                    <X size={10} color="white" />
+                    <X size={12} color="white" />
                   </button>
                 </div>
               ))}
@@ -205,19 +165,16 @@ export default function CoordinatorPanel() {
 
         {/* Progress bar */}
         {uploading && (
-          <div style={{ marginBottom: '20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <span style={{ fontSize: '12px', color: '#64748B' }}>Subiendo fotos...</span>
-              <span style={{ fontSize: '12px', fontWeight: 500, color: '#4F46E5' }}>
-                {completedCount} de {files.length}
-              </span>
+          <div style={{ marginBottom: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+              <span style={{ fontSize: '13px', color: '#1A4B77' }}>Subiendo...</span>
+              <span style={{ fontSize: '13px', color: '#71717A' }}>{uploadProgress}%</span>
             </div>
-            <div style={{ height: '6px', background: '#E2E8F0', borderRadius: '99px', overflow: 'hidden' }}>
+            <div style={{ height: '2px', background: '#F4F4F5', width: '100%' }}>
               <div style={{
                 height: '100%',
                 width: `${uploadProgress}%`,
-                background: 'linear-gradient(90deg, #4F46E5, #818CF8)',
-                borderRadius: '99px',
+                background: '#1A4B77',
                 transition: 'width 0.3s ease',
               }} />
             </div>
@@ -227,13 +184,15 @@ export default function CoordinatorPanel() {
         {/* Done state */}
         {done && (
           <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            background: '#F0FDF4', border: '1px solid #BBF7D0',
-            borderRadius: '8px', padding: '12px 16px', marginBottom: '16px',
+            display: 'flex', alignItems: 'center', gap: '12px',
+            background: '#FAFAFA', border: '1px solid #E4E4E7',
+            padding: '16px', marginBottom: '32px',
           }}>
-            <CheckCircle2 size={16} color="#16A34A" />
-            <span style={{ fontSize: '13px', color: '#15803D', fontWeight: 500 }}>
-              ¡Fotos subidas correctamente! El lote quedó en revisión.
+            <div style={{ width: '24px', height: '24px', background: '#1A4B77', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Check size={14} color="#FFFFFF" strokeWidth={3} />
+            </div>
+            <span style={{ fontSize: '14px', color: '#1A4B77', fontWeight: 500 }}>
+              Carga completada. El lote ha sido enviado a revisión.
             </span>
           </div>
         )}
@@ -244,33 +203,21 @@ export default function CoordinatorPanel() {
           disabled={!canUpload}
           style={{
             width: '100%',
-            padding: '14px',
-            background: canUpload ? '#4F46E5' : '#C7D2FE',
-            color: '#FFFFFF',
+            padding: '16px',
+            background: canUpload ? '#1A4B77' : '#F4F4F5',
+            color: canUpload ? '#FFFFFF' : '#A1A1AA',
             border: 'none',
-            borderRadius: '10px',
             fontSize: '14px',
-            fontWeight: 600,
+            fontWeight: 500,
             fontFamily: 'inherit',
             cursor: canUpload ? 'pointer' : 'not-allowed',
-            transition: 'all 0.2s',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
+            transition: 'background 0.2s',
           }}
-          onMouseEnter={e => canUpload && (e.currentTarget.style.background = '#4338CA')}
-          onMouseLeave={e => canUpload && (e.currentTarget.style.background = '#4F46E5')}
+          onMouseEnter={e => canUpload && (e.currentTarget.style.background = '#133656')}
+          onMouseLeave={e => canUpload && (e.currentTarget.style.background = '#1A4B77')}
         >
-          <Upload size={16} />
-          {uploading ? 'Subiendo...' : 'Subir fotos'}
+          {uploading ? 'Procesando...' : 'Subir material'}
         </button>
-
-        {!turno || !actividad ? (
-          <p style={{ textAlign: 'center', fontSize: '12px', color: '#94A3B8', marginTop: '10px' }}>
-            Seleccioná turno y actividad para continuar
-          </p>
-        ) : null}
       </main>
     </div>
   );
@@ -287,7 +234,7 @@ function SelectField({
 }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: '12px', fontWeight: 500, color: '#374151', marginBottom: '6px' }}>
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>
         {label}
       </label>
       <div style={{ position: 'relative' }}>
@@ -296,27 +243,26 @@ function SelectField({
           onChange={e => onChange(e.target.value)}
           style={{
             width: '100%',
-            padding: '9px 32px 9px 12px',
-            border: '1px solid #E2E8F0',
-            borderRadius: '8px',
+            padding: '12px 32px 12px 16px',
+            border: '1px solid #E4E4E7',
             background: '#FFFFFF',
-            color: value ? '#0F172A' : '#94A3B8',
-            fontSize: '13px',
+            color: value ? '#09090B' : '#71717A',
+            fontSize: '14px',
             fontFamily: 'inherit',
             appearance: 'none',
             cursor: 'pointer',
             outline: 'none',
-            transition: 'border-color 0.15s',
+            transition: 'border-color 0.2s',
           }}
-          onFocus={e => (e.target.style.borderColor = '#4F46E5')}
-          onBlur={e => (e.target.style.borderColor = '#E2E8F0')}
+          onFocus={e => (e.target.style.borderColor = '#09090B')}
+          onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
         >
           <option value="" disabled>{placeholder}</option>
           {options.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
-        <ChevronDown size={14} style={{
-          position: 'absolute', right: '10px', top: '50%',
-          transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94A3B8',
+        <ChevronDown size={16} strokeWidth={1.5} style={{
+          position: 'absolute', right: '12px', top: '50%',
+          transform: 'translateY(-50%)', pointerEvents: 'none', color: '#71717A',
         }} />
       </div>
     </div>
