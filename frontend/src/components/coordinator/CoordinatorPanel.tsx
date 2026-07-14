@@ -13,6 +13,7 @@ interface UploadFile {
 }
 
 export default function CoordinatorPanel() {
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [turno, setTurno] = useState('');
   const [actividad, setActividad] = useState('');
   const [files, setFiles] = useState<UploadFile[]>([]);
@@ -51,7 +52,7 @@ export default function CoordinatorPanel() {
   };
 
   const simulateUpload = async () => {
-    if (!turno || !actividad || files.length === 0) return;
+    if (!fecha || !turno || !actividad || files.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     for (let i = 0; i <= 100; i += 10) {
@@ -63,7 +64,7 @@ export default function CoordinatorPanel() {
     setFiles([]);
   };
 
-  const canUpload = turno && actividad && files.length > 0 && !uploading;
+  const canUpload = fecha && turno && actividad && files.length > 0 && !uploading;
 
   return (
     <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FFFFFF' }}>
@@ -81,7 +82,12 @@ export default function CoordinatorPanel() {
         </div>
 
         {/* Selects */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+          <DateField
+            label="Fecha"
+            value={fecha}
+            onChange={setFecha}
+          />
           <SelectField
             label="Turno"
             value={turno}
@@ -254,7 +260,7 @@ function SelectField({
             outline: 'none',
             transition: 'border-color 0.2s',
           }}
-          onFocus={e => (e.target.style.borderColor = '#09090B')}
+          onFocus={e => (e.target.style.borderColor = '#1A4B77')}
           onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
         >
           <option value="" disabled>{placeholder}</option>
@@ -265,6 +271,41 @@ function SelectField({
           transform: 'translateY(-50%)', pointerEvents: 'none', color: '#71717A',
         }} />
       </div>
+    </div>
+  );
+}
+
+function DateField({
+  label, value, onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>
+        {label}
+      </label>
+      <input
+        type="date"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        style={{
+          width: '100%',
+          padding: '12px 16px',
+          border: '1px solid #E4E4E7',
+          background: '#FFFFFF',
+          color: value ? '#09090B' : '#71717A',
+          fontSize: '14px',
+          fontFamily: 'inherit',
+          outline: 'none',
+          transition: 'border-color 0.2s',
+          boxSizing: 'border-box',
+        }}
+        onFocus={e => (e.target.style.borderColor = '#1A4B77')}
+        onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
+      />
     </div>
   );
 }
