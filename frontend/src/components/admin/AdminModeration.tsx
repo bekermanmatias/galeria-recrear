@@ -161,8 +161,9 @@ export default function AdminModeration() {
                     if (overlay) overlay.style.opacity = isDeleted ? '1' : '0';
                   }}
                 >
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <LayoutGrid size={32} color="#A1A1AA" strokeWidth={1} />
+                  {/* Photo mock */}
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: isDeleted ? 0.3 : 1 }}>
+                     <img src={`https://picsum.photos/seed/mod${selectedLote.id}${i}/400/400`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   </div>
                   
                   {/* Hover Overlay */}
@@ -207,6 +208,7 @@ export default function AdminModeration() {
       {selectedPhoto !== null && (
         <LightboxViewer
           index={selectedPhoto}
+          loteId={selectedLote.id}
           isDeleted={deletedIds.has(selectedPhoto)}
           onClose={() => setSelectedPhoto(null)}
           onToggleDelete={() => toggleDelete(selectedPhoto)}
@@ -216,7 +218,7 @@ export default function AdminModeration() {
   );
 }
 
-function LightboxViewer({ index, isDeleted, onClose, onToggleDelete }: { index: number, isDeleted: boolean, onClose: () => void, onToggleDelete: () => void }) {
+function LightboxViewer({ index, loteId, isDeleted, onClose, onToggleDelete }: { index: number, loteId: number, isDeleted: boolean, onClose: () => void, onToggleDelete: () => void }) {
   const [zoom, setZoom] = useState(1);
   return (
     <div 
@@ -233,12 +235,12 @@ function LightboxViewer({ index, isDeleted, onClose, onToggleDelete }: { index: 
         onClick={(e) => e.stopPropagation()}
       >
         <div style={{
-          width: '600px', height: '600px', background: '#F4F4F5', 
+          width: '800px', height: '800px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out',
           opacity: isDeleted ? 0.5 : 1
         }}>
-          <LayoutGrid size={120} color="#A1A1AA" strokeWidth={1} />
+          <img src={`https://picsum.photos/seed/mod${loteId}${index}/1200/1200`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
       </div>
 

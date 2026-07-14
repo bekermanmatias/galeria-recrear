@@ -100,24 +100,11 @@ export default function ParentPortal() {
         <div style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-          gap: '2px', // Very tight gap for modern look
+          gap: '16px',
         }}>
           {photos.map(i => (
-            <div
-              key={`${selectedDay}-${i}`}
-              onClick={() => setLightbox(i)}
-              style={{
-                aspectRatio: '1',
-                background: PHOTO_COLORS[(i + selectedDay.charCodeAt(4)) % PHOTO_COLORS.length],
-                cursor: 'pointer',
-                transition: 'opacity 0.2s',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                opacity: 0.9,
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-              onMouseLeave={e => e.currentTarget.style.opacity = '0.9'}
-            >
-              <Image size={32} color="#A1A1AA" strokeWidth={1.5} />
+            <div key={i} onClick={() => setLightbox(i)} style={{ aspectRatio: '1', borderRadius: '8px', cursor: 'pointer', overflow: 'hidden' }}>
+              <img src={`https://picsum.photos/seed/rec${selectedDay}${i}/400/400`} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             </div>
           ))}
         </div>
@@ -183,14 +170,13 @@ export default function ParentPortal() {
             style={{
               width: 'min(90vw, 1000px)',
               height: '80vh',
-              background: PHOTO_COLORS[(lightbox + selectedDay.charCodeAt(4)) % PHOTO_COLORS.length],
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transform: `scale(${zoom})`,
               transition: 'transform 0.2s ease-out',
               cursor: zoom > 1 ? 'grab' : 'default',
             }}
           >
-            <Image size={64} color="#71717A" strokeWidth={1} />
+            <img src={`https://picsum.photos/seed/rec${selectedDay}${lightbox}/1200/800`} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
           </div>
 
           {/* Next */}

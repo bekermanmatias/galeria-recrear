@@ -3,8 +3,8 @@ import { Image as ImageIcon, Download, Search, X, ZoomIn, ZoomOut } from 'lucide
 
 const PHOTOS = Array.from({ length: 48 }, (_, i) => ({
   id: i,
-  url: `/placeholder-photo-${i}.jpg`, 
-  colegio: i % 2 === 0 ? 'Escuela Normal' : 'Colegio San Luis',
+  url: `https://picsum.photos/seed/gal${i}/800/800`, 
+  colegio: ['Colegio A', 'Colegio B', 'Colegio C'][i % 3],
   actividad: i % 3 === 0 ? 'Pileta' : 'Cabalgata',
   turno: i % 2 === 0 ? 'Mañana' : 'Tarde',
   fecha: i % 2 === 0 ? '2026-07-14' : '2026-07-15',
