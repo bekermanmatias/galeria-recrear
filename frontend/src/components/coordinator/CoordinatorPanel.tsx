@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Check, ChevronDown, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download, ChevronDown } from 'lucide-react';
 import Navbar from '../layout/Navbar';
 import SearchableSelect from '../ui/SearchableSelect';
+import Lightbox from '../ui/Lightbox';
 
 const TURNOS = ['Mañana', 'Tarde', 'Noche'];
 const ACTIVIDADES = ['Cabalgata', 'Hotel', 'Pileta', 'Excursión', 'Cena'];
@@ -237,106 +238,38 @@ export default function CoordinatorPanel() {
         </button>
       </main>
 
-      {/* Lightbox */}
-      {selectedPhoto && (
-        <LightboxViewer
-          src={files.find(f => f.id === selectedPhoto)?.preview || ''}
-          onClose={() => setSelectedPhoto(null)}
-          onDelete={() => {
-            removeFile(selectedPhoto);
-            setSelectedPhoto(null);
-          }}
+      {selectedPhoto !== null && (
+        <Lightbox 
+          src={files.find(f => f.id === selectedPhoto)?.preview || ''} 
+          onClose={() => setSelectedPhoto(null)} 
+          actions={
+            <>
+              <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+              <button 
+                onClick={() => {
+                  removeFile(selectedPhoto);
+                  setSelectedPhoto(null);
+                }}
+                style={{ 
+                  background: 'rgba(239, 68, 68, 0.2)', 
+                  border: 'none', 
+                  color: '#F87171', 
+                  cursor: 'pointer', padding: '8px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', gap: '8px'
+                }}
+              >
+                <Trash2 size={20} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>
+                  Eliminar
+                </span>
+              </button>
+            </>
+          }
         />
       )}
     </div>
   );
 }
-
-function LightboxViewer({ src, onClose, onDelete }: { src: string, onClose: () => void, onDelete?: () => void }) {
-  const [zoom, setZoom] = useState(1);
-  return (
-    <div 
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0, 0, 0, 0.9)',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <div 
-        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'zoom-out' }}
-        onClick={onClose}
-      >
-        <img 
-          src={src} 
-          alt="Vista completa" 
-          onClick={(e) => e.stopPropagation()}
-          style={{ 
-            maxWidth: '100%', maxHeight: '100%', 
-            objectFit: 'contain', 
-            transform: `scale(${zoom})`,
-            transition: 'transform 0.2s ease-out'
-          }}
-        />
-      </div>
-
-      <button 
-        onClick={onClose}
-        style={{
-          position: 'absolute', top: '24px', right: '24px',
-          background: 'rgba(255, 255, 255, 0.1)', border: 'none',
-          borderRadius: '50%', width: '48px', height: '48px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: 'white', zIndex: 10
-        }}
-      >
-        <X size={24} />
-      </button>
-
-      {/* Toolbar */}
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', bottom: '32px',
-          background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
-          padding: '8px', borderRadius: '12px',
-          display: 'flex', gap: '8px', zIndex: 10
-        }}
-      >
-        <button 
-          onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomOut size={20} />
-        </button>
-        <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <button 
-          onClick={() => setZoom(z => Math.min(3, z + 0.5))}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomIn size={20} />
-        </button>
-        
-        {onDelete && (
-          <>
-            <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-            <button 
-              onClick={onDelete}
-              style={{ background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-            >
-              <Trash2 size={20} />
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-
 
 function DateField({
   label, value, onChange,

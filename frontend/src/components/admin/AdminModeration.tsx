@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Check, Trash2, RotateCcw, X, ZoomIn, ZoomOut, Search, Filter, Eye, ChevronDown } from 'lucide-react';
+import Lightbox from '../ui/Lightbox';
 
 const LOTES_PENDIENTES = [
   { id: 1, colegio: 'Escuela Normal', turno: 'Mañana', actividad: 'Cabalgata', fotos: 24, fecha: 'Hoy, 10:30' },
@@ -356,104 +357,31 @@ export default function AdminModeration() {
       </main>
 
       {selectedPhoto !== null && (
-        <LightboxViewer
-          index={selectedPhoto}
-          loteId={selectedLote.id}
-          isDeleted={deletedIds.has(selectedPhoto)}
-          onClose={() => setSelectedPhoto(null)}
-          onToggleDelete={() => toggleDelete(selectedPhoto)}
+        <Lightbox 
+          src={`https://picsum.photos/seed/mod${selectedLote.id}${lightboxImage.index}/1200/1200`} 
+          isDeleted={lightboxImage.isDeleted}
+          onClose={() => setLightboxImage(null)} 
+          actions={
+            <>
+              <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+              <button 
+                onClick={() => handleToggleDelete(selectedLote.id, lightboxImage.index)}
+                style={{ 
+                  background: lightboxImage.isDeleted ? 'rgba(34, 197, 94, 0.2)' : 'rgba(239, 68, 68, 0.2)', 
+                  border: 'none', 
+                  color: lightboxImage.isDeleted ? '#4ADE80' : '#F87171', 
+                  cursor: 'pointer', padding: '8px', borderRadius: '8px',
+                  display: 'flex', alignItems: 'center', gap: '8px'
+                }}
+              >
+                {lightboxImage.isDeleted ? <RotateCcw size={20} /> : <Trash2 size={20} />}
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>
+                  {lightboxImage.isDeleted ? 'Restaurar' : 'Descartar'}
+                </span>
+              </button>
+            </>
+          }
         />
       )}
-    </div>
-  );
-}
-
-function LightboxViewer({ index, loteId, isDeleted, onClose, onToggleDelete }: { index: number, loteId: number, isDeleted: boolean, onClose: () => void, onToggleDelete: () => void }) {
-  const [zoom, setZoom] = useState(1);
-  return (
-    <div 
-      onClick={onClose}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0, 0, 0, 0.9)',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <div 
-        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'zoom-out' }}
-        onClick={onClose}
-      >
-        <div 
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: '800px', height: '800px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out',
-            opacity: isDeleted ? 0.5 : 1
-          }}
-        >
-          <img src={`https://picsum.photos/seed/mod${loteId}${index}/1200/1200`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        </div>
-      </div>
-
-      <button 
-        onClick={onClose}
-        style={{
-          position: 'absolute', top: '24px', right: '24px',
-          background: 'rgba(255, 255, 255, 0.1)', border: 'none',
-          borderRadius: '50%', width: '48px', height: '48px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: 'white', zIndex: 10
-        }}
-      >
-        <X size={24} />
-      </button>
-
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', bottom: '32px',
-          background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
-          padding: '8px', borderRadius: '12px',
-          display: 'flex', gap: '8px', zIndex: 10
-        }}
-      >
-        <button 
-          onClick={() => setZoom(z => Math.max(0.5, z - 0.5))}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomOut size={20} />
-        </button>
-        <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <button 
-          onClick={() => setZoom(z => Math.min(3, z + 0.5))}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomIn size={20} />
-        </button>
-
-        <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-
-        <button 
-          onClick={onToggleDelete}
-          style={{ 
-            background: isDeleted ? '#22C55E' : '#EF4444', 
-            border: 'none', color: 'white', cursor: 'pointer', 
-            padding: '8px 16px', borderRadius: '8px',
-            display: 'flex', alignItems: 'center', gap: '6px',
-            fontWeight: 500, fontSize: '13px'
-          }}
-        >
-          {isDeleted ? (
-            <><RotateCcw size={16} /> Restaurar</>
-          ) : (
-            <><Trash2 size={16} /> Descartar</>
-          )}
-        </button>
-      </div>
-    </div>
   );
 }
