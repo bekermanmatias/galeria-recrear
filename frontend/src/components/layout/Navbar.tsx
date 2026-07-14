@@ -27,8 +27,8 @@ export default function Navbar({ role }: NavbarProps) {
           alt="Galería Recrear" 
           style={{ height: '64px', width: 'auto', objectFit: 'contain' }} 
         />
-        <div className="hide-on-mobile" style={{ height: '32px', width: '1px', background: '#E4E4E7' }} />
-        <span className="hide-on-mobile" style={{ fontSize: '18px', fontWeight: 600, color: '#1A4B77', letterSpacing: '-0.02em' }}>
+        <div className="hide-on-mobile" style={{ height: '40px', width: '2px', background: '#E2E8F0', borderRadius: '2px' }} />
+        <span className="hide-on-mobile" style={{ fontSize: '22px', fontWeight: 700, color: '#1E293B', letterSpacing: '-0.03em' }}>
           Portal de Fotos
         </span>
       </div>
