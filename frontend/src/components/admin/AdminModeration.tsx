@@ -62,10 +62,7 @@ export default function AdminModeration() {
             onClick={() => setMobileLotesOpen(!mobileLotesOpen)}
             style={{ padding: '16px', background: '#F8FAFC', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer' }}
           >
-            <div>
-              <h2 style={{ margin: '0 0 2px', fontSize: '15px', color: '#1E293B', fontWeight: 600 }}>Moderación</h2>
-              <p style={{ margin: 0, fontSize: '12px', color: '#64748B' }}>{LOTES_PENDIENTES.length} lotes pendientes</p>
-            </div>
+            <span style={{ fontSize: '15px', color: '#1A4B77', fontWeight: 600 }}>Seleccionar lote... ({LOTES_PENDIENTES.length})</span>
             <ChevronDown size={20} color="#64748B" style={{ transform: mobileLotesOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
           </button>
         )}
@@ -234,6 +231,7 @@ export default function AdminModeration() {
               return (
                 <div
                   key={i}
+                  onClick={() => { if (isMobile && !isDeleted) setSelectedPhoto(i); }}
                   style={{
                     position: 'relative',
                     aspectRatio: '1',
@@ -243,6 +241,7 @@ export default function AdminModeration() {
                     opacity: isDeleted ? 0.4 : 1,
                     transition: 'all 0.2s ease',
                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                    cursor: (isMobile && !isDeleted) ? 'pointer' : 'default',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'scale(1.02)';
@@ -269,7 +268,23 @@ export default function AdminModeration() {
                     </div>
                   )}
                   
-                  {!isDeleted && (
+                  {isMobile && !isDeleted && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleDelete(i); }}
+                      style={{
+                        position: 'absolute', top: '8px', right: '8px',
+                        background: '#EF4444', border: 'none', borderRadius: '50%',
+                        width: '32px', height: '32px',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        cursor: 'pointer', zIndex: 10,
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+                      }}
+                    >
+                      <Trash2 size={16} color="white" />
+                    </button>
+                  )}
+                  
+                  {!isMobile && !isDeleted && (
                     <div
                       className="overlay"
                       style={{
