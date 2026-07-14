@@ -264,12 +264,13 @@ function LightboxViewer({ src, onClose, onDelete }: { src: string, onClose: () =
       }}
     >
       <div 
-        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'default' }}
-        onClick={(e) => e.stopPropagation()}
+        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'zoom-out' }}
+        onClick={onClose}
       >
         <img 
           src={src} 
           alt="Vista completa" 
+          onClick={(e) => e.stopPropagation()}
           style={{ 
             maxWidth: '100%', maxHeight: '100%', 
             objectFit: 'contain', 

@@ -164,19 +164,25 @@ export default function ParentPortal() {
             <ChevronLeft size={32} strokeWidth={1.5} />
           </button>
 
-          {/* Photo */}
           <div
-            onClick={e => e.stopPropagation()}
+            onClick={onClose}
             style={{
-              width: 'min(90vw, 1000px)',
-              height: '80vh',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transform: `scale(${zoom})`,
-              transition: 'transform 0.2s ease-out',
-              cursor: zoom > 1 ? 'grab' : 'default',
+              flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'default'
             }}
           >
-            <img src={`https://picsum.photos/seed/rec${selectedDay}${lightbox}/1200/800`} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: 'min(90vw, 1000px)',
+                height: '80vh',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transform: `scale(${zoom})`,
+                transition: 'transform 0.2s ease-out',
+                cursor: zoom > 1 ? 'grab' : 'default',
+              }}
+            >
+              <img src={`https://picsum.photos/seed/rec${selectedDay}${lightbox}/1200/800`} alt="" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+            </div>
           </div>
 
           {/* Next */}

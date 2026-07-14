@@ -229,15 +229,18 @@ function LightboxViewer({ index, loteId, isDeleted, onClose, onToggleDelete }: {
       }}
     >
       <div 
-        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'default' }}
-        onClick={(e) => e.stopPropagation()}
+        style={{ flex: 1, width: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: zoom > 1 ? 'grab' : 'zoom-out' }}
+        onClick={onClose}
       >
-        <div style={{
-          width: '800px', height: '800px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out',
-          opacity: isDeleted ? 0.5 : 1
-        }}>
+        <div 
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: '800px', height: '800px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transform: `scale(${zoom})`, transition: 'transform 0.2s ease-out',
+            opacity: isDeleted ? 0.5 : 1
+          }}
+        >
           <img src={`https://picsum.photos/seed/mod${loteId}${index}/1200/1200`} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
       </div>
