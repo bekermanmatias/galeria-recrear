@@ -121,34 +121,6 @@ export default function AdminModeration() {
             </div>
             
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div style={{ position: 'relative' }}>
-                <Search size={16} color="#94A3B8" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input 
-                  type="text" 
-                  placeholder="Buscar foto..." 
-                  style={{
-                    padding: '10px 12px 10px 36px',
-                    borderRadius: '8px',
-                    border: '1px solid #E5E7EB',
-                    fontSize: '13px',
-                    width: '200px',
-                    outline: 'none',
-                    fontFamily: 'inherit'
-                  }}
-                />
-              </div>
-              <button style={{
-                padding: '10px 16px',
-                background: '#FFFFFF',
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                color: '#475569',
-                fontSize: '13px', fontWeight: 500, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: '8px'
-              }}>
-                <Filter size={16} />
-                Filtrar
-              </button>
               <button
                 onClick={handleAprobar}
                 disabled={aprobarLoading}
