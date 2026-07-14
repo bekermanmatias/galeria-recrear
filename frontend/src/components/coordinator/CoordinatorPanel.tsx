@@ -73,9 +73,9 @@ export default function CoordinatorPanel() {
       <Navbar role="coordinator" />
 
       {/* Content */}
-      <main style={{ maxWidth: '720px', margin: '0 auto', padding: '40px 24px' }}>
+      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ margin: '0 0 8px', fontSize: '32px', fontWeight: 600, letterSpacing: '-0.03em', color: '#1A4B77' }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: '32px', letterSpacing: '-0.03em', color: '#1A4B77' }}>
             Subir material
           </h2>
           <p style={{ margin: 0, fontSize: '15px', color: '#71717A' }}>
@@ -84,7 +84,7 @@ export default function CoordinatorPanel() {
         </div>
 
         {/* Selects */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+        <div className="responsive-grid">
           <SelectField
             label="Colegio"
             value={colegio}

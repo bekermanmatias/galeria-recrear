@@ -20,18 +20,8 @@ export default function Navbar({ role }: NavbarProps) {
   }, []);
 
   return (
-    <nav style={{
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: '20px 32px',
-      borderBottom: '1px solid #E4E4E7',
-      background: '#FFFFFF',
-      position: 'sticky',
-      top: 0,
-      zIndex: 50,
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+    <nav className="navbar-container">
+      <div className="navbar-brand">
         <img 
           src="/logo-recrear.png" 
           alt="Galería Recrear" 
