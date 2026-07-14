@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutGrid, School, Calendar, Users, Upload as UploadIcon, List } from 'lucide-react';
+import { LayoutGrid, School, Calendar, Users, Upload as UploadIcon, List, Image } from 'lucide-react';
 import Navbar from '../layout/Navbar';
 import AdminModeration from './AdminModeration';
 import AdminColegios from './AdminColegios';
@@ -7,11 +7,13 @@ import AdminActividades from './AdminActividades';
 import AdminTurnos from './AdminTurnos';
 import AdminUsuarios from './AdminUsuarios';
 import AdminCargaManual from './AdminCargaManual';
+import AdminGaleria from './AdminGaleria';
 
-type TabId = 'moderacion' | 'colegios' | 'actividades' | 'turnos' | 'usuarios' | 'carga';
+type TabId = 'moderacion' | 'colegios' | 'actividades' | 'turnos' | 'usuarios' | 'carga' | 'galeria';
 
 const TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
+  { id: 'galeria', label: 'Galería Total', icon: Image },
   { id: 'colegios', label: 'Colegios', icon: School },
   { id: 'actividades', label: 'Actividades', icon: List },
   { id: 'turnos', label: 'Turnos', icon: Calendar },
@@ -70,6 +72,7 @@ export default function AdminPanel() {
         {/* Dynamic Content Area */}
         <main style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {activeTab === 'moderacion' && <AdminModeration />}
+          {activeTab === 'galeria' && <AdminGaleria />}
           {activeTab === 'colegios' && <AdminColegios />}
           {activeTab === 'actividades' && <AdminActividades />}
           {activeTab === 'turnos' && <AdminTurnos />}
