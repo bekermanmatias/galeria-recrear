@@ -54,21 +54,21 @@ export default function AdminGaleria() {
             onChange={setFiltroColegio}
             options={['Todos', 'Escuela Normal', 'Colegio San Luis']}
             placeholder="Todos los colegios"
-            style={{ width: '180px' }}
+            style={{ width: '200px' }}
           />
           <SearchableSelect
             value={filtroTurno}
             onChange={setFiltroTurno}
             options={['Todos', 'Mañana', 'Tarde', 'Noche']}
             placeholder="Todos los turnos"
-            style={{ width: '160px' }}
+            style={{ width: '200px' }}
           />
           <SearchableSelect
             value={filtroActividad}
             onChange={setFiltroActividad}
             options={['Todos', 'Cabalgata', 'Pileta', 'Hotel']}
             placeholder="Todas las actividades"
-            style={{ width: '180px' }}
+            style={{ width: '200px' }}
           />
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#F4F4F5', padding: '4px 8px', borderRadius: '6px' }}>
             <span style={{ fontSize: '12px', color: '#71717A', fontWeight: 500 }}>Desde:</span>
