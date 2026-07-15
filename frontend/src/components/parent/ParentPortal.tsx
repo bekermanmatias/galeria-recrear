@@ -145,12 +145,13 @@ function AlbumView({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  const [isMobile, setIsMobile] = useState(false);
 
   const photos = Array.from({ length: album.totalFotos }, (_, i) => i);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -431,10 +432,11 @@ export default function ParentPortal() {
   const [turnoFilter, setTurnoFilter] = useState<typeof TURNOS_FILTER[number]>('Todos');
   const [sort, setSort] = useState<typeof SORT_OPTIONS[number]>('Más reciente');
   const [sortOpen, setSortOpen] = useState(false);
-  const [isPortalMobile, setIsPortalMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  const [isPortalMobile, setIsPortalMobile] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsPortalMobile(window.innerWidth <= 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);

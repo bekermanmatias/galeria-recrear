@@ -13,11 +13,12 @@ export default function AdminModeration() {
   const [aprobarLoading, setAprobarLoading] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+  const [isMobile, setIsMobile] = useState(false);
   const [mobileLotesOpen, setMobileLotesOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
