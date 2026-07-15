@@ -113,7 +113,6 @@ export default function ParentPortal() {
             </div>
           ))}
         </div>
-        </div>
       </main>
       </div>
       )}
