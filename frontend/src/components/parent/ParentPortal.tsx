@@ -401,56 +401,110 @@ export default function ParentPortal() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Page header + filters */}
           <div style={{
-            padding: '0 24px',
-            height: '80px',
+            padding: '20px 24px',
             background: '#FFFFFF',
             borderBottom: '1px solid #E5E7EB',
             display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: '12px',
+            flexDirection: 'column',
+            gap: '16px',
             flexShrink: 0,
           }}>
-            <div>
-              <div style={{ fontSize: '20px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+            {/* Nivel Superior */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+              <div style={{ fontSize: '24px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                 {colegio.nombre}
               </div>
-              <div style={{ fontSize: '13px', color: '#64748B' }}>
-                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
+
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {/* Search */}
+                <div style={{ position: 'relative' }}>
+                  <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                  <input
+                    type="text"
+                    placeholder="Buscar álbum..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    style={{
+                      padding: '8px 12px 8px 32px',
+                      borderRadius: '8px',
+                      border: '1px solid #E2E8F0',
+                      fontSize: '13px',
+                      outline: 'none',
+                      color: '#1E293B',
+                      width: '240px',
+                      fontFamily: 'inherit',
+                      transition: 'border-color 0.2s',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = '#1A4B77'}
+                    onBlur={e => e.currentTarget.style.borderColor = '#E2E8F0'}
+                  />
+                </div>
+
+                {/* Sort */}
+                <div style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setSortOpen(!sortOpen)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      background: '#F1F5F9', border: 'none', borderRadius: '8px',
+                      padding: '8px 12px', cursor: 'pointer', color: '#475569',
+                      fontSize: '13px', fontWeight: 500, fontFamily: 'inherit',
+                      height: '37px',
+                    }}
+                  >
+                    <SlidersHorizontal size={14} />
+                    {sort}
+                    <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                  </button>
+                  {sortOpen && (
+                    <div style={{
+                      position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                      background: '#FFFFFF', borderRadius: '10px',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                      border: '1px solid #E2E8F0',
+                      zIndex: 50, overflow: 'hidden', minWidth: '160px',
+                    }}>
+                      {SORT_OPTIONS.map(s => (
+                        <button
+                          key={s}
+                          onClick={() => { setSort(s); setSortOpen(false); }}
+                          style={{
+                            display: 'block', width: '100%', textAlign: 'left',
+                            padding: '10px 14px', border: 'none',
+                            background: sort === s ? '#F1F5F9' : 'transparent',
+                            color: sort === s ? '#1A4B77' : '#374151',
+                            fontSize: '13px', fontWeight: sort === s ? 600 : 400,
+                            cursor: 'pointer', fontFamily: 'inherit',
+                          }}
+                          onMouseEnter={e => { if (sort !== s) (e.currentTarget.style.background = '#F8FAFC'); }}
+                          onMouseLeave={e => { if (sort !== s) (e.currentTarget.style.background = 'transparent'); }}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              {/* Search */}
-              <div style={{ position: 'relative' }}>
-                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
-                <input
-                  type="text"
-                  placeholder="Buscar álbum..."
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  style={{
-                    padding: '8px 12px 8px 32px',
-                    borderRadius: '8px',
-                    border: '1px solid #E2E8F0',
-                    fontSize: '13px',
-                    outline: 'none',
-                    color: '#1E293B',
-                    width: '200px',
-                    fontFamily: 'inherit',
-                  }}
-                />
+            {/* Nivel Inferior */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
+                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
               </div>
+              
+              <div style={{ width: '1px', height: '14px', background: '#E2E8F0' }} />
 
               {/* Turno filter pills */}
-              <div style={{ display: 'flex', gap: '4px' }}>
+              <div style={{ display: 'flex', gap: '6px' }}>
                 {TURNOS_FILTER.map(t => (
                   <button
                     key={t}
                     onClick={() => setTurnoFilter(t)}
                     style={{
                       display: 'flex', alignItems: 'center', gap: '6px',
-                      padding: '6px 12px',
+                      padding: '4px 12px',
                       borderRadius: '20px',
                       border: 'none',
                       background: turnoFilter === t ? '#1A4B77' : '#F1F5F9',
@@ -464,51 +518,6 @@ export default function ParentPortal() {
                     {t}
                   </button>
                 ))}
-              </div>
-
-              {/* Sort */}
-              <div style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setSortOpen(!sortOpen)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px',
-                    background: '#F1F5F9', border: 'none', borderRadius: '8px',
-                    padding: '8px 12px', cursor: 'pointer', color: '#475569',
-                    fontSize: '12px', fontWeight: 500, fontFamily: 'inherit',
-                  }}
-                >
-                  <SlidersHorizontal size={14} />
-                  {sort}
-                  <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
-                </button>
-                {sortOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 4px)', right: 0,
-                    background: '#FFFFFF', borderRadius: '10px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                    border: '1px solid #E2E8F0',
-                    zIndex: 50, overflow: 'hidden', minWidth: '160px',
-                  }}>
-                    {SORT_OPTIONS.map(s => (
-                      <button
-                        key={s}
-                        onClick={() => { setSort(s); setSortOpen(false); }}
-                        style={{
-                          display: 'block', width: '100%', textAlign: 'left',
-                          padding: '10px 14px', border: 'none',
-                          background: sort === s ? '#F1F5F9' : 'transparent',
-                          color: sort === s ? '#1A4B77' : '#374151',
-                          fontSize: '13px', fontWeight: sort === s ? 600 : 400,
-                          cursor: 'pointer', fontFamily: 'inherit',
-                        }}
-                        onMouseEnter={e => { if (sort !== s) (e.currentTarget.style.background = '#F8FAFC'); }}
-                        onMouseLeave={e => { if (sort !== s) (e.currentTarget.style.background = 'transparent'); }}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
             </div>
           </div>
