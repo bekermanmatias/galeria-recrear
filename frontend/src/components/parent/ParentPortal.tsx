@@ -445,15 +445,17 @@ export default function ParentPortal() {
                   <button
                     onClick={() => setSortOpen(!sortOpen)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                       background: '#F1F5F9', border: 'none', borderRadius: '8px',
                       padding: '8px 12px', cursor: 'pointer', color: '#475569',
                       fontSize: '13px', fontWeight: 500, fontFamily: 'inherit',
-                      height: '37px',
+                      height: '37px', width: '140px',
                     }}
                   >
-                    <SlidersHorizontal size={14} />
-                    {sort}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <SlidersHorizontal size={14} />
+                      {sort}
+                    </div>
                     <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
                   </button>
                   {sortOpen && (
