@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ZoomIn, ZoomOut, Download } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LightboxProps {
   src: string;
@@ -7,9 +7,11 @@ interface LightboxProps {
   onClose: () => void;
   actions?: React.ReactNode;
   isDeleted?: boolean;
+  onNext?: () => void;
+  onPrev?: () => void;
 }
 
-export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }: LightboxProps) {
+export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, onNext, onPrev }: LightboxProps) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -27,10 +29,9 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (zoom <= 1) {
-      // If not zoomed in, maybe we just close if they click the background, but the image itself stops propagation.
       return;
     }
-    e.preventDefault(); // Prevent default image drag
+    e.preventDefault();
     setIsDragging(true);
     dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
   };
@@ -62,7 +63,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
         background: 'rgba(0, 0, 0, 0.9)',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden' // Prevent scrollbars
+        overflow: 'hidden'
       }}
     >
       <div 
@@ -108,6 +109,38 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted }:
       >
         <X size={24} />
       </button>
+
+      {onPrev && (
+        <button
+          onClick={e => { e.stopPropagation(); onPrev(); }}
+          style={{
+            position: 'absolute', left: '24px', top: '50%', transform: 'translateY(-50%)',
+            background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: '#FFFFFF', transition: 'background 0.2s', zIndex: 10
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+        >
+          <ChevronLeft size={32} strokeWidth={1.5} />
+        </button>
+      )}
+
+      {onNext && (
+        <button
+          onClick={e => { e.stopPropagation(); onNext(); }}
+          style={{
+            position: 'absolute', right: '24px', top: '50%', transform: 'translateY(-50%)',
+            background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '12px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: '#FFFFFF', transition: 'background 0.2s', zIndex: 10
+          }}
+          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
+          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
+        >
+          <ChevronRight size={32} strokeWidth={1.5} />
+        </button>
+      )}
 
       {/* Toolbar */}
       <div 

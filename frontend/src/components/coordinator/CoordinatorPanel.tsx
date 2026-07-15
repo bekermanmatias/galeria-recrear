@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download, ChevronDown } from 'lucide-react';
-import Navbar from '../layout/Navbar';
+import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download, ChevronDown, Upload as UploadIcon, Image } from 'lucide-react';
+import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
 
@@ -15,7 +15,13 @@ interface UploadFile {
   status: 'pending' | 'uploading' | 'done' | 'error';
 }
 
+const TABS = [
+  { id: 'carga', label: 'Subir Material', icon: UploadIcon },
+  { id: 'galeria', label: 'Ver Galería', icon: Image },
+] as const;
+
 export default function CoordinatorPanel() {
+  const [activeTab, setActiveTab] = useState('carga');
   const [colegio, setColegio] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [turno, setTurno] = useState('');
@@ -72,11 +78,15 @@ export default function CoordinatorPanel() {
   const canUpload = colegio && fecha && turno && actividad && files.length > 0 && !uploading;
 
   return (
-    <div style={{ fontFamily: "'Inter', sans-serif", minHeight: '100vh', background: '#FFFFFF' }}>
-      <Navbar role="coordinator" />
-
-      {/* Content */}
-      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto' }}>
+    <DashboardLayout
+      role="coordinator"
+      tabs={TABS as any}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+    >
+      {activeTab === 'carga' && (
+      <div style={{ flex: 1, overflowY: 'auto' }}>
+      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' }}>
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: '0 0 8px', fontSize: '32px', letterSpacing: '-0.03em', color: '#1A4B77' }}>
             Subir material
@@ -237,6 +247,14 @@ export default function CoordinatorPanel() {
           {uploading ? 'Procesando...' : 'Subir material'}
         </button>
       </main>
+      </div>
+      )}
+
+      {activeTab === 'galeria' && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A' }}>
+          La galería del coordinador estará disponible próximamente.
+        </div>
+      )}
 
       {selectedPhoto !== null && (
         <Lightbox 
@@ -267,7 +285,7 @@ export default function CoordinatorPanel() {
           }
         />
       )}
-    </div>
+    </DashboardLayout>
   );
 }
 
