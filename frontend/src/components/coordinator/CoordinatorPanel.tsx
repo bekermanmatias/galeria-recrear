@@ -85,13 +85,13 @@ export default function CoordinatorPanel() {
       onTabChange={setActiveTab}
     >
       {activeTab === 'carga' && (
-      <div style={{ flex: 1, overflowY: 'auto' }}>
-      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ margin: '0 0 8px', fontSize: '32px', letterSpacing: '-0.03em', color: '#1A4B77' }}>
+          <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>
             Subir material
           </h2>
-          <p style={{ margin: 0, fontSize: '15px', color: '#71717A' }}>
+          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>
             Seleccioná el turno, la actividad y arrastrá las fotos.
           </p>
         </div>
@@ -140,6 +140,7 @@ export default function CoordinatorPanel() {
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             marginBottom: '32px',
+            borderRadius: '8px',
           }}
         >
           <input
@@ -171,7 +172,7 @@ export default function CoordinatorPanel() {
               maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
             }}>
               {files.map(f => (
-                <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', cursor: 'pointer' }}>
+                <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', borderRadius: '4px', cursor: 'pointer' }}>
                   <img src={f.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   <button
                     onClick={e => { e.stopPropagation(); removeFile(f.id); }}
@@ -198,7 +199,7 @@ export default function CoordinatorPanel() {
               <span style={{ fontSize: '13px', color: '#1A4B77' }}>Subiendo...</span>
               <span style={{ fontSize: '13px', color: '#71717A' }}>{uploadProgress}%</span>
             </div>
-            <div style={{ height: '2px', background: '#F4F4F5', width: '100%' }}>
+            <div style={{ height: '4px', background: '#F4F4F5', width: '100%', borderRadius: '2px', overflow: 'hidden' }}>
               <div style={{
                 height: '100%',
                 width: `${uploadProgress}%`,
@@ -214,7 +215,7 @@ export default function CoordinatorPanel() {
           <div style={{
             display: 'flex', alignItems: 'center', gap: '12px',
             background: '#FAFAFA', border: '1px solid #E4E4E7',
-            padding: '16px', marginBottom: '32px',
+            padding: '16px', marginBottom: '32px', borderRadius: '8px'
           }}>
             <div style={{ width: '24px', height: '24px', background: '#1A4B77', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={14} color="#FFFFFF" strokeWidth={3} />
@@ -235,6 +236,7 @@ export default function CoordinatorPanel() {
             background: canUpload ? '#1A4B77' : '#F4F4F5',
             color: canUpload ? '#FFFFFF' : '#A1A1AA',
             border: 'none',
+            borderRadius: '8px',
             fontSize: '14px',
             fontWeight: 500,
             fontFamily: 'inherit',
@@ -332,6 +334,7 @@ function DateField({
           outline: 'none',
           transition: 'border-color 0.2s',
           boxSizing: 'border-box',
+          borderRadius: '6px',
         }}
         onFocus={e => (e.target.style.borderColor = '#1A4B77')}
         onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
