@@ -397,6 +397,13 @@ export default function ParentPortal() {
   const [turnoFilter, setTurnoFilter] = useState<typeof TURNOS_FILTER[number]>('Todos');
   const [sort, setSort] = useState<typeof SORT_OPTIONS[number]>('Más reciente');
   const [sortOpen, setSortOpen] = useState(false);
+  const [isPortalMobile, setIsPortalMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
+
+  useEffect(() => {
+    const handleResize = () => setIsPortalMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const TABS = COLEGIOS_USUARIO.map(c => ({
     id: c.id,
@@ -434,7 +441,7 @@ export default function ParentPortal() {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
           {/* Page header + filters */}
           <div style={{
-            padding: '20px 24px',
+            padding: isPortalMobile ? '20px 22px' : '20px 24px',
             background: '#FFFFFF',
             borderBottom: '1px solid #E5E7EB',
             display: 'flex',
@@ -443,14 +450,20 @@ export default function ParentPortal() {
             flexShrink: 0,
           }}>
             {/* Nivel Superior */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: isPortalMobile ? 'stretch' : 'center',
+              justifyContent: 'space-between',
+              flexDirection: isPortalMobile ? 'column' : 'row',
+              gap: isPortalMobile ? '14px' : '12px',
+            }}>
               <div style={{ fontSize: '24px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
                 {colegio.nombre}
               </div>
 
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isPortalMobile ? '100%' : 'auto' }}>
                 {/* Search */}
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', flex: isPortalMobile ? 1 : 'none', minWidth: 0 }}>
                   <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
                   <input
                     type="text"
@@ -464,9 +477,10 @@ export default function ParentPortal() {
                       fontSize: '13px',
                       outline: 'none',
                       color: '#1E293B',
-                      width: '240px',
+                      width: isPortalMobile ? '100%' : '240px',
                       fontFamily: 'inherit',
                       transition: 'border-color 0.2s',
+                      boxSizing: 'border-box',
                     }}
                     onFocus={e => e.currentTarget.style.borderColor = '#1A4B77'}
                     onBlur={e => e.currentTarget.style.borderColor = '#E2E8F0'}
@@ -474,7 +488,7 @@ export default function ParentPortal() {
                 </div>
 
                 {/* Sort */}
-                <div style={{ position: 'relative' }}>
+                <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button
                     onClick={() => setSortOpen(!sortOpen)}
                     style={{
@@ -482,14 +496,14 @@ export default function ParentPortal() {
                       background: '#F1F5F9', border: 'none', borderRadius: '8px',
                       padding: '8px 12px', cursor: 'pointer', color: '#475569',
                       fontSize: '13px', fontWeight: 500, fontFamily: 'inherit',
-                      height: '37px', width: '140px',
+                      height: '37px', width: isPortalMobile ? '44px' : '140px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
                       <SlidersHorizontal size={14} />
-                      {sort}
+                      {!isPortalMobile && sort}
                     </div>
-                    <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
+                    {!isPortalMobile && <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />}
                   </button>
                   {sortOpen && (
                     <div style={{
@@ -524,9 +538,14 @@ export default function ParentPortal() {
             </div>
 
             {/* Nivel Inferior */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: isPortalMobile ? 'stretch' : 'center',
+              gap: isPortalMobile ? '10px' : '16px',
+              flexDirection: isPortalMobile ? 'column' : 'row',
+            }}>
               {/* Turno filter pills */}
-              <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                 {TURNOS_FILTER.map(t => (
                   <button
                     key={t}
@@ -547,16 +566,16 @@ export default function ParentPortal() {
                 ))}
               </div>
 
-              <div style={{ width: '1px', height: '14px', background: '#E2E8F0' }} />
+              {!isPortalMobile && <div style={{ width: '1px', height: '14px', background: '#E2E8F0' }} />}
 
-              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
-                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
+              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 500, lineHeight: 1.35 }}>
+                {albumsFiltrados.length} {albumsFiltrados.length === 1 ? 'álbum' : 'álbumes'} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
 
           {/* Albums grid */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 24px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: isPortalMobile ? '28px 22px' : '28px 24px' }}>
             {albumsFiltrados.length === 0 ? (
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '12px', color: '#94A3B8' }}>
                 <ImageIcon size={48} strokeWidth={1} />
@@ -567,8 +586,8 @@ export default function ParentPortal() {
               <div style={{ maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
                 <div style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-                  gap: '24px',
+                  gridTemplateColumns: isPortalMobile ? '1fr' : 'repeat(auto-fill, minmax(320px, 1fr))',
+                  gap: isPortalMobile ? '26px' : '24px',
                 }}>
                   {albumsFiltrados.map(album => (
                     <AlbumCard key={album.id} album={album} onClick={() => setAlbumAbierto(album)} />
