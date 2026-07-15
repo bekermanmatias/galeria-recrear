@@ -1,3 +1,8 @@
 ---
-return Astro.redirect('/parent');
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ParentPortal from '../components/parent/ParentPortal';
 ---
+
+<BaseLayout title="Portal de Fotos">
+  <ParentPortal client:load />
+</BaseLayout>
