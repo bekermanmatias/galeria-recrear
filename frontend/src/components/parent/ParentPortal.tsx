@@ -306,13 +306,17 @@ function AlbumView({
                 }}
                 onMouseEnter={e => {
                   if (!isSelected) (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.02)';
-                  const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
-                  if (ov) ov.style.opacity = '1';
+                  if (selectionMode) {
+                    const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
+                    if (ov) ov.style.opacity = '1';
+                  }
                 }}
                 onMouseLeave={e => {
                   if (!isSelected) (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
-                  const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
-                  if (ov) ov.style.opacity = '0';
+                  if (selectionMode && !isSelected) {
+                    const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
+                    if (ov) ov.style.opacity = '0';
+                  }
                 }}
               >
                 <img
