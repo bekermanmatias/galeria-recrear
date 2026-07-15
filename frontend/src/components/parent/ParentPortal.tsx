@@ -51,26 +51,23 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
     <div
       onClick={onClick}
       style={{
-        borderRadius: '12px',
+        borderRadius: '8px',
         overflow: 'hidden',
         cursor: 'pointer',
         background: '#FFFFFF',
-        border: '1px solid #E2E8F0',
-        transition: 'transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease',
+        transition: 'transform 0.15s ease, box-shadow 0.15s ease',
         display: 'flex',
         flexDirection: 'column',
       }}
       onMouseEnter={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)';
-        (e.currentTarget as HTMLDivElement).style.borderColor = '#CBD5E1';
+        (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.02)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 30px rgba(0,0,0,0.12)';
         const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
         if (img) img.style.transform = 'scale(1.06)';
       }}
       onMouseLeave={e => {
-        (e.currentTarget as HTMLDivElement).style.transform = 'none';
+        (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
         (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
-        (e.currentTarget as HTMLDivElement).style.borderColor = '#E2E8F0';
         const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
         if (img) img.style.transform = 'scale(1)';
       }}
