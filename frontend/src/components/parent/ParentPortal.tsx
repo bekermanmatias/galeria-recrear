@@ -217,7 +217,13 @@ function AlbumView({
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
+        <div style={{
+          display: isMobile ? 'grid' : 'flex',
+          gridTemplateColumns: isMobile ? (selectionMode && selected.size > 0 ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))') : undefined,
+          gap: '8px',
+          alignItems: 'center',
+          width: isMobile ? '100%' : 'auto',
+        }}>
           {selectionMode ? (
             <>
               <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500, display: isMobile ? 'none' : 'inline' }}>
@@ -227,26 +233,34 @@ function AlbumView({
                 onClick={handleSelectAll}
                 style={{
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
-                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
+                  padding: isMobile ? '0 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
                   fontSize: isMobile ? '12px' : '13px', fontWeight: 500,
                   flex: isMobile ? 1 : 'none',
-                  minHeight: isMobile ? '44px' : 'auto',
+                  height: isMobile ? '52px' : 'auto',
                   whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
-                {selected.size === photos.length ? 'Deseleccionar' : 'Seleccionar todo'}
+                {isMobile ? (selected.size === photos.length ? 'Deselecc.' : 'Todos') : (selected.size === photos.length ? 'Deseleccionar todo' : 'Seleccionar todo')}
               </button>
               {selected.size > 0 && (
                 <button
                   style={{
                     background: '#1A4B77', border: 'none', borderRadius: '8px',
-                    padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                    padding: isMobile ? '0 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
                     fontSize: isMobile ? '12px' : '13px', fontWeight: 600,
                     display: 'flex', alignItems: 'center', gap: '6px',
                     justifyContent: 'center',
-                    flex: isMobile ? 1.15 : 'none',
-                    minHeight: isMobile ? '44px' : 'auto',
+                    flex: isMobile ? 1 : 'none',
+                    height: isMobile ? '52px' : 'auto',
                     whiteSpace: 'nowrap',
+                    minWidth: 0,
+                    overflow: 'hidden',
                   }}
                 >
                   <Download size={15} />
@@ -257,11 +271,17 @@ function AlbumView({
                 onClick={exitSelection}
                 style={{
                   background: 'none', border: '1px solid #E2E8F0', borderRadius: '8px',
-                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#64748B',
+                  padding: isMobile ? '0 8px' : '8px 14px', cursor: 'pointer', color: '#64748B',
                   fontSize: isMobile ? '12px' : '13px', fontWeight: 500,
                   flex: isMobile ? 1 : 'none',
-                  minHeight: isMobile ? '44px' : 'auto',
+                  height: isMobile ? '52px' : 'auto',
                   whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                 }}
               >
                 Cancelar
@@ -274,12 +294,14 @@ function AlbumView({
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
-                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
+                  padding: isMobile ? '0 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
                   fontSize: isMobile ? '12px' : '13px', fontWeight: 500, transition: 'background 0.2s',
                   justifyContent: 'center',
                   flex: isMobile ? 1 : 'none',
-                  minHeight: isMobile ? '44px' : 'auto',
+                  height: isMobile ? '52px' : 'auto',
                   whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  overflow: 'hidden',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
@@ -291,12 +313,14 @@ function AlbumView({
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   background: '#1A4B77', border: 'none', borderRadius: '8px',
-                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                  padding: isMobile ? '0 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
                   fontSize: isMobile ? '12px' : '13px', fontWeight: 600,
                   justifyContent: 'center',
-                  flex: isMobile ? 1.15 : 'none',
-                  minHeight: isMobile ? '44px' : 'auto',
+                  flex: isMobile ? 1 : 'none',
+                  height: isMobile ? '52px' : 'auto',
                   whiteSpace: 'nowrap',
+                  minWidth: 0,
+                  overflow: 'hidden',
                 }}
               >
                 <Download size={15} />
