@@ -75,20 +75,36 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
         if (img) img.style.transform = 'scale(1)';
       }}
     >
-      {/* Cover image */}
-      <div style={{ position: 'relative', height: '200px', overflow: 'hidden', background: '#E2E8F0' }}>
-        <img
-          className="album-cover"
-          src={`https://picsum.photos/seed/${album.seed}/600/400`}
-          alt={album.actividad}
-          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
-        />
-        {/* Gradient overlay */}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 55%)',
-          pointerEvents: 'none',
-        }} />
+      {/* Split Grid Collage */}
+      <div style={{ position: 'relative', height: '200px', display: 'flex', gap: '3px', background: '#E2E8F0', overflow: 'hidden' }}>
+        {/* Hero image (70%) */}
+        <div style={{ flex: '0 0 68%', position: 'relative', overflow: 'hidden' }}>
+          <img
+            className="album-cover"
+            src={`https://picsum.photos/seed/${album.seed}/600/600`}
+            alt={album.actividad}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.4s ease' }}
+          />
+        </div>
+
+        {/* Right column: two stacked images (30%) */}
+        <div style={{ flex: '1 1 auto', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <img
+              src={`https://picsum.photos/seed/${album.seed}b/400/300`}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.4s ease' }}
+            />
+          </div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <img
+              src={`https://picsum.photos/seed/${album.seed}c/400/300`}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', transition: 'transform 0.4s ease' }}
+            />
+          </div>
+        </div>
+
         {/* Photo count badge */}
         <div style={{
           position: 'absolute', top: '10px', right: '10px',
