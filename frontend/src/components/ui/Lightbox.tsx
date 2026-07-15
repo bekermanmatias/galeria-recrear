@@ -16,6 +16,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, o
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
+  const touchStart = useRef({ x: 0, y: 0, time: 0 });
 
   const handleWheel = (e: React.WheelEvent) => {
     setZoom(prev => {
@@ -48,6 +49,34 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, o
     setIsDragging(false);
   };
 
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStart.current = {
+      x: touch.clientX,
+      y: touch.clientY,
+      time: Date.now(),
+    };
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (zoom > 1 || e.changedTouches.length === 0) return;
+
+    const touch = e.changedTouches[0];
+    const deltaX = touch.clientX - touchStart.current.x;
+    const deltaY = touch.clientY - touchStart.current.y;
+    const elapsed = Date.now() - touchStart.current.time;
+    const isHorizontalSwipe = Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3;
+
+    if (!isHorizontalSwipe || elapsed > 700) return;
+
+    e.stopPropagation();
+    if (deltaX < 0) {
+      onNext?.();
+    } else {
+      onPrev?.();
+    }
+  };
+
   useEffect(() => {
     const handleGlobalMouseUp = () => setIsDragging(false);
     window.addEventListener('mouseup', handleGlobalMouseUp);
@@ -76,6 +105,8 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, o
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
       >
         <img 
           src={src} 
