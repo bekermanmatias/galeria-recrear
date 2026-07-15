@@ -55,20 +55,22 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
         overflow: 'hidden',
         cursor: 'pointer',
         background: '#FFFFFF',
-        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
-        transition: 'transform 0.22s ease, box-shadow 0.22s ease',
+        border: '1px solid #E2E8F0',
+        transition: 'transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease',
         display: 'flex',
         flexDirection: 'column',
       }}
       onMouseEnter={e => {
         (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(0,0,0,0.14)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1)';
+        (e.currentTarget as HTMLDivElement).style.borderColor = '#CBD5E1';
         const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
         if (img) img.style.transform = 'scale(1.06)';
       }}
       onMouseLeave={e => {
         (e.currentTarget as HTMLDivElement).style.transform = 'none';
-        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = 'none';
+        (e.currentTarget as HTMLDivElement).style.borderColor = '#E2E8F0';
         const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
         if (img) img.style.transform = 'scale(1)';
       }}
@@ -90,7 +92,7 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
         {/* Photo count badge */}
         <div style={{
           position: 'absolute', top: '10px', right: '10px',
-          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
+          background: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(12px)',
           color: '#FFFFFF', fontSize: '12px', fontWeight: 600,
           padding: '3px 10px', borderRadius: '20px',
           display: 'flex', alignItems: 'center', gap: '4px',
@@ -101,18 +103,15 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
       </div>
 
       {/* Info */}
-      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-        <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: 1.2 }}>
+      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: '#0F172A', lineHeight: 1.2 }}>
           {album.actividad}
         </div>
-        <div style={{ fontSize: '13px', color: '#64748B' }}>{album.fecha}</div>
-        <div>
-          <span style={{
-            display: 'inline-flex', alignItems: 'center', gap: '6px',
-            color: '#475569',
-            fontSize: '12px', fontWeight: 500,
-          }}>
-            {getTurnoIcon(album.turno, 14)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748B' }}>
+          {album.fecha}
+          <span style={{ fontSize: '10px' }}>•</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {getTurnoIcon(album.turno, 13)}
             Turno {album.turno}
           </span>
         </div>
