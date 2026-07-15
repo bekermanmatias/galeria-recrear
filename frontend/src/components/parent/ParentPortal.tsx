@@ -531,14 +531,16 @@ export default function ParentPortal() {
                 <div style={{ fontSize: '13px' }}>Probá con otro filtro o término de búsqueda</div>
               </div>
             ) : (
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                gap: '20px',
-              }}>
-                {albumsFiltrados.map(album => (
-                  <AlbumCard key={album.id} album={album} onClick={() => setAlbumAbierto(album)} />
-                ))}
+              <div style={{ maxWidth: '1440px', margin: '0 auto', width: '100%' }}>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                  gap: '24px',
+                }}>
+                  {albumsFiltrados.map(album => (
+                    <AlbumCard key={album.id} album={album} onClick={() => setAlbumAbierto(album)} />
+                  ))}
+                </div>
               </div>
             )}
           </div>
