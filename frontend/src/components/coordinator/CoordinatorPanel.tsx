@@ -260,6 +260,22 @@ export default function CoordinatorPanel() {
         <Lightbox 
           src={files.find(f => f.id === selectedPhoto)?.preview || ''} 
           onClose={() => setSelectedPhoto(null)} 
+          onNext={
+            files.findIndex(f => f.id === selectedPhoto) < files.length - 1
+              ? () => {
+                  const index = files.findIndex(f => f.id === selectedPhoto);
+                  setSelectedPhoto(files[index + 1].id);
+                }
+              : undefined
+          }
+          onPrev={
+            files.findIndex(f => f.id === selectedPhoto) > 0
+              ? () => {
+                  const index = files.findIndex(f => f.id === selectedPhoto);
+                  setSelectedPhoto(files[index - 1].id);
+                }
+              : undefined
+          }
           actions={
             <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />

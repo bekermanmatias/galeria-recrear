@@ -361,6 +361,8 @@ export default function AdminModeration() {
           src={`https://picsum.photos/seed/mod${selectedLote.id}${selectedPhoto}/1200/1200`} 
           isDeleted={deletedIds.has(selectedPhoto)}
           onClose={() => setSelectedPhoto(null)} 
+          onNext={selectedPhoto < currentLote.fotos - 1 ? () => setSelectedPhoto(selectedPhoto + 1) : undefined}
+          onPrev={selectedPhoto > 0 ? () => setSelectedPhoto(selectedPhoto - 1) : undefined}
           actions={
             <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />

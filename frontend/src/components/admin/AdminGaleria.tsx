@@ -18,7 +18,7 @@ export default function AdminGaleria() {
   const [filtroActividad, setFiltroActividad] = useState('Todos');
   const [filtroFechaInicio, setFiltroFechaInicio] = useState('');
   const [filtroFechaFin, setFiltroFechaFin] = useState('');
-  const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<number | null>(null);
   
   const filteredPhotos = PHOTOS.filter(p => {
     const matchColegio = filtroColegio === 'Todos' || p.colegio === filtroColegio;
@@ -106,7 +106,7 @@ export default function AdminGaleria() {
               borderRadius: '8px',
               overflow: 'hidden'
             }}
-            onClick={() => setSelectedPhoto(photo.url)}
+            onClick={() => setSelectedPhoto(photo.id)}
             onMouseEnter={e => {
               const overlay = e.currentTarget.querySelector('.overlay') as HTMLElement;
               if (overlay) overlay.style.opacity = '1';
@@ -139,8 +139,27 @@ export default function AdminGaleria() {
       </div>
 
       {/* Lightbox */}
-      {selectedPhoto && (
-        <Lightbox src={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+      {selectedPhoto !== null && (
+        <Lightbox
+          src={filteredPhotos.find(photo => photo.id === selectedPhoto)?.url || ''}
+          onClose={() => setSelectedPhoto(null)}
+          onNext={
+            filteredPhotos.findIndex(photo => photo.id === selectedPhoto) < filteredPhotos.length - 1
+              ? () => {
+                  const index = filteredPhotos.findIndex(photo => photo.id === selectedPhoto);
+                  setSelectedPhoto(filteredPhotos[index + 1].id);
+                }
+              : undefined
+          }
+          onPrev={
+            filteredPhotos.findIndex(photo => photo.id === selectedPhoto) > 0
+              ? () => {
+                  const index = filteredPhotos.findIndex(photo => photo.id === selectedPhoto);
+                  setSelectedPhoto(filteredPhotos[index - 1].id);
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );
