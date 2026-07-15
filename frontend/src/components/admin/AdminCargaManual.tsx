@@ -304,6 +304,7 @@ function DateField({
         onChange={e => onChange(e.target.value)}
         style={{
           width: '100%',
+          height: '44px',
           padding: '12px 16px',
           border: '1px solid #E4E4E7',
           background: '#FFFFFF',
