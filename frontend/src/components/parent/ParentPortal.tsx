@@ -126,10 +126,7 @@ function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', color: '#64748B' }}>
           {album.fecha}
           <span style={{ fontSize: '10px' }}>•</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {getTurnoIcon(album.turno, 13)}
-            Turno {album.turno}
-          </span>
+          Turno {album.turno}
         </div>
       </div>
     </div>
@@ -507,12 +504,6 @@ export default function ParentPortal() {
 
             {/* Nivel Inferior */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
-                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
-              </div>
-              
-              <div style={{ width: '1px', height: '14px', background: '#E2E8F0' }} />
-
               {/* Turno filter pills */}
               <div style={{ display: 'flex', gap: '6px' }}>
                 {TURNOS_FILTER.map(t => (
@@ -520,7 +511,6 @@ export default function ParentPortal() {
                     key={t}
                     onClick={() => setTurnoFilter(t)}
                     style={{
-                      display: 'flex', alignItems: 'center', gap: '6px',
                       padding: '4px 12px',
                       borderRadius: '20px',
                       border: 'none',
@@ -531,10 +521,15 @@ export default function ParentPortal() {
                       fontFamily: 'inherit',
                     }}
                   >
-                    {getTurnoIcon(t, 14)}
                     {t}
                   </button>
                 ))}
+              </div>
+
+              <div style={{ width: '1px', height: '14px', background: '#E2E8F0' }} />
+
+              <div style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
+                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
               </div>
             </div>
           </div>
