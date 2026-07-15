@@ -1,24 +1,41 @@
 import { useState } from 'react';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
+type UsuarioRol = 'admin' | 'coordinador' | 'user';
+
 interface Usuario {
   id: string;
   nombre: string;
   email: string;
-  rol: 'admin' | 'coordinator' | 'photographer';
+  rol: UsuarioRol;
 }
 
 const MOCK_USUARIOS: Usuario[] = [
   { id: '1', nombre: 'Admin Master', email: 'admin@recrear.com', rol: 'admin' },
-  { id: '2', nombre: 'Juan Perez', email: 'juan@recrear.com', rol: 'coordinator' },
-  { id: '3', nombre: 'Maria Garcia', email: 'maria@recrear.com', rol: 'photographer' },
+  { id: '2', nombre: 'Juan Perez', email: 'juan@recrear.com', rol: 'coordinador' },
+  { id: '3', nombre: 'Maria Garcia', email: 'maria@recrear.com', rol: 'user' },
 ];
+
+const roleLabel = (rol: UsuarioRol) => {
+  switch (rol) {
+    case 'admin':
+      return 'Administrador';
+    case 'coordinador':
+      return 'Coordinador';
+    case 'user':
+      return 'Usuario';
+  }
+};
 
 export default function AdminUsuarios() {
   const [usuarios, setUsuarios] = useState<Usuario[]>(MOCK_USUARIOS);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{nombre: string, email: string, rol: string}>({ nombre: '', email: '', rol: 'coordinator' });
+  const [formData, setFormData] = useState<{ nombre: string; email: string; rol: UsuarioRol }>({
+    nombre: '',
+    email: '',
+    rol: 'user',
+  });
   const [searchQuery, setSearchQuery] = useState('');
 
   const openModal = (user?: Usuario) => {
@@ -27,19 +44,19 @@ export default function AdminUsuarios() {
       setFormData({ nombre: user.nombre, email: user.email, rol: user.rol });
     } else {
       setEditingId(null);
-      setFormData({ nombre: '', email: '', rol: 'coordinator' });
+      setFormData({ nombre: '', email: '', rol: 'user' });
     }
     setIsModalOpen(true);
   };
 
   const handleSave = () => {
     if (!formData.nombre || !formData.email) return;
-    
+
     const newUser: Usuario = {
       id: editingId || Math.random().toString(36).slice(2),
       nombre: formData.nombre,
       email: formData.email,
-      rol: formData.rol as 'admin' | 'coordinator' | 'photographer',
+      rol: formData.rol,
     };
 
     if (editingId) {
@@ -56,17 +73,8 @@ export default function AdminUsuarios() {
     }
   };
 
-  const roleLabel = (rol: string) => {
-    switch (rol) {
-      case 'admin': return 'Administrador';
-      case 'coordinator': return 'Coordinador';
-      case 'photographer': return 'Fotógrafo';
-      default: return rol;
-    }
-  };
-
-  const filteredUsuarios = usuarios.filter(u => 
-    u.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  const filteredUsuarios = usuarios.filter(u =>
+    u.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
     roleLabel(u.rol).toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -129,21 +137,21 @@ export default function AdminUsuarios() {
               </tr>
             ) : (
               filteredUsuarios.map(u => (
-              <tr key={u.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
-                <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{u.nombre}</td>
-                <td style={{ padding: '16px 24px', fontSize: '14px', color: '#71717A' }}>{u.email}</td>
-                <td style={{ padding: '16px 24px', fontSize: '14px' }}>
-                  <span style={{ 
-                    padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 500,
-                    background: u.rol === 'admin' ? '#FEE2E2' : u.rol === 'coordinator' ? '#DBEAFE' : '#F3F4F6',
-                    color: u.rol === 'admin' ? '#991B1B' : u.rol === 'coordinator' ? '#1E40AF' : '#374151'
-                  }}>
-                    {roleLabel(u.rol)}
-                  </span>
-                </td>
-                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                  <button onClick={() => openModal(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
-                  <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
+                <tr key={u.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
+                  <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{u.nombre}</td>
+                  <td style={{ padding: '16px 24px', fontSize: '14px', color: '#71717A' }}>{u.email}</td>
+                  <td style={{ padding: '16px 24px', fontSize: '14px' }}>
+                    <span style={{
+                      padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 500,
+                      background: u.rol === 'admin' ? '#FEE2E2' : u.rol === 'coordinador' ? '#DBEAFE' : '#F3F4F6',
+                      color: u.rol === 'admin' ? '#991B1B' : u.rol === 'coordinador' ? '#1E40AF' : '#374151'
+                    }}>
+                      {roleLabel(u.rol)}
+                    </span>
+                  </td>
+                  <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                    <button onClick={() => openModal(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
+                    <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
                   </td>
                 </tr>
               ))
@@ -152,7 +160,6 @@ export default function AdminUsuarios() {
         </table>
       </div>
 
-      {/* Modal */}
       {isModalOpen && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
           <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '100%', maxWidth: '400px' }}>
@@ -160,7 +167,7 @@ export default function AdminUsuarios() {
               <h3 style={{ margin: 0, fontSize: '20px', color: '#1A4B77' }}>{editingId ? 'Editar Usuario' : 'Nuevo Usuario'}</h3>
               <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#71717A" /></button>
             </div>
-            
+
             <div style={{ display: 'grid', gap: '16px' }}>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
                 Nombre completo
@@ -172,10 +179,10 @@ export default function AdminUsuarios() {
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
                 Rol
-                <select value={formData.rol} onChange={e => setFormData({ ...formData, rol: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white' }}>
+                <select value={formData.rol} onChange={e => setFormData({ ...formData, rol: e.target.value as UsuarioRol })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white' }}>
                   <option value="admin">Administrador</option>
-                  <option value="coordinator">Coordinador</option>
-                  <option value="photographer">Fotógrafo</option>
+                  <option value="coordinador">Coordinador</option>
+                  <option value="user">Usuario</option>
                 </select>
               </label>
             </div>
