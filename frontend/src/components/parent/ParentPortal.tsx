@@ -1,196 +1,266 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
-import { Search, Download, CheckSquare, ArrowLeft, Camera, User, ChevronDown, LogOut, Settings, X, Sun, Cloud, Moon } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Image as ImageIcon, School, Download, CheckSquare, Square, ArrowLeft, Search, SlidersHorizontal, Camera, ChevronDown, Sun, CloudSun, Moon } from 'lucide-react';
+import DashboardLayout from '../layout/DashboardLayout';
 import Lightbox from '../ui/Lightbox';
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+// ─── Mock Data ───────────────────────────────────────────────────────────────
 
-const USUARIO = { nombre: 'Martín García', colegio: 'Colegio San Luis', viaje: 'Viaje de Egresados 2026' };
+const COLEGIOS_USUARIO = [
+  { id: 'colegio-1', nombre: 'Colegio San Luis', codigo: 'CSL' },
+  { id: 'colegio-2', nombre: 'Instituto Belgrano', codigo: 'IB' },
+];
 
 interface Album {
   id: string;
+  colegioId: string;
   actividad: string;
   fecha: string;
-  diaLabel: string;
   turno: 'Mañana' | 'Tarde' | 'Noche';
   totalFotos: number;
   seed: string;
 }
 
 const ALBUMS: Album[] = [
-  { id: 'a1', actividad: 'Cabalgata', fecha: '14 Jul', diaLabel: 'Día 1', turno: 'Mañana', totalFotos: 38, seed: 'cabalg1' },
-  { id: 'a2', actividad: 'Pileta', fecha: '14 Jul', diaLabel: 'Día 1', turno: 'Tarde', totalFotos: 24, seed: 'pileta1' },
-  { id: 'a3', actividad: 'Fogón nocturno', fecha: '14 Jul', diaLabel: 'Día 1', turno: 'Noche', totalFotos: 17, seed: 'fogon1' },
-  { id: 'a4', actividad: 'Excursión al río', fecha: '15 Jul', diaLabel: 'Día 2', turno: 'Mañana', totalFotos: 52, seed: 'excur1' },
-  { id: 'a5', actividad: 'Taller de arte', fecha: '15 Jul', diaLabel: 'Día 2', turno: 'Tarde', totalFotos: 29, seed: 'taller1' },
-  { id: 'a6', actividad: 'Mateada grupal', fecha: '16 Jul', diaLabel: 'Día 3', turno: 'Mañana', totalFotos: 21, seed: 'mateada1' },
-  { id: 'a7', actividad: 'Deportes al aire libre', fecha: '16 Jul', diaLabel: 'Día 3', turno: 'Tarde', totalFotos: 44, seed: 'deport1' },
-  { id: 'a8', actividad: 'Noche de talentos', fecha: '16 Jul', diaLabel: 'Día 3', turno: 'Noche', totalFotos: 33, seed: 'noche1' },
+  { id: 'a1', colegioId: 'colegio-1', actividad: 'Cabalgata', fecha: '14 Jul 2026', turno: 'Mañana', totalFotos: 38, seed: 'cabalg1' },
+  { id: 'a2', colegioId: 'colegio-1', actividad: 'Pileta', fecha: '14 Jul 2026', turno: 'Tarde', totalFotos: 24, seed: 'pileta1' },
+  { id: 'a3', colegioId: 'colegio-1', actividad: 'Fogón', fecha: '14 Jul 2026', turno: 'Noche', totalFotos: 17, seed: 'fogon1' },
+  { id: 'a4', colegioId: 'colegio-1', actividad: 'Excursión al río', fecha: '15 Jul 2026', turno: 'Mañana', totalFotos: 52, seed: 'excur1' },
+  { id: 'a5', colegioId: 'colegio-1', actividad: 'Taller de arte', fecha: '15 Jul 2026', turno: 'Tarde', totalFotos: 29, seed: 'taller1' },
+  { id: 'a6', colegioId: 'colegio-1', actividad: 'Mateada grupal', fecha: '16 Jul 2026', turno: 'Mañana', totalFotos: 21, seed: 'mateada1' },
+  { id: 'a7', colegioId: 'colegio-2', actividad: 'Cabalgata', fecha: '12 Jul 2026', turno: 'Mañana', totalFotos: 44, seed: 'ibc1' },
+  { id: 'a8', colegioId: 'colegio-2', actividad: 'Noche de talentos', fecha: '12 Jul 2026', turno: 'Noche', totalFotos: 33, seed: 'ibt1' },
+  { id: 'a9', colegioId: 'colegio-2', actividad: 'Deportes en la naturaleza', fecha: '13 Jul 2026', turno: 'Mañana', totalFotos: 61, seed: 'ibdeport1' },
 ];
 
-const DIAS_UNICOS = Array.from(new Map(ALBUMS.map(a => [a.diaLabel, { label: a.diaLabel, fecha: a.fecha }])).values());
 const TURNOS_FILTER = ['Todos', 'Mañana', 'Tarde', 'Noche'] as const;
+const SORT_OPTIONS = ['Más reciente', 'Más antiguo', 'Más fotos'] as const;
 
-const TURNO_ICON = { Mañana: Sun, Tarde: Cloud, Noche: Moon };
+const getTurnoIcon = (turno: string, size = 14) => {
+  switch (turno) {
+    case 'Mañana': return <Sun size={size} />;
+    case 'Tarde': return <CloudSun size={size} />;
+    case 'Noche': return <Moon size={size} />;
+    default: return null;
+  }
+};
 
-// ─── User Avatar Menu ─────────────────────────────────────────────────────────
-
-function UserMenu() {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const initials = USUARIO.nombre.split(' ').map(n => n[0]).join('').slice(0, 2);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-full pl-1 pr-3 py-1 hover:bg-slate-100 transition-colors duration-150"
-      >
-        <div className="w-8 h-8 rounded-full bg-[#1A4B77] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-          {initials}
-        </div>
-        <span className="text-sm font-medium text-slate-700 hidden sm:block">{USUARIO.nombre}</span>
-        <ChevronDown size={14} className="text-slate-400" style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-[calc(100%+8px)] bg-white border border-slate-100 rounded-xl shadow-xl w-52 py-1 z-50">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <div className="text-sm font-semibold text-slate-800">{USUARIO.nombre}</div>
-            <div className="text-xs text-slate-400 mt-0.5">{USUARIO.colegio}</div>
-          </div>
-          <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-600 hover:bg-slate-50 transition-colors text-left">
-            <Settings size={14} className="text-slate-400" /> Configuración
-          </button>
-          <div className="border-t border-slate-100 my-1" />
-          <button className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors text-left">
-            <LogOut size={14} /> Cerrar sesión
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Album Card ───────────────────────────────────────────────────────────────
+// ─── AlbumCard Component ──────────────────────────────────────────────────────
 
 function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
-  const TurnoIcon = TURNO_ICON[album.turno];
   return (
     <div
       onClick={onClick}
-      className="group bg-white rounded-2xl border border-slate-100 overflow-hidden cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-slate-200"
+      style={{
+        borderRadius: '12px',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        background: '#FFFFFF',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.07)',
+        transition: 'transform 0.22s ease, box-shadow 0.22s ease',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-4px)';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 12px 32px rgba(0,0,0,0.14)';
+        const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
+        if (img) img.style.transform = 'scale(1.06)';
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLDivElement).style.transform = 'none';
+        (e.currentTarget as HTMLDivElement).style.boxShadow = '0 2px 12px rgba(0,0,0,0.07)';
+        const img = e.currentTarget.querySelector('.album-cover') as HTMLElement;
+        if (img) img.style.transform = 'scale(1)';
+      }}
     >
-      {/* Cover */}
-      <div className="relative h-52 overflow-hidden bg-slate-100">
+      {/* Cover image */}
+      <div style={{ position: 'relative', height: '200px', overflow: 'hidden', background: '#E2E8F0' }}>
         <img
+          className="album-cover"
           src={`https://picsum.photos/seed/${album.seed}/600/400`}
           alt={album.actividad}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
         />
-        {/* Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
-        {/* Photo count — glassmorphism */}
-        <div className="absolute top-3 right-3 bg-black/40 backdrop-blur-md text-white text-xs font-semibold px-2.5 py-1 rounded-full flex items-center gap-1.5">
-          <Camera size={11} />
+        {/* Gradient overlay */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, transparent 55%)',
+          pointerEvents: 'none',
+        }} />
+        {/* Photo count badge */}
+        <div style={{
+          position: 'absolute', top: '10px', right: '10px',
+          background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)',
+          color: '#FFFFFF', fontSize: '12px', fontWeight: 600,
+          padding: '3px 10px', borderRadius: '20px',
+          display: 'flex', alignItems: 'center', gap: '4px',
+        }}>
+          <Camera size={12} />
           {album.totalFotos}
         </div>
       </div>
 
-      {/* Meta */}
-      <div className="px-4 py-3.5">
-        <div className="font-semibold text-slate-800 text-base leading-tight mb-1">{album.actividad}</div>
-        <div className="flex items-center gap-1.5 text-slate-400 text-sm">
-          <TurnoIcon size={13} />
-          <span>Turno {album.turno}</span>
-          <span className="text-slate-200 mx-0.5">·</span>
-          <span>{album.fecha}</span>
+      {/* Info */}
+      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        <div style={{ fontSize: '16px', fontWeight: 700, color: '#1E293B', lineHeight: 1.2 }}>
+          {album.actividad}
+        </div>
+        <div style={{ fontSize: '13px', color: '#64748B' }}>{album.fecha}</div>
+        <div>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: '6px',
+            color: '#475569',
+            fontSize: '12px', fontWeight: 500,
+          }}>
+            {getTurnoIcon(album.turno, 14)}
+            Turno {album.turno}
+          </span>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Album View (inside album) ────────────────────────────────────────────────
+// ─── PhotoGrid (inside an album) ──────────────────────────────────────────────
 
-function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
+function AlbumView({
+  album,
+  onBack,
+}: {
+  album: Album;
+  onBack: () => void;
+}) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+
   const photos = Array.from({ length: album.totalFotos }, (_, i) => i);
-  const TurnoIcon = TURNO_ICON[album.turno];
 
   const toggleSelect = (i: number) => {
-    setSelected(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n; });
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(i)) next.delete(i); else next.add(i);
+      return next;
+    });
   };
-  const handlePhoto = (i: number) => { if (selectionMode) toggleSelect(i); else setLightbox(i); };
+
+  const handlePhotoClick = (i: number) => {
+    if (selectionMode) { toggleSelect(i); return; }
+    setLightbox(i);
+  };
+
+  const handleSelectAll = () => {
+    if (selected.size === photos.length) setSelected(new Set());
+    else setSelected(new Set(photos));
+  };
+
   const exitSelection = () => { setSelectionMode(false); setSelected(new Set()); };
 
   return (
-    <div className="flex flex-col h-full bg-[#F8FAFC]">
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
-      <div className="bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-4">
+      <div style={{
+        padding: '0 24px',
+        height: '80px',
+        background: '#FFFFFF',
+        borderBottom: '1px solid #E5E7EB',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '16px',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
           <button
             onClick={onBack}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors"
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              background: '#F1F5F9', border: 'none', borderRadius: '8px',
+              padding: '8px 14px', cursor: 'pointer', color: '#475569',
+              fontSize: '13px', fontWeight: 500, transition: 'background 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
           >
             <ArrowLeft size={16} />
-            <span>Álbumes</span>
+            Álbumes
           </button>
-          <div className="w-px h-5 bg-slate-200" />
           <div>
-            <div className="text-lg font-bold text-slate-900 leading-tight">{album.actividad}</div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
-              <TurnoIcon size={11} />
-              <span>Turno {album.turno}</span>
-              <span className="text-slate-300">·</span>
-              <span>{album.fecha}</span>
-              <span className="text-slate-300">·</span>
-              <span>{album.totalFotos} fotos</span>
+            <div style={{ fontSize: '20px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {album.actividad}
+            </div>
+            <div style={{ fontSize: '13px', color: '#64748B' }}>
+              {album.fecha} · Turno {album.turno} · {album.totalFotos} fotos
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {selectionMode ? (
             <>
-              <span className="text-sm text-slate-500 font-medium">{selected.size} seleccionada{selected.size !== 1 ? 's' : ''}</span>
+              <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
+                {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
+              </span>
               <button
-                onClick={() => setSelected(selected.size === photos.length ? new Set() : new Set(photos))}
-                className="text-sm px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors font-medium"
+                onClick={handleSelectAll}
+                style={{
+                  background: '#F1F5F9', border: 'none', borderRadius: '8px',
+                  padding: '8px 14px', cursor: 'pointer', color: '#475569',
+                  fontSize: '13px', fontWeight: 500,
+                }}
               >
                 {selected.size === photos.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
               </button>
               {selected.size > 0 && (
-                <button className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-[#1A4B77] text-white hover:bg-[#163d62] transition-colors font-semibold">
-                  <Download size={14} />
+                <button
+                  style={{
+                    background: '#1A4B77', border: 'none', borderRadius: '8px',
+                    padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                    fontSize: '13px', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                  }}
+                >
+                  <Download size={15} />
                   Descargar ({selected.size})
                 </button>
               )}
               <button
                 onClick={exitSelection}
-                className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors text-slate-400"
+                style={{
+                  background: 'none', border: '1px solid #E2E8F0', borderRadius: '8px',
+                  padding: '8px 14px', cursor: 'pointer', color: '#64748B',
+                  fontSize: '13px', fontWeight: 500,
+                }}
               >
-                <X size={16} />
+                Cancelar
               </button>
             </>
           ) : (
             <>
               <button
                 onClick={() => setSelectionMode(true)}
-                className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors font-medium"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: '#F1F5F9', border: 'none', borderRadius: '8px',
+                  padding: '8px 14px', cursor: 'pointer', color: '#475569',
+                  fontSize: '13px', fontWeight: 500, transition: 'background 0.2s',
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
               >
-                <CheckSquare size={14} />
+                <CheckSquare size={15} />
                 Seleccionar
               </button>
-              <button className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-lg bg-[#1A4B77] text-white hover:bg-[#163d62] transition-colors font-semibold">
-                <Download size={14} />
+              <button
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  background: '#1A4B77', border: 'none', borderRadius: '8px',
+                  padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                  fontSize: '13px', fontWeight: 600,
+                }}
+              >
+                <Download size={15} />
                 Descargar todo
               </button>
             </>
@@ -198,49 +268,81 @@ function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
         </div>
       </div>
 
-      {/* Photos */}
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}>
+      {/* Photo Grid */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gap: '12px',
+        }}>
           {photos.map(i => {
             const isSelected = selected.has(i);
             return (
               <div
                 key={i}
-                onClick={() => handlePhoto(i)}
-                className="relative cursor-pointer rounded-xl overflow-hidden aspect-square group/photo transition-transform duration-150"
+                onClick={() => handlePhotoClick(i)}
                 style={{
+                  position: 'relative',
+                  aspectRatio: '1',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  cursor: 'pointer',
                   outline: isSelected ? '3px solid #1A4B77' : '3px solid transparent',
                   outlineOffset: '0px',
-                  transform: isSelected ? 'scale(0.97)' : undefined,
+                  transition: 'outline 0.15s ease, transform 0.15s ease',
+                  transform: isSelected ? 'scale(0.97)' : 'scale(1)',
+                }}
+                onMouseEnter={e => {
+                  if (!isSelected) (e.currentTarget as HTMLDivElement).style.transform = 'scale(1.02)';
+                  const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
+                  if (ov) ov.style.opacity = '1';
+                }}
+                onMouseLeave={e => {
+                  if (!isSelected) (e.currentTarget as HTMLDivElement).style.transform = 'scale(1)';
+                  const ov = e.currentTarget.querySelector('.photo-overlay') as HTMLElement;
+                  if (ov) ov.style.opacity = '0';
                 }}
               >
                 <img
                   src={`https://picsum.photos/seed/${album.seed}${i}/400/400`}
                   alt=""
-                  className="w-full h-full object-cover transition-transform duration-300 group-hover/photo:scale-105"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
                 />
+                {/* Selection checkbox */}
                 <div
-                  className="absolute inset-0 transition-opacity duration-150 flex items-start justify-start p-2"
-                  style={{ opacity: isSelected || selectionMode ? 1 : 0, background: isSelected ? 'rgba(26,75,119,0.15)' : 'rgba(0,0,0,0.1)' }}
+                  className="photo-overlay"
+                  style={{
+                    position: 'absolute', inset: 0,
+                    background: isSelected ? 'rgba(26,75,119,0.2)' : 'rgba(0,0,0,0.12)',
+                    opacity: isSelected || selectionMode ? 1 : 0,
+                    transition: 'opacity 0.2s',
+                    display: 'flex', alignItems: 'flex-start', justifyContent: 'flex-start',
+                    padding: '8px',
+                  }}
                 >
-                  <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shadow-sm transition-all duration-150 ${isSelected ? 'bg-[#1A4B77] border-[#1A4B77]' : 'bg-white/85 border-white/90'}`}>
+                  <div style={{
+                    width: '22px', height: '22px',
+                    borderRadius: '50%',
+                    background: isSelected ? '#1A4B77' : 'rgba(255,255,255,0.85)',
+                    border: `2px solid ${isSelected ? '#1A4B77' : 'rgba(255,255,255,0.9)'}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+                    transition: 'all 0.15s',
+                  }}>
                     {isSelected && (
-                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M1.5 5l2.5 2.5 4.5-4.5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                        <path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                       </svg>
                     )}
                   </div>
                 </div>
-                <div
-                  className="absolute inset-0 opacity-0 group-hover/photo:opacity-100 transition-opacity duration-150"
-                  style={{ background: 'rgba(0,0,0,0.06)', display: selectionMode ? 'none' : undefined }}
-                />
               </div>
             );
           })}
         </div>
       </div>
 
+      {/* Lightbox */}
       {lightbox !== null && (
         <Lightbox
           src={`https://picsum.photos/seed/${album.seed}${lightbox}/1200/800`}
@@ -256,160 +358,183 @@ function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
 // ─── Main Portal ──────────────────────────────────────────────────────────────
 
 export default function ParentPortal() {
+  const [colegioActivo, setColegioActivo] = useState(COLEGIOS_USUARIO[0].id);
   const [albumAbierto, setAlbumAbierto] = useState<Album | null>(null);
-  const [diaActivo, setDiaActivo] = useState('Todos');
-  const [turnoFilter, setTurnoFilter] = useState<typeof TURNOS_FILTER[number]>('Todos');
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [turnoFilter, setTurnoFilter] = useState<typeof TURNOS_FILTER[number]>('Todos');
+  const [sort, setSort] = useState<typeof SORT_OPTIONS[number]>('Más reciente');
+  const [sortOpen, setSortOpen] = useState(false);
+
+  const TABS = COLEGIOS_USUARIO.map(c => ({
+    id: c.id,
+    label: c.nombre,
+    icon: School,
+  }));
 
   const albumsFiltrados = useMemo(() => {
-    let list = [...ALBUMS];
-    if (diaActivo !== 'Todos') list = list.filter(a => a.diaLabel === diaActivo);
+    let list = ALBUMS.filter(a => a.colegioId === colegioActivo);
     if (turnoFilter !== 'Todos') list = list.filter(a => a.turno === turnoFilter);
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(a => a.actividad.toLowerCase().includes(q) || a.fecha.toLowerCase().includes(q));
+      list = list.filter(a =>
+        a.actividad.toLowerCase().includes(q) ||
+        a.fecha.toLowerCase().includes(q)
+      );
     }
+    if (sort === 'Más fotos') list = [...list].sort((a, b) => b.totalFotos - a.totalFotos);
+    else if (sort === 'Más antiguo') list = [...list].reverse();
     return list;
-  }, [diaActivo, turnoFilter, searchQuery]);
+  }, [colegioActivo, turnoFilter, searchQuery, sort]);
 
-  const diasTabs = [{ label: 'Todos', fecha: '' }, ...DIAS_UNICOS];
-
-  if (albumAbierto) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
-        {/* Minimal top bar for album view */}
-        <header className="bg-white border-b border-slate-100 px-6 h-14 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2 text-slate-800 font-bold text-base">
-            <img src="/logo-recrear.png" alt="Recrear" style={{ height: '32px', width: 'auto', objectFit: 'contain' }} />
-          </div>
-          <UserMenu />
-        </header>
-        <div className="flex-1 overflow-hidden flex flex-col">
-          <AlbumView album={albumAbierto} onBack={() => setAlbumAbierto(null)} />
-        </div>
-      </div>
-    );
-  }
+  const colegio = COLEGIOS_USUARIO.find(c => c.id === colegioActivo)!;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-['Plus_Jakarta_Sans',sans-serif]">
-      {/* ── Hero Header ── */}
-      <header className="bg-white border-b border-slate-100 px-6 sm:px-10 py-5">
-        <div className="max-w-7xl mx-auto flex items-start justify-between gap-4">
-          {/* Left: title */}
-          <div className="flex items-center gap-4">
-            <img src="/logo-recrear.png" alt="Recrear" style={{ height: '40px', width: 'auto', objectFit: 'contain' }} />
-            <div className="w-px h-8 bg-slate-200" />
+    <DashboardLayout
+      role="parent"
+      tabs={TABS}
+      activeTab={colegioActivo}
+      onTabChange={(id) => { setColegioActivo(id); setAlbumAbierto(null); }}
+    >
+      {albumAbierto ? (
+        <AlbumView album={albumAbierto} onBack={() => setAlbumAbierto(null)} />
+      ) : (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          {/* Page header + filters */}
+          <div style={{
+            padding: '0 24px',
+            height: '80px',
+            background: '#FFFFFF',
+            borderBottom: '1px solid #E5E7EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexShrink: 0,
+          }}>
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 leading-tight tracking-tight">
-                {USUARIO.colegio}
-              </h1>
-              <p className="text-sm text-slate-400 mt-0.5">
-                {USUARIO.viaje} · <span className="font-medium">{albumsFiltrados.length} álbumes disponibles</span>
-              </p>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+                {colegio.nombre}
+              </div>
+              <div style={{ fontSize: '13px', color: '#64748B' }}>
+                {albumsFiltrados.length} álbume{albumsFiltrados.length !== 1 ? 's' : ''} disponible{albumsFiltrados.length !== 1 ? 's' : ''}
+              </div>
             </div>
-          </div>
 
-          {/* Right: search + avatar */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex items-center">
-              {searchOpen ? (
-                <div className="flex items-center gap-1 animate-in slide-in-from-right-2 duration-150">
-                  <input
-                    autoFocus
-                    type="text"
-                    placeholder="Buscar actividad..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 outline-none focus:border-[#1A4B77] w-48 text-slate-700 placeholder-slate-300 transition-all"
-                  />
-                  <button onClick={() => { setSearchOpen(false); setSearchQuery(''); }} className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-                    <X size={15} />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* Search */}
+              <div style={{ position: 'relative' }}>
+                <Search size={14} color="#94A3B8" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+                <input
+                  type="text"
+                  placeholder="Buscar álbum..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  style={{
+                    padding: '8px 12px 8px 32px',
+                    borderRadius: '8px',
+                    border: '1px solid #E2E8F0',
+                    fontSize: '13px',
+                    outline: 'none',
+                    color: '#1E293B',
+                    width: '200px',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              {/* Turno filter pills */}
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {TURNOS_FILTER.map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTurnoFilter(t)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '6px 12px',
+                      borderRadius: '20px',
+                      border: 'none',
+                      background: turnoFilter === t ? '#1A4B77' : '#F1F5F9',
+                      color: turnoFilter === t ? '#FFFFFF' : '#475569',
+                      fontSize: '12px', fontWeight: 600,
+                      cursor: 'pointer', transition: 'all 0.2s',
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {getTurnoIcon(t, 14)}
+                    {t}
                   </button>
-                </div>
-              ) : (
+                ))}
+              </div>
+
+              {/* Sort */}
+              <div style={{ position: 'relative' }}>
                 <button
-                  onClick={() => setSearchOpen(true)}
-                  className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+                  onClick={() => setSortOpen(!sortOpen)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    background: '#F1F5F9', border: 'none', borderRadius: '8px',
+                    padding: '8px 12px', cursor: 'pointer', color: '#475569',
+                    fontSize: '12px', fontWeight: 500, fontFamily: 'inherit',
+                  }}
                 >
-                  <Search size={18} />
+                  <SlidersHorizontal size={14} />
+                  {sort}
+                  <ChevronDown size={12} style={{ transform: sortOpen ? 'rotate(180deg)' : 'none', transition: '0.2s' }} />
                 </button>
-              )}
+                {sortOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 4px)', right: 0,
+                    background: '#FFFFFF', borderRadius: '10px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                    border: '1px solid #E2E8F0',
+                    zIndex: 50, overflow: 'hidden', minWidth: '160px',
+                  }}>
+                    {SORT_OPTIONS.map(s => (
+                      <button
+                        key={s}
+                        onClick={() => { setSort(s); setSortOpen(false); }}
+                        style={{
+                          display: 'block', width: '100%', textAlign: 'left',
+                          padding: '10px 14px', border: 'none',
+                          background: sort === s ? '#F1F5F9' : 'transparent',
+                          color: sort === s ? '#1A4B77' : '#374151',
+                          fontSize: '13px', fontWeight: sort === s ? 600 : 400,
+                          cursor: 'pointer', fontFamily: 'inherit',
+                        }}
+                        onMouseEnter={e => { if (sort !== s) (e.currentTarget.style.background = '#F8FAFC'); }}
+                        onMouseLeave={e => { if (sort !== s) (e.currentTarget.style.background = 'transparent'); }}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <UserMenu />
+          </div>
+
+          {/* Albums grid */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '28px 24px' }}>
+            {albumsFiltrados.length === 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '12px', color: '#94A3B8' }}>
+                <ImageIcon size={48} strokeWidth={1} />
+                <div style={{ fontSize: '16px', fontWeight: 500 }}>No se encontraron álbumes</div>
+                <div style={{ fontSize: '13px' }}>Probá con otro filtro o término de búsqueda</div>
+              </div>
+            ) : (
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+                gap: '20px',
+              }}>
+                {albumsFiltrados.map(album => (
+                  <AlbumCard key={album.id} album={album} onClick={() => setAlbumAbierto(album)} />
+                ))}
+              </div>
+            )}
           </div>
         </div>
-
-        {/* ── Filters ── */}
-        <div className="max-w-7xl mx-auto mt-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
-          {/* Day tabs */}
-          <div className="flex gap-1">
-            {diasTabs.map(dia => {
-              const isActive = diaActivo === dia.label;
-              return (
-                <button
-                  key={dia.label}
-                  onClick={() => setDiaActivo(dia.label)}
-                  className={`flex flex-col items-center px-4 py-2 rounded-lg transition-all duration-150 text-left border-b-2 ${
-                    isActive
-                      ? 'border-[#1A4B77] text-[#1A4B77]'
-                      : 'border-transparent text-slate-400 hover:text-slate-700 hover:border-slate-200'
-                  }`}
-                >
-                  <span className={`text-sm leading-tight ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                    {dia.label}
-                  </span>
-                  {dia.fecha && (
-                    <span className="text-[10px] mt-0.5 text-slate-400 font-normal">{dia.fecha}</span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="w-px h-8 bg-slate-100 hidden sm:block" />
-
-          {/* Turno chips */}
-          <div className="flex gap-2">
-            {TURNOS_FILTER.map(t => {
-              const isActive = turnoFilter === t;
-              const TIcon = t !== 'Todos' ? TURNO_ICON[t as keyof typeof TURNO_ICON] : null;
-              return (
-                <button
-                  key={t}
-                  onClick={() => setTurnoFilter(t)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-150 ${
-                    isActive
-                      ? 'bg-slate-900 border-slate-900 text-white'
-                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400 hover:text-slate-700'
-                  }`}
-                >
-                  {TIcon && <TIcon size={11} />}
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </header>
-
-      {/* ── Albums Grid ── */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-6 sm:px-10 py-8">
-        {albumsFiltrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 text-slate-300 gap-3">
-            <Search size={40} strokeWidth={1} />
-            <div className="text-base font-medium text-slate-400">No se encontraron álbumes</div>
-            <div className="text-sm text-slate-300">Probá ajustando los filtros</div>
-          </div>
-        ) : (
-          <div className="grid gap-6" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-            {albumsFiltrados.map(album => (
-              <AlbumCard key={album.id} album={album} onClick={() => setAlbumAbierto(album)} />
-            ))}
-          </div>
-        )}
-      </main>
-    </div>
+      )}
+    </DashboardLayout>
   );
 }
