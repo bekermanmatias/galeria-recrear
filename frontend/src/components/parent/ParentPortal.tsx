@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Image as ImageIcon, School, Download, CheckSquare, Square, ArrowLeft, Search, SlidersHorizontal, Camera, ChevronDown, Sun, CloudSun, Moon } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import Lightbox from '../ui/Lightbox';
@@ -145,8 +145,15 @@ function AlbumView({
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' ? window.innerWidth <= 768 : false);
 
   const photos = Array.from({ length: album.totalFotos }, (_, i) => i);
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const toggleSelect = (i: number) => {
     setSelected(prev => {
@@ -172,24 +179,26 @@ function AlbumView({
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* Header */}
       <div style={{
-        padding: '0 24px',
-        height: '80px',
+        padding: isMobile ? '12px 16px' : '0 24px',
+        minHeight: isMobile ? 'auto' : '80px',
         background: '#FFFFFF',
         borderBottom: '1px solid #E5E7EB',
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
         justifyContent: 'space-between',
-        gap: '16px',
+        gap: isMobile ? '12px' : '16px',
         flexShrink: 0,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '12px' : '16px', minWidth: 0 }}>
           <button
             onClick={onBack}
             style={{
               display: 'flex', alignItems: 'center', gap: '6px',
               background: '#F1F5F9', border: 'none', borderRadius: '8px',
-              padding: '8px 14px', cursor: 'pointer', color: '#475569',
+              padding: isMobile ? '10px 12px' : '8px 14px', cursor: 'pointer', color: '#475569',
               fontSize: '13px', fontWeight: 500, transition: 'background 0.2s',
+              flexShrink: 0,
             }}
             onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
             onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
@@ -197,7 +206,7 @@ function AlbumView({
             <ArrowLeft size={16} />
             Álbumes
           </button>
-          <div>
+          <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: '20px', fontWeight: 700, color: '#1A4B77', letterSpacing: '-0.02em', lineHeight: 1.1 }}>
               {album.actividad}
             </div>
@@ -208,10 +217,10 @@ function AlbumView({
         </div>
 
         {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', width: isMobile ? '100%' : 'auto' }}>
           {selectionMode ? (
             <>
-              <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500 }}>
+              <span style={{ fontSize: '13px', color: '#64748B', fontWeight: 500, display: isMobile ? 'none' : 'inline' }}>
                 {selected.size} seleccionada{selected.size !== 1 ? 's' : ''}
               </span>
               <button
@@ -220,9 +229,10 @@ function AlbumView({
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
                   padding: '8px 14px', cursor: 'pointer', color: '#475569',
                   fontSize: '13px', fontWeight: 500,
+                  flex: isMobile ? 1 : 'none',
                 }}
               >
-                {selected.size === photos.length ? 'Deseleccionar todo' : 'Seleccionar todo'}
+                {selected.size === photos.length ? 'Deseleccionar' : 'Seleccionar todo'}
               </button>
               {selected.size > 0 && (
                 <button
@@ -231,6 +241,8 @@ function AlbumView({
                     padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
                     fontSize: '13px', fontWeight: 600,
                     display: 'flex', alignItems: 'center', gap: '6px',
+                    justifyContent: 'center',
+                    flex: isMobile ? 1 : 'none',
                   }}
                 >
                   <Download size={15} />
@@ -243,6 +255,7 @@ function AlbumView({
                   background: 'none', border: '1px solid #E2E8F0', borderRadius: '8px',
                   padding: '8px 14px', cursor: 'pointer', color: '#64748B',
                   fontSize: '13px', fontWeight: 500,
+                  flex: isMobile ? 1 : 'none',
                 }}
               >
                 Cancelar
@@ -257,6 +270,8 @@ function AlbumView({
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
                   padding: '8px 14px', cursor: 'pointer', color: '#475569',
                   fontSize: '13px', fontWeight: 500, transition: 'background 0.2s',
+                  justifyContent: 'center',
+                  flex: isMobile ? 1 : 'none',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
@@ -270,6 +285,8 @@ function AlbumView({
                   background: '#1A4B77', border: 'none', borderRadius: '8px',
                   padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
                   fontSize: '13px', fontWeight: 600,
+                  justifyContent: 'center',
+                  flex: isMobile ? 1 : 'none',
                 }}
               >
                 <Download size={15} />
@@ -281,10 +298,10 @@ function AlbumView({
       </div>
 
       {/* Photo Grid */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px' : '24px' }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+          gridTemplateColumns: isMobile ? 'repeat(2, minmax(0, 1fr))' : 'repeat(auto-fill, minmax(180px, 1fr))',
           gap: '12px',
         }}>
           {photos.map(i => {

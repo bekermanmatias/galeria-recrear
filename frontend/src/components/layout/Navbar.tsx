@@ -152,9 +152,6 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
         </div>
 
         <div className="show-on-mobile" style={{ alignItems: 'center', gap: '10px' }}>
-          <div style={{ width: '32px', height: '32px', background: '#F1F5F9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <User size={18} color="#64748B" />
-          </div>
           {onMenuToggle && (
             <button
               onClick={onMenuToggle}
