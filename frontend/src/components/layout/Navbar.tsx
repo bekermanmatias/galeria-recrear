@@ -35,12 +35,6 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
       </div>
       
       <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-        {role === 'parent' && (
-          <span style={{ fontSize: '15px', color: '#71717A' }}>
-            Viaje de Egresados
-          </span>
-        )}
-        
         {(role === 'coordinator' || role === 'admin') && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <div className="hide-on-mobile" style={{ position: 'relative' }} ref={menuRef}>
