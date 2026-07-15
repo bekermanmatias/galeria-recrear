@@ -227,9 +227,11 @@ function AlbumView({
                 onClick={handleSelectAll}
                 style={{
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
-                  padding: '8px 14px', cursor: 'pointer', color: '#475569',
-                  fontSize: '13px', fontWeight: 500,
+                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
+                  fontSize: isMobile ? '12px' : '13px', fontWeight: 500,
                   flex: isMobile ? 1 : 'none',
+                  minHeight: isMobile ? '44px' : 'auto',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {selected.size === photos.length ? 'Deseleccionar' : 'Seleccionar todo'}
@@ -238,24 +240,28 @@ function AlbumView({
                 <button
                   style={{
                     background: '#1A4B77', border: 'none', borderRadius: '8px',
-                    padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
-                    fontSize: '13px', fontWeight: 600,
+                    padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                    fontSize: isMobile ? '12px' : '13px', fontWeight: 600,
                     display: 'flex', alignItems: 'center', gap: '6px',
                     justifyContent: 'center',
-                    flex: isMobile ? 1 : 'none',
+                    flex: isMobile ? 1.15 : 'none',
+                    minHeight: isMobile ? '44px' : 'auto',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   <Download size={15} />
-                  Descargar ({selected.size})
+                  {isMobile ? `Descargar ${selected.size}` : `Descargar (${selected.size})`}
                 </button>
               )}
               <button
                 onClick={exitSelection}
                 style={{
                   background: 'none', border: '1px solid #E2E8F0', borderRadius: '8px',
-                  padding: '8px 14px', cursor: 'pointer', color: '#64748B',
-                  fontSize: '13px', fontWeight: 500,
+                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#64748B',
+                  fontSize: isMobile ? '12px' : '13px', fontWeight: 500,
                   flex: isMobile ? 1 : 'none',
+                  minHeight: isMobile ? '44px' : 'auto',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Cancelar
@@ -268,10 +274,12 @@ function AlbumView({
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   background: '#F1F5F9', border: 'none', borderRadius: '8px',
-                  padding: '8px 14px', cursor: 'pointer', color: '#475569',
-                  fontSize: '13px', fontWeight: 500, transition: 'background 0.2s',
+                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#475569',
+                  fontSize: isMobile ? '12px' : '13px', fontWeight: 500, transition: 'background 0.2s',
                   justifyContent: 'center',
                   flex: isMobile ? 1 : 'none',
+                  minHeight: isMobile ? '44px' : 'auto',
+                  whiteSpace: 'nowrap',
                 }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#E2E8F0')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#F1F5F9')}
@@ -283,14 +291,16 @@ function AlbumView({
                 style={{
                   display: 'flex', alignItems: 'center', gap: '6px',
                   background: '#1A4B77', border: 'none', borderRadius: '8px',
-                  padding: '8px 14px', cursor: 'pointer', color: '#FFFFFF',
-                  fontSize: '13px', fontWeight: 600,
+                  padding: isMobile ? '10px 8px' : '8px 14px', cursor: 'pointer', color: '#FFFFFF',
+                  fontSize: isMobile ? '12px' : '13px', fontWeight: 600,
                   justifyContent: 'center',
-                  flex: isMobile ? 1 : 'none',
+                  flex: isMobile ? 1.15 : 'none',
+                  minHeight: isMobile ? '44px' : 'auto',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 <Download size={15} />
-                Descargar todo
+                {isMobile ? 'Descargar' : 'Descargar todo'}
               </button>
             </>
           )}
