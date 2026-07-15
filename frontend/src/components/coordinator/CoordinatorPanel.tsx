@@ -86,7 +86,7 @@ export default function CoordinatorPanel() {
     >
       {activeTab === 'carga' && (
       <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
-      <main className="responsive-padding" style={{ maxWidth: '720px', margin: '0 auto' }}>
+      <main style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>
             Subir material
