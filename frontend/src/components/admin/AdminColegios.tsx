@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { adminRequest, type School } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 interface Colegio {
@@ -10,17 +11,14 @@ interface Colegio {
   coordinadores: string[];
 }
 
-const MOCK_COLEGIOS: Colegio[] = [
-  { id: '1', nombre: 'Colegio San Luis', codigo: '1a', fechaInicio: '2024-11-01', fechaFin: '2024-11-15', coordinadores: ['Juan Perez'] },
-  { id: '2', nombre: 'Instituto Belgrano', codigo: '2b', fechaInicio: '2024-10-10', fechaFin: '2024-10-20', coordinadores: ['Maria Garcia'] },
-];
-
 export default function AdminColegios() {
-  const [colegios, setColegios] = useState<Colegio[]>(MOCK_COLEGIOS);
+  const [colegios, setColegios] = useState<Colegio[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '', coordinadores: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const load = () => adminRequest<{items: School[]}>('/schools').then(data => setColegios(data.items.map(item => ({ id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date ?? '',fechaFin:item.end_date ?? '',coordinadores:[] }))));
+  useEffect(() => { load(); }, []);
   const openModal = (col?: Colegio) => {
     if (col) {
       setEditingId(col.id);
@@ -32,31 +30,12 @@ export default function AdminColegios() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.nombre || !formData.codigo) return;
-    
-    const newCol: Colegio = {
-      id: editingId || Math.random().toString(36).slice(2),
-      nombre: formData.nombre,
-      codigo: formData.codigo,
-      fechaInicio: formData.fechaInicio,
-      fechaFin: formData.fechaFin,
-      coordinadores: formData.coordinadores.split(',').map(s => s.trim()).filter(Boolean),
-    };
-
-    if (editingId) {
-      setColegios(prev => prev.map(c => c.id === editingId ? newCol : c));
-    } else {
-      setColegios(prev => [...prev, newCol]);
-    }
-    setIsModalOpen(false);
+    await adminRequest('/schools'+(editingId ? '/'+editingId : ''), { method:editingId ? 'PATCH' : 'POST', body:JSON.stringify({ name:formData.nombre, code:formData.codigo, botCode:formData.codigo.toUpperCase(), startDate:formData.fechaInicio || null, endDate:formData.fechaFin || null }) });
+    setIsModalOpen(false); await load();
   };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar este colegio?')) {
-      setColegios(prev => prev.filter(c => c.id !== id));
-    }
-  };
+  const handleDelete = async (id:string) => { if(confirm('¿Eliminar este colegio?')) { await adminRequest('/schools/'+id,{method:'DELETE'}); await load(); } };
 
   const filteredColegios = colegios.filter(c => 
     c.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -182,3 +161,4 @@ export default function AdminColegios() {
     </div>
   );
 }
+

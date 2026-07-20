@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChevronRight, ChevronLeft, X, LogOut, Settings } from 'lucide-react';
 import Navbar from './Navbar';
+import { api } from '../../lib/api';
 
 export interface TabItem {
   id: string;
@@ -23,7 +24,7 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
       <Navbar role={role} onMenuToggle={() => setMobileMenuOpen(true)} />
-      
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
         {/* Dark Sidebar Nav (hidden on parent if 1 tab? Or always show) */}
         <aside className="admin-sidebar" style={{
@@ -45,9 +46,9 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
                   onClick={() => onTabChange(tab.id)}
                   title={!isSidebarExpanded ? tab.label : undefined}
                   style={{
-                    display: 'flex', alignItems: 'center', 
+                    display: 'flex', alignItems: 'center',
                     gap: isSidebarExpanded ? '12px' : '0',
-                    width: '100%', 
+                    width: '100%',
                     padding: isSidebarExpanded ? '12px 16px' : '12px',
                     justifyContent: isSidebarExpanded ? 'flex-start' : 'center',
                     background: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
@@ -98,7 +99,7 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
           {children}
         </main>
       </div>
-      
+
       {/* Mobile Drawer Menu */}
       {mobileMenuOpen && (
         <div style={{
@@ -110,7 +111,7 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
               <X size={24} color="#64748B" />
             </button>
           </div>
-          
+
           <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px', flex: 1, overflowY: 'auto' }}>
             {tabs.map(tab => {
               const Icon = tab.icon;
@@ -134,12 +135,12 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
               )
             })}
           </div>
-          
+
           <div style={{ padding: '24px', borderTop: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#475569', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
+            <button onClick={() => window.dispatchEvent(new Event('open-account-settings'))} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#475569', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
               <Settings size={20} color="#64748B" /> Configuración
             </button>
-            <button style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
+            <button onClick={async () => { try { await api.logout(); } finally { window.location.href = '/login'; } }} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
               <LogOut size={20} color="#EF4444" /> Cerrar sesión
             </button>
           </div>

@@ -3,10 +3,7 @@ import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
-
-const TURNOS = ['Mañana', 'Tarde', 'Noche'];
-const ACTIVIDADES = ['Cabalgata', 'Hotel', 'Pileta', 'Excursión', 'Cena'];
-const COLEGIOS = ['Colegio San Luis', 'Instituto Belgrano', 'Escuela Normal', 'Colegio Nacional'];
+import { api, type CatalogItem, type LotSummary, type School } from '../../lib/api';
 
 interface UploadFile {
   id: string;
@@ -33,10 +30,49 @@ export default function CoordinatorPanel() {
   const [done, setDone] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [schools, setSchools] = useState<School[]>([]);
+  const [activities, setActivities] = useState<CatalogItem[]>([]);
+  const [shifts, setShifts] = useState<CatalogItem[]>([]);
+  const [lots, setLots] = useState<LotSummary[]>([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    api.me()
+      .then(({ user }) => {
+        if (user.role !== 'COORDINATOR') {
+          window.location.href = user.role === 'ADMIN' ? '/admin' : '/parent';
+          return;
+        }
+        return Promise.all([api.mySchools(), api.lots()]);
+      })
+      .then(result => {
+        if (!result) return;
+        setSchools(result[0].items);
+        setLots(result[1].items);
+      })
+      .catch(() => { window.location.href = '/login'; });
+  }, []);
+
+  useEffect(() => {
+    const school = schools.find(item => item.name === colegio);
+    if (!school) {
+      setActivities([]);
+      setShifts([]);
+      return;
+    }
+    api.catalogs(school.id)
+      .then(data => {
+        setActivities(data.activities);
+        setShifts(data.shifts);
+        setActividad('');
+        setTurno('');
+      })
+      .catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los catálogos.'));
+  }, [colegio, schools]);
 
   const addFiles = (newFiles: FileList) => {
     const mapped: UploadFile[] = Array.from(newFiles)
-      .filter(f => f.type.startsWith('image/'))
+      .filter(f => ['image/jpeg', 'image/png', 'image/heic', 'image/heif', 'video/mp4', 'video/quicktime'].includes(f.type) || /\.(jpe?g|png|heic|heif|mp4|mov)$/i.test(f.name))
       .map(f => ({
         id: Math.random().toString(36).slice(2),
         file: f,
@@ -62,17 +98,39 @@ export default function CoordinatorPanel() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
-  const simulateUpload = async () => {
-    if (!colegio || !fecha || !turno || !actividad || files.length === 0) return;
+  const uploadFiles = async () => {
+    const school = schools.find(item => item.name === colegio);
+    const shift = shifts.find(item => item.name === turno);
+    const activity = activities.find(item => item.name === actividad);
+    if (!school || !shift || !activity || !fecha || files.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise(r => setTimeout(r, 120));
-      setUploadProgress(i);
+    setError('');
+    setDone(false);
+    try {
+      const lot = await api.createLot({ schoolId: school.id, shiftId: shift.id, activityId: activity.id, eventDate: fecha });
+      for (let index = 0; index < files.length; index += 1) {
+        const current = files[index];
+        setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item));
+        try {
+          await api.uploadMedia(lot.lotId, current.file);
+          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'done' } : item));
+        } catch (reason) {
+          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'error' } : item));
+          throw reason;
+        }
+        setUploadProgress(Math.round(((index + 1) / files.length) * 100));
+      }
+      await api.submitLot(lot.lotId);
+      setLots((await api.lots()).items);
+      files.forEach(item => URL.revokeObjectURL(item.preview));
+      setFiles([]);
+      setDone(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo completar la carga.');
+    } finally {
+      setUploading(false);
     }
-    setUploading(false);
-    setDone(true);
-    setFiles([]);
   };
 
   const canUpload = colegio && fecha && turno && actividad && files.length > 0 && !uploading;
@@ -102,7 +160,7 @@ export default function CoordinatorPanel() {
             label="Colegio"
             value={colegio}
             onChange={setColegio}
-            options={COLEGIOS}
+            options={schools.map(item => item.name)}
             placeholder="Seleccionar colegio..."
           />
           <DateField
@@ -114,14 +172,14 @@ export default function CoordinatorPanel() {
             label="Turno"
             value={turno}
             onChange={setTurno}
-            options={TURNOS}
+            options={shifts.map(item => item.name)}
             placeholder="Seleccionar turno..."
           />
           <SearchableSelect
             label="Actividad"
             value={actividad}
             onChange={setActividad}
-            options={ACTIVIDADES}
+            options={activities.map(item => item.name)}
             placeholder="Seleccionar actividad..."
           />
         </div>
@@ -146,7 +204,7 @@ export default function CoordinatorPanel() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime"
             multiple
             style={{ display: 'none' }}
             onChange={e => e.target.files && addFiles(e.target.files)}
@@ -156,7 +214,7 @@ export default function CoordinatorPanel() {
             Hacé clic o arrastrá las fotos acá
           </p>
           <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>
-            JPG, PNG, HEIC. Se subirán en calidad original.
+            JPG, PNG, HEIC, MP4 y MOV. Se subirán en calidad original.
           </p>
         </div>
 
@@ -173,7 +231,9 @@ export default function CoordinatorPanel() {
             }}>
               {files.map(f => (
                 <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', borderRadius: '4px', cursor: 'pointer' }}>
-                  <img src={f.preview} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  {f.file.type.startsWith('video/') || /\.(mp4|mov)$/i.test(f.file.name)
+                    ? <video src={f.preview} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : <img src={f.preview} alt={f.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                   <button
                     onClick={e => { e.stopPropagation(); removeFile(f.id); }}
                     style={{
@@ -226,9 +286,11 @@ export default function CoordinatorPanel() {
           </div>
         )}
 
+        {error && <div role="alert" style={{ color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>{error}</div>}
+
         {/* Submit button */}
         <button
-          onClick={simulateUpload}
+          onClick={uploadFiles}
           disabled={!canUpload}
           style={{
             width: '100%',
@@ -253,15 +315,29 @@ export default function CoordinatorPanel() {
       )}
 
       {activeTab === 'galeria' && (
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#71717A' }}>
-          La galería del coordinador estará disponible próximamente.
+        <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
+          <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
+            <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>Lotes enviados</h2>
+            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#71717A' }}>Estado del material cargado para tus colegios.</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+              {lots.map(lot => (
+                <article key={lot.id} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '18px', background: '#FFFFFF' }}>
+                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '8px' }}>{lot.school_name}</strong>
+                  <div style={{ color: '#475569', fontSize: '14px' }}>{lot.activity_name} · Turno {lot.shift_name}</div>
+                  <div style={{ color: '#64748B', fontSize: '13px', marginTop: '4px' }}>{lot.event_date}</div>
+                  <span style={{ display: 'inline-block', marginTop: '14px', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>{lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : 'En carga'}</span>
+                </article>
+              ))}
+              {!lots.length && <p style={{ color: '#71717A' }}>Todavía no hay lotes cargados.</p>}
+            </div>
+          </div>
         </div>
       )}
 
       {selectedPhoto !== null && (
-        <Lightbox 
-          src={files.find(f => f.id === selectedPhoto)?.preview || ''} 
-          onClose={() => setSelectedPhoto(null)} 
+        <Lightbox
+          src={files.find(f => f.id === selectedPhoto)?.preview || ''}
+          onClose={() => setSelectedPhoto(null)}
           onNext={
             files.findIndex(f => f.id === selectedPhoto) < files.length - 1
               ? () => {
@@ -281,15 +357,15 @@ export default function CoordinatorPanel() {
           actions={
             <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-              <button 
+              <button
                 onClick={() => {
                   removeFile(selectedPhoto);
                   setSelectedPhoto(null);
                 }}
-                style={{ 
-                  background: 'rgba(239, 68, 68, 0.2)', 
-                  border: 'none', 
-                  color: '#F87171', 
+                style={{
+                  background: 'rgba(239, 68, 68, 0.2)',
+                  border: 'none',
+                  color: '#F87171',
                   cursor: 'pointer', padding: '8px', borderRadius: '8px',
                   display: 'flex', alignItems: 'center', gap: '8px'
                 }}

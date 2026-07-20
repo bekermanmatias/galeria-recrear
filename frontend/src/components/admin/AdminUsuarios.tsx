@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { adminRequest, type AdminUser, type School } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 type UsuarioRol = 'admin' | 'coordinador' | 'user';
@@ -9,12 +10,6 @@ interface Usuario {
   email: string;
   rol: UsuarioRol;
 }
-
-const MOCK_USUARIOS: Usuario[] = [
-  { id: '1', nombre: 'Admin Master', email: 'admin@recrear.com', rol: 'admin' },
-  { id: '2', nombre: 'Juan Perez', email: 'juan@recrear.com', rol: 'coordinador' },
-  { id: '3', nombre: 'Maria Garcia', email: 'maria@recrear.com', rol: 'user' },
-];
 
 const roleLabel = (rol: UsuarioRol) => {
   switch (rol) {
@@ -28,50 +23,40 @@ const roleLabel = (rol: UsuarioRol) => {
 };
 
 export default function AdminUsuarios() {
-  const [usuarios, setUsuarios] = useState<Usuario[]>(MOCK_USUARIOS);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState<{ nombre: string; email: string; rol: UsuarioRol }>({
+  const [formData, setFormData] = useState<{ nombre: string; email: string; rol: UsuarioRol; password: string }>({
     nombre: '',
     email: '',
-    rol: 'user',
+    rol: 'user', password: '',
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [schools, setSchools] = useState<School[]>([]);
+  const [schoolId, setSchoolId] = useState('');
+  const load = () => adminRequest<{items: AdminUser[]}>('/users').then(data => setUsuarios(data.items.map(item => ({id:item.id,nombre:item.name,email:item.email,rol:item.role==='ADMIN'?'admin':item.role==='COORDINATOR'?'coordinador':'user'}))));
+  useEffect(() => { load(); adminRequest<{items: School[]}>('/schools').then(data => setSchools(data.items)); }, []);
 
   const openModal = (user?: Usuario) => {
     if (user) {
       setEditingId(user.id);
-      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol });
+      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol, password:'' }); setSchoolId('');
     } else {
       setEditingId(null);
-      setFormData({ nombre: '', email: '', rol: 'user' });
+      setFormData({ nombre: '', email: '', rol: 'user', password:'' }); setSchoolId('');
     }
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.nombre || !formData.email) return;
-
-    const newUser: Usuario = {
-      id: editingId || Math.random().toString(36).slice(2),
-      nombre: formData.nombre,
-      email: formData.email,
-      rol: formData.rol,
-    };
-
-    if (editingId) {
-      setUsuarios(prev => prev.map(u => u.id === editingId ? newUser : u));
-    } else {
-      setUsuarios(prev => [...prev, newUser]);
-    }
-    setIsModalOpen(false);
+  const handleSave = async () => {
+    if (!formData.nombre || !formData.email || (!editingId && formData.password.length < 8)) return;
+    const role = formData.rol==='admin'?'ADMIN':formData.rol==='coordinador'?'COORDINATOR':'PARENT';
+    const body:any={name:formData.nombre,email:formData.email,role}; if(formData.password) body.password=formData.password;
+    const saved = await adminRequest<AdminUser>('/users'+(editingId?'/'+editingId:''),{method:editingId?'PATCH':'POST',body:JSON.stringify(body)});
+    if (schoolId && role !== 'ADMIN') await adminRequest('/schools/'+schoolId+'/members/'+saved.id,{method:'PUT',body:JSON.stringify({membershipRole:role})});
+    setIsModalOpen(false); await load();
   };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar este usuario?')) {
-      setUsuarios(prev => prev.filter(u => u.id !== id));
-    }
-  };
+  const handleDelete = async (id:string) => { if(confirm('¿Desactivar este usuario?')) { await adminRequest('/users/'+id,{method:'DELETE'}); await load(); } };
 
   const filteredUsuarios = usuarios.filter(u =>
     u.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -178,6 +163,17 @@ export default function AdminUsuarios() {
                 <input type="email" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
               </label>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
+                {editingId ? 'Nueva contraseña (opcional)' : 'Contraseña inicial'}
+                <input type="password" minLength={8} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
+              </label>
+              {formData.rol !== 'admin' && <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
+                Colegio asignado
+                <select value={schoolId} onChange={e => setSchoolId(e.target.value)} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white' }}>
+                  <option value="">Sin asignar</option>
+                  {schools.filter(school => school.active !== false).map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
+                </select>
+              </label>}
+              <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
                 Rol
                 <select value={formData.rol} onChange={e => setFormData({ ...formData, rol: e.target.value as UsuarioRol })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white' }}>
                   <option value="admin">Administrador</option>
@@ -197,3 +193,5 @@ export default function AdminUsuarios() {
     </div>
   );
 }
+
+

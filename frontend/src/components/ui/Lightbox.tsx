@@ -6,12 +6,13 @@ interface LightboxProps {
   alt?: string;
   onClose: () => void;
   actions?: React.ReactNode;
+  info?: React.ReactNode;
   isDeleted?: boolean;
   onNext?: () => void;
   onPrev?: () => void;
 }
 
-export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, onNext, onPrev }: LightboxProps) {
+export default function Lightbox({ src, alt = '', onClose, actions, info, isDeleted, onNext, onPrev }: LightboxProps) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -204,6 +205,7 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, o
         >
           <ZoomIn size={20} />
         </button>
+        {info && <><div style={{ width: '1px', height: 22, background: 'rgba(255,255,255,.2)', margin: '0 4px' }} /><span style={{ color: '#fff', display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', padding: '0 4px' }}>{info}</span></>}
         
         {actions || (
            <>
@@ -228,3 +230,9 @@ export default function Lightbox({ src, alt = '', onClose, actions, isDeleted, o
     </div>
   );
 }
+
+
+
+
+
+
