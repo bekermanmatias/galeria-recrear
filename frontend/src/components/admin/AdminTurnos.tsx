@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 interface Turno {
@@ -7,18 +8,14 @@ interface Turno {
   codigo: string;
 }
 
-const MOCK_TURNOS: Turno[] = [
-  { id: '1', nombre: 'Mañana', codigo: 'm' },
-  { id: '2', nombre: 'Tarde', codigo: 't' },
-  { id: '3', nombre: 'Noche', codigo: 'n' },
-];
-
 export default function AdminTurnos() {
-  const [turnos, setTurnos] = useState<Turno[]>(MOCK_TURNOS);
+  const [turnos, setTurnos] = useState<Turno[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const load = () => adminRequest<{items: CatalogItem[]}>( '/shifts' ).then(data => setTurnos(data.items.map(item => ({ id:item.id, nombre:item.name, codigo:item.bot_code }))));
+  useEffect(() => { load(); }, []);
 
   const openModal = (t?: Turno) => {
     if (t) {
@@ -31,28 +28,9 @@ export default function AdminTurnos() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.nombre || !formData.codigo) return;
-    
-    const newTurno: Turno = {
-      id: editingId || Math.random().toString(36).slice(2),
-      nombre: formData.nombre,
-      codigo: formData.codigo,
-    };
+  const handleSave = async () => { if (!formData.nombre || !formData.codigo) return; await adminRequest('/shifts'+(editingId ? '/'+editingId : ''), { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify({ name:formData.nombre, botCode:formData.codigo }) }); setIsModalOpen(false); await load(); };
 
-    if (editingId) {
-      setTurnos(prev => prev.map(t => t.id === editingId ? newTurno : t));
-    } else {
-      setTurnos(prev => [...prev, newTurno]);
-    }
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar este turno?')) {
-      setTurnos(prev => prev.filter(t => t.id !== id));
-    }
-  };
+  const handleDelete = async (id: string) => { if (confirm('¿Desactivar este registro?')) { await adminRequest('/shifts/'+id,{method:'DELETE'}); await load(); } };
 
   const filteredTurnos = turnos.filter(t => 
     t.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -160,3 +138,5 @@ export default function AdminTurnos() {
     </div>
   );
 }
+
+

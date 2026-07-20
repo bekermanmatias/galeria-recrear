@@ -38,3 +38,4 @@ frontend/build/
 # Backend
 backend/coverage/
 backend/dist/
+backend/.storage/

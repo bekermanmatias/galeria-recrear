@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 
 interface Actividad {
@@ -7,18 +8,14 @@ interface Actividad {
   codigo: string;
 }
 
-const MOCK_ACTIVIDADES: Actividad[] = [
-  { id: '1', nombre: 'Cabalgata', codigo: 'c' },
-  { id: '2', nombre: 'Pileta', codigo: 'p' },
-  { id: '3', nombre: 'Hotel', codigo: 'h' },
-];
-
 export default function AdminActividades() {
-  const [actividades, setActividades] = useState<Actividad[]>(MOCK_ACTIVIDADES);
+  const [actividades, setActividades] = useState<Actividad[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const load = () => adminRequest<{items: CatalogItem[]}>( '/activities' ).then(data => setActividades(data.items.map(item => ({ id:item.id, nombre:item.name, codigo:item.bot_code }))));
+  useEffect(() => { load(); }, []);
 
   const openModal = (act?: Actividad) => {
     if (act) {
@@ -31,28 +28,9 @@ export default function AdminActividades() {
     setIsModalOpen(true);
   };
 
-  const handleSave = () => {
-    if (!formData.nombre || !formData.codigo) return;
-    
-    const newAct: Actividad = {
-      id: editingId || Math.random().toString(36).slice(2),
-      nombre: formData.nombre,
-      codigo: formData.codigo,
-    };
+  const handleSave = async () => { if (!formData.nombre || !formData.codigo) return; await adminRequest('/activities'+(editingId ? '/'+editingId : ''), { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify({ name:formData.nombre, botCode:formData.codigo }) }); setIsModalOpen(false); await load(); };
 
-    if (editingId) {
-      setActividades(prev => prev.map(a => a.id === editingId ? newAct : a));
-    } else {
-      setActividades(prev => [...prev, newAct]);
-    }
-    setIsModalOpen(false);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm('¿Eliminar esta actividad?')) {
-      setActividades(prev => prev.filter(a => a.id !== id));
-    }
-  };
+  const handleDelete = async (id: string) => { if (confirm('¿Desactivar este registro?')) { await adminRequest('/activities/'+id,{method:'DELETE'}); await load(); } };
 
   const filteredActividades = actividades.filter(a => 
     a.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -160,3 +138,5 @@ export default function AdminActividades() {
     </div>
   );
 }
+
+

@@ -4,53 +4,54 @@ services:
       context: ./frontend
     ports:
       - "4321:4321"
+    env_file:
+      - ./frontend/.env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
     volumes:
       - ./frontend:/app
-      - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - WATCHPACK_POLLING=true
-    networks:
-      - app-network
+      - frontend_node_modules:/app/node_modules
+    command: sh -c "npm install --legacy-peer-deps && npm run dev -- --host 0.0.0.0"
+    depends_on:
+      backend:
+        condition: service_started
 
   backend:
     build:
       context: ./backend
     ports:
       - "3001:3000"
+    env_file:
+      - ./backend/.env
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
     volumes:
       - ./backend:/app
-      - /app/node_modules
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-      - PORT=3000
-      - NODE_ENV=development
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=galeria_recrear
+      - backend_node_modules:/app/node_modules
+    command: sh -c "npm install && npm run migrate && npm run seed && npm run dev"
     depends_on:
-      - db
-    networks:
-      - app-network
+      db:
+        condition: service_healthy
 
   db:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     ports:
       - "5432:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=galeria_recrear
+      POSTGRES_DB: galeria_recrear
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d galeria_recrear"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     volumes:
-      - pgdata:/var/lib/postgresql/data
-    networks:
-      - app-network
+      - postgres_data:/var/lib/postgresql/data
 
 volumes:
-  pgdata:
+  postgres_data:
+  frontend_node_modules:
+  backend_node_modules:
 
-networks:
-  app-network:
-    driver: bridge
