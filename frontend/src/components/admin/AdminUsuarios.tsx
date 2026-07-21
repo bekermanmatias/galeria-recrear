@@ -34,6 +34,7 @@ export default function AdminUsuarios() {
     rol: 'user', password: '',
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [schoolSearch, setSchoolSearch] = useState('');
   const [schools, setSchools] = useState<School[]>([]);
   const [schoolIds, setSchoolIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
@@ -44,10 +45,10 @@ export default function AdminUsuarios() {
   const openModal = (user?: Usuario) => {
     if (user) {
       setEditingId(user.id);
-      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol, password:'' }); setSchoolIds(user.school_ids || []);
+      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol, password:'' }); setSchoolIds(user.school_ids || []); setSchoolSearch('');
     } else {
       setEditingId(null);
-      setFormData({ nombre: '', email: '', rol: 'user', password:'' }); setSchoolIds([]);
+      setFormData({ nombre: '', email: '', rol: 'user', password:'' }); setSchoolIds([]); setSchoolSearch('');
     }
     setIsModalOpen(true);
   };
@@ -173,9 +174,10 @@ export default function AdminUsuarios() {
               </label>
               {formData.rol !== 'admin' && <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
                 Colegios asignados
+                <input type="text" placeholder="Buscar colegio..." value={schoolSearch} onChange={e => setSchoolSearch(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', fontSize: '13px', outline: 'none' }} onFocus={e => e.target.style.borderColor = '#1A4B77'} onBlur={e => e.target.style.borderColor = '#E4E4E7'} />
                 <div style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {schools.filter(school => school.active !== false).map(school => (
-                    <label key={school.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 400, cursor: 'pointer' }}>
+                  {schools.filter(school => school.active !== false && school.name.toLowerCase().includes(schoolSearch.toLowerCase())).map(school => (
+                    <label key={school.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 400, cursor: 'pointer', padding: '2px 0' }}>
                       <input type="checkbox" checked={schoolIds.includes(school.id)} onChange={e => {
                         if (e.target.checked) setSchoolIds([...schoolIds, school.id]);
                         else setSchoolIds(schoolIds.filter(id => id !== school.id));
@@ -183,6 +185,9 @@ export default function AdminUsuarios() {
                       {school.name}
                     </label>
                   ))}
+                  {schools.filter(school => school.active !== false && school.name.toLowerCase().includes(schoolSearch.toLowerCase())).length === 0 && (
+                    <span style={{ color: '#A1A1AA', fontSize: '12px', fontStyle: 'italic' }}>No se encontraron colegios.</span>
+                  )}
                 </div>
               </label>}
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
