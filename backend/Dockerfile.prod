@@ -14,5 +14,5 @@ RUN npm run build
 
 EXPOSE 3000
 
-# Corre las migraciones (opcional) y luego arranca el servidor Node real
-CMD ["sh", "-c", "npm run migrate && npm start"]
+# Corre las migraciones (opcional), el seed y luego arranca el servidor Node real
+CMD ["sh", "-c", "npm run migrate && npm run seed && npm start"]
