@@ -14,18 +14,26 @@ jobs:
 
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          ENV_BACKEND: ${{ secrets.PROD_ENV_BACKEND }}
+          ENV_FRONTEND: ${{ secrets.PROD_ENV_FRONTEND }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
+          envs: ENV_BACKEND,ENV_FRONTEND
           script: |
             cd ${{ secrets.PROJECT_PATH }}
             
             echo "1. Pulling latest code..."
             git pull origin main
             
-            echo "2. Reiniciando contenedores con Docker Compose..."
+            echo "2. Configurando archivos .env..."
+            echo "$ENV_BACKEND" > backend/.env
+            echo "$ENV_FRONTEND" > frontend/.env
+            
+            echo "3. Reiniciando contenedores con Docker Compose..."
             docker-compose -f docker-compose.prod.yml up -d --build
             
             echo "¡Deploy completado exitosamente!"
