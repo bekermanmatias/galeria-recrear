@@ -10,6 +10,7 @@ interface Usuario {
   nombre: string;
   email: string;
   rol: UsuarioRol;
+  school_ids?: string[];
 }
 
 const roleLabel = (rol: UsuarioRol) => {
@@ -34,19 +35,19 @@ export default function AdminUsuarios() {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [schools, setSchools] = useState<School[]>([]);
-  const [schoolId, setSchoolId] = useState('');
+  const [schoolIds, setSchoolIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const load = () => adminRequest<{items: AdminUser[]}>('/users').then(data => setUsuarios(data.items.map(item => ({id:item.id,nombre:item.name,email:item.email,rol:item.role==='ADMIN'?'admin':item.role==='COORDINATOR'?'coordinador':'user'}))));
+  const load = () => adminRequest<{items: AdminUser[]}>('/users').then(data => setUsuarios(data.items.map(item => ({id:item.id,nombre:item.name,email:item.email,rol:item.role==='ADMIN'?'admin':item.role==='COORDINATOR'?'coordinador':'user',school_ids:item.school_ids}))));
   useEffect(() => { load(); adminRequest<{items: School[]}>('/schools').then(data => setSchools(data.items)); }, []);
 
   const openModal = (user?: Usuario) => {
     if (user) {
       setEditingId(user.id);
-      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol, password:'' }); setSchoolId('');
+      setFormData({ nombre: user.nombre, email: user.email, rol: user.rol, password:'' }); setSchoolIds(user.school_ids || []);
     } else {
       setEditingId(null);
-      setFormData({ nombre: '', email: '', rol: 'user', password:'' }); setSchoolId('');
+      setFormData({ nombre: '', email: '', rol: 'user', password:'' }); setSchoolIds([]);
     }
     setIsModalOpen(true);
   };
@@ -56,7 +57,7 @@ export default function AdminUsuarios() {
     const role = formData.rol==='admin'?'ADMIN':formData.rol==='coordinador'?'COORDINATOR':'PARENT';
     const body:any={name:formData.nombre,email:formData.email,role}; if(formData.password) body.password=formData.password;
     const saved = await adminRequest<AdminUser>('/users'+(editingId?'/'+editingId:''),{method:editingId?'PATCH':'POST',body:JSON.stringify(body)});
-    if (schoolId && role !== 'ADMIN') await adminRequest('/schools/'+schoolId+'/members/'+saved.id,{method:'PUT',body:JSON.stringify({membershipRole:role})});
+    if (role !== 'ADMIN') await adminRequest('/users/'+saved.id+'/schools',{method:'PUT',body:JSON.stringify({schoolIds, role})});
     setIsModalOpen(false); await load();
   };
   const handleDelete = (id:string) => setPendingDelete(id);
@@ -171,11 +172,18 @@ export default function AdminUsuarios() {
                 <input type="password" minLength={8} value={formData.password} onChange={e => setFormData({ ...formData, password: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
               </label>
               {formData.rol !== 'admin' && <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                Colegio asignado
-                <select value={schoolId} onChange={e => setSchoolId(e.target.value)} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white' }}>
-                  <option value="">Sin asignar</option>
-                  {schools.filter(school => school.active !== false).map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
-                </select>
+                Colegios asignados
+                <div style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {schools.filter(school => school.active !== false).map(school => (
+                    <label key={school.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 400, cursor: 'pointer' }}>
+                      <input type="checkbox" checked={schoolIds.includes(school.id)} onChange={e => {
+                        if (e.target.checked) setSchoolIds([...schoolIds, school.id]);
+                        else setSchoolIds(schoolIds.filter(id => id !== school.id));
+                      }} style={{ cursor: 'pointer' }} />
+                      {school.name}
+                    </label>
+                  ))}
+                </div>
               </label>}
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
                 Rol

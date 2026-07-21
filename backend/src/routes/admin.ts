@@ -17,7 +17,16 @@ export const adminRouter = Router();
 adminRouter.get('/users', asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query);
   const term = String(req.query.q ?? '');
-  const result = await query('SELECT id, name, email, role, active, created_at FROM users WHERE name ILIKE $1 OR email ILIKE $1 ORDER BY name LIMIT $2 OFFSET $3', [`%${term}%`, pageSize, (page - 1) * pageSize]);
+  const result = await query(`
+    SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
+           COALESCE(array_agg(us.school_id) FILTER (WHERE us.school_id IS NOT NULL AND us.active = true), ARRAY[]::uuid[]) as school_ids
+    FROM users u
+    LEFT JOIN user_schools us ON u.id = us.user_id
+    WHERE u.name ILIKE $1 OR u.email ILIKE $1
+    GROUP BY u.id
+    ORDER BY u.name
+    LIMIT $2 OFFSET $3
+  `, [`%${term}%`, pageSize, (page - 1) * pageSize]);
   res.json({ items: result.rows, page, pageSize });
 }));
 adminRouter.post('/users', asyncHandler(async (req, res) => {
@@ -36,6 +45,16 @@ adminRouter.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
   const input = z.object({ password: z.string().min(8).max(128) }).parse(req.body);
   const result = await query('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id', [await hashPassword(input.password), req.params.id]);
   if (!result.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
+  res.status(204).end();
+}));
+adminRouter.put('/users/:id/schools', asyncHandler(async (req, res) => {
+  const input = z.object({ schoolIds: z.array(z.string().uuid()), role: z.enum(['COORDINATOR', 'PARENT']) }).parse(req.body);
+  await transaction(async client => {
+    await client.query("UPDATE user_schools SET active=false WHERE user_id=$1 AND membership_role=$2", [req.params.id, input.role]);
+    for (const schoolId of input.schoolIds) {
+      await client.query('INSERT INTO user_schools (user_id, school_id, membership_role, active) VALUES ($1,$2,$3,true) ON CONFLICT (user_id,school_id,membership_role) DO UPDATE SET active=true', [req.params.id, schoolId, input.role]);
+    }
+  });
   res.status(204).end();
 }));
 adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query('UPDATE users SET active = false WHERE id = $1', [req.params.id]); res.status(204).end(); }));
