@@ -59,7 +59,20 @@ adminRouter.put('/users/:id/schools', asyncHandler(async (req, res) => {
 }));
 adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query('UPDATE users SET active = false WHERE id = $1', [req.params.id]); res.status(204).end(); }));
 
-adminRouter.get('/schools', asyncHandler(async (_req, res) => { const result = await query('SELECT * FROM schools WHERE deleted_at IS NULL ORDER BY name'); res.json({ items: result.rows }); }));
+adminRouter.get('/schools', asyncHandler(async (_req, res) => {
+  const result = await query(`
+    SELECT s.*, 
+           COALESCE(array_agg(u.id) FILTER (WHERE u.id IS NOT NULL), ARRAY[]::uuid[]) as coordinator_ids,
+           COALESCE(array_agg(u.name) FILTER (WHERE u.id IS NOT NULL), ARRAY[]::text[]) as coordinators
+    FROM schools s
+    LEFT JOIN user_schools us ON s.id = us.school_id AND us.membership_role = 'COORDINATOR' AND us.active = true
+    LEFT JOIN users u ON us.user_id = u.id AND u.active = true
+    WHERE s.deleted_at IS NULL
+    GROUP BY s.id
+    ORDER BY s.name
+  `);
+  res.json({ items: result.rows });
+}));
 adminRouter.post('/schools', asyncHandler(async (req, res) => {
   const input = schoolSchema.parse(req.body);
   const result = await query('INSERT INTO schools (name, code, bot_code, start_date, end_date, active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *', [input.name, input.code, input.botCode, input.startDate ?? null, input.endDate ?? null, input.active ?? true]);
@@ -71,6 +84,17 @@ adminRouter.patch('/schools/:id', asyncHandler(async (req, res) => {
   if (!result.rowCount) throw new AppError(404, 'SCHOOL_NOT_FOUND', 'Colegio no encontrado'); res.json(result.rows[0]);
 }));
 adminRouter.delete('/schools/:id', asyncHandler(async (req, res) => { await query('UPDATE schools SET deleted_at = now(), active = false WHERE id = $1', [req.params.id]); res.status(204).end(); }));
+
+adminRouter.put('/schools/:id/coordinators', asyncHandler(async (req, res) => {
+  const input = z.object({ coordinatorIds: z.array(z.string().uuid()) }).parse(req.body);
+  await transaction(async client => {
+    await client.query("UPDATE user_schools SET active=false WHERE school_id=$1 AND membership_role='COORDINATOR'", [req.params.id]);
+    for (const userId of input.coordinatorIds) {
+      await client.query("INSERT INTO user_schools (user_id, school_id, membership_role, active) VALUES ($1,$2,'COORDINATOR',true) ON CONFLICT (user_id,school_id,membership_role) DO UPDATE SET active=true", [userId, req.params.id]);
+    }
+  });
+  res.status(204).end();
+}));
 
 for (const [route, table, hasSort] of [['activities', 'activities', false], ['shifts', 'shifts', true]] as const) {
   adminRouter.get(`/${route}`, asyncHandler(async (_req, res) => { const result = await query(`SELECT * FROM ${table} ORDER BY ${hasSort ? 'sort_order, ' : ''}name`); res.json({ items: result.rows }); }));

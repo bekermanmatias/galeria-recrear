@@ -2,7 +2,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001/api/v1'
 
 export type Role = 'ADMIN' | 'COORDINATOR' | 'PARENT';
 export interface SessionUser { id: string; name: string; email: string; role: Role; }
-export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; }
+export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; coordinator_ids?: string[]; coordinators?: string[]; }
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
 export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; }
 export interface LotSummary { id: string; event_date: string; school_id: string; school_name: string; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }

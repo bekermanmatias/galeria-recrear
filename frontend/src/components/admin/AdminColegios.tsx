@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adminRequest, type School } from '../../lib/api';
+import { adminRequest, type School, type AdminUser } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
@@ -10,32 +10,44 @@ interface Colegio {
   fechaInicio: string;
   fechaFin: string;
   coordinadores: string[];
+  coordinator_ids?: string[];
 }
 
 export default function AdminColegios() {
   const [colegios, setColegios] = useState<Colegio[]>([]);
+  const [coordinators, setCoordinators] = useState<AdminUser[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '', coordinadores: '' });
+  const [formData, setFormData] = useState({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '' });
+  const [coordinatorIds, setCoordinatorIds] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [coordinatorSearch, setCoordinatorSearch] = useState('');
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
-  const load = () => adminRequest<{items: School[]}>('/schools').then(data => setColegios(data.items.map(item => ({ id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date ?? '',fechaFin:item.end_date ?? '',coordinadores:[] }))));
+  
+  const load = () => {
+    adminRequest<{items: School[]}>('/schools').then(data => setColegios(data.items.map(item => ({ id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date ?? '',fechaFin:item.end_date ?? '',coordinadores:item.coordinators || [], coordinator_ids: item.coordinator_ids || [] }))));
+    adminRequest<{items: AdminUser[]}>('/users').then(data => setCoordinators(data.items.filter(u => u.role === 'COORDINATOR')));
+  };
   useEffect(() => { load(); }, []);
   const openModal = (col?: Colegio) => {
     if (col) {
       setEditingId(col.id);
-      setFormData({ ...col, coordinadores: col.coordinadores.join(', ') });
+      setFormData({ nombre: col.nombre, codigo: col.codigo, fechaInicio: col.fechaInicio, fechaFin: col.fechaFin });
+      setCoordinatorIds(col.coordinator_ids || []);
     } else {
       setEditingId(null);
-      setFormData({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '', coordinadores: '' });
+      setFormData({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '' });
+      setCoordinatorIds([]);
     }
+    setCoordinatorSearch('');
     setIsModalOpen(true);
   };
 
   const handleSave = async () => {
     if (!formData.nombre || !formData.codigo) return;
-    await adminRequest('/schools'+(editingId ? '/'+editingId : ''), { method:editingId ? 'PATCH' : 'POST', body:JSON.stringify({ name:formData.nombre, code:formData.codigo, botCode:formData.codigo.toUpperCase(), startDate:formData.fechaInicio || null, endDate:formData.fechaFin || null }) });
+    const saved = await adminRequest<School>('/schools'+(editingId ? '/'+editingId : ''), { method:editingId ? 'PATCH' : 'POST', body:JSON.stringify({ name:formData.nombre, code:formData.codigo, botCode:formData.codigo.toUpperCase(), startDate:formData.fechaInicio || null, endDate:formData.fechaFin || null }) });
+    await adminRequest('/schools/'+saved.id+'/coordinators', { method: 'PUT', body: JSON.stringify({ coordinatorIds }) });
     setIsModalOpen(false); await load();
   };
   const handleDelete = (id:string) => setPendingDelete(id);
@@ -150,8 +162,22 @@ export default function AdminColegios() {
                 </label>
               </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                Coordinadores Asignados (separados por coma)
-                <input value={formData.coordinadores} onChange={e => setFormData({ ...formData, coordinadores: e.target.value })} placeholder="Ej: Juan, Maria" style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
+                Coordinadores Asignados
+                <input type="text" placeholder="Buscar coordinador..." value={coordinatorSearch} onChange={e => setCoordinatorSearch(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', fontSize: '13px', outline: 'none' }} onFocus={e => e.target.style.borderColor = '#1A4B77'} onBlur={e => e.target.style.borderColor = '#E4E4E7'} />
+                <div style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {coordinators.filter(u => u.active !== false && u.name.toLowerCase().includes(coordinatorSearch.toLowerCase())).map(u => (
+                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 400, cursor: 'pointer', padding: '2px 0' }}>
+                      <input type="checkbox" checked={coordinatorIds.includes(u.id)} onChange={e => {
+                        if (e.target.checked) setCoordinatorIds([...coordinatorIds, u.id]);
+                        else setCoordinatorIds(coordinatorIds.filter(id => id !== u.id));
+                      }} style={{ cursor: 'pointer' }} />
+                      {u.name} <span style={{ color: '#A1A1AA', fontSize: '12px' }}>({u.email})</span>
+                    </label>
+                  ))}
+                  {coordinators.filter(u => u.active !== false && u.name.toLowerCase().includes(coordinatorSearch.toLowerCase())).length === 0 && (
+                    <span style={{ color: '#A1A1AA', fontSize: '12px', fontStyle: 'italic' }}>No se encontraron coordinadores.</span>
+                  )}
+                </div>
               </label>
             </div>
 
