@@ -176,14 +176,13 @@ export default function AdminUsuarios() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Colegios asignados</span>
                   <button type="button" onClick={() => {
-                    const filtered = schools.filter(school => school.active !== false && school.name.toLowerCase().includes(schoolSearch.toLowerCase()));
-                    if (filtered.every(s => schoolIds.includes(s.id))) {
-                      setSchoolIds(schoolIds.filter(id => !filtered.some(s => s.id === id)));
+                    const activos = schools.filter(school => school.active !== false);
+                    if (activos.every(s => schoolIds.includes(s.id))) {
+                      setSchoolIds([]);
                     } else {
-                      const newIds = new Set([...schoolIds, ...filtered.map(s => s.id)]);
-                      setSchoolIds(Array.from(newIds));
+                      setSchoolIds(activos.map(s => s.id));
                     }
-                  }} style={{ background: 'none', border: 'none', color: '#1A4B77', fontSize: '12px', cursor: 'pointer', padding: 0 }}>Marcar/desmarcar (visibles)</button>
+                  }} style={{ background: 'none', border: 'none', color: '#1A4B77', fontSize: '12px', cursor: 'pointer', padding: 0 }}>Marcar/desmarcar todos</button>
                 </div>
                 <input type="text" placeholder="Buscar colegio..." value={schoolSearch} onChange={e => setSchoolSearch(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', fontSize: '13px', outline: 'none' }} onFocus={e => e.target.style.borderColor = '#1A4B77'} onBlur={e => e.target.style.borderColor = '#E4E4E7'} />
                 <div style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
