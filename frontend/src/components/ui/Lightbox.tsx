@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, ZoomIn, ZoomOut, Download, Share2, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface LightboxProps {
   src: string;
@@ -7,15 +7,21 @@ interface LightboxProps {
   onClose: () => void;
   actions?: React.ReactNode;
   info?: React.ReactNode;
+  downloadUrl?: string;
+  downloadName?: string;
   isDeleted?: boolean;
   onNext?: () => void;
   onPrev?: () => void;
 }
 
-export default function Lightbox({ src, alt = '', onClose, actions, info, isDeleted, onNext, onPrev }: LightboxProps) {
+export default function Lightbox({ src, alt = '', onClose, actions, info, downloadUrl, downloadName, isDeleted, onNext, onPrev }: LightboxProps) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareStatus, setShareStatus] = useState('');
   const dragStart = useRef({ x: 0, y: 0 });
   const touchStart = useRef({ x: 0, y: 0, time: 0 });
 
@@ -83,6 +89,62 @@ export default function Lightbox({ src, alt = '', onClose, actions, info, isDele
     window.addEventListener('mouseup', handleGlobalMouseUp);
     return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
   }, []);
+
+  const handleDownload = async () => {
+    if (isDownloading) return;
+    try {
+      setIsDownloading(true);
+      setDownloadError('');
+      const response = await fetch(downloadUrl || src, { credentials: 'include' });
+      if (!response.ok) throw new Error('No se pudo descargar la imagen');
+      const blobUrl = URL.createObjectURL(await response.blob());
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = downloadName || alt || `recrear-${Date.now()}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+    } catch {
+      setDownloadError('No se pudo descargar');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (isSharing) return;
+    try {
+      setIsSharing(true);
+      setShareStatus('');
+      const response = await fetch(downloadUrl || src, { credentials: 'include' });
+      if (!response.ok) throw new Error('No se pudo obtener la imagen');
+      const blob = await response.blob();
+      const filename = downloadName || alt || `recrear-${Date.now()}.jpg`;
+      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
+      const shareData = { files: [file], title: 'Foto de Recrear' };
+
+      if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
+        await navigator.share(shareData);
+        return;
+      }
+
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      setShareStatus('Se descargó para compartir');
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      setShareStatus('No se pudo compartir');
+    } finally {
+      setIsSharing(false);
+    }
+  };
 
   return (
     <div 
@@ -210,19 +272,23 @@ export default function Lightbox({ src, alt = '', onClose, actions, info, isDele
         {actions || (
            <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
+              <button
+                onClick={handleShare}
+                disabled={isSharing}
+                title={shareStatus || 'Compartir en redes sociales'}
+                style={{ background: 'transparent', border: 'none', color: shareStatus.startsWith('No') ? '#FCA5A5' : 'white', cursor: isSharing ? 'wait' : 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', opacity: isSharing ? .65 : 1 }}
+              >
+                <Share2 size={20} />
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>{isSharing ? 'Preparando…' : shareStatus || 'Compartir'}</span>
+              </button>
               <button 
-                onClick={() => {
-                  const link = document.createElement('a');
-                  link.href = src;
-                  link.download = `recrear-${Date.now()}.jpg`;
-                  document.body.appendChild(link);
-                  link.click();
-                  document.body.removeChild(link);
-                }}
-                style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                onClick={handleDownload}
+                disabled={isDownloading}
+                title={downloadError || 'Descargar archivo original'}
+                style={{ background: 'transparent', border: 'none', color: downloadError ? '#FCA5A5' : 'white', cursor: isDownloading ? 'wait' : 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', opacity: isDownloading ? .65 : 1 }}
               >
                 <Download size={20} />
-                <span style={{ fontSize: '13px', fontWeight: 500 }}>Descargar</span>
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>{isDownloading ? 'Descargando…' : downloadError || 'Descargar'}</span>
               </button>
            </>
         )}
@@ -230,6 +296,10 @@ export default function Lightbox({ src, alt = '', onClose, actions, info, isDele
     </div>
   );
 }
+
+
+
+
 
 
 

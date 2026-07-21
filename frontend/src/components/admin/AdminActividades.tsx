@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 interface Actividad {
   id: string;
@@ -14,6 +15,8 @@ export default function AdminActividades() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const load = () => adminRequest<{items: CatalogItem[]}>( '/activities' ).then(data => setActividades(data.items.map(item => ({ id:item.id, nombre:item.name, codigo:item.bot_code }))));
   useEffect(() => { load(); }, []);
 
@@ -30,7 +33,8 @@ export default function AdminActividades() {
 
   const handleSave = async () => { if (!formData.nombre || !formData.codigo) return; await adminRequest('/activities'+(editingId ? '/'+editingId : ''), { method: editingId ? 'PATCH' : 'POST', body: JSON.stringify({ name:formData.nombre, botCode:formData.codigo }) }); setIsModalOpen(false); await load(); };
 
-  const handleDelete = async (id: string) => { if (confirm('¿Desactivar este registro?')) { await adminRequest('/activities/'+id,{method:'DELETE'}); await load(); } };
+  const handleDelete = (id: string) => setPendingDelete(id);
+  const confirmDelete = async () => { if (!pendingDelete) return; try { setDeleteBusy(true); await adminRequest('/activities/'+pendingDelete,{method:'DELETE'}); setPendingDelete(null); await load(); } finally { setDeleteBusy(false); } };
 
   const filteredActividades = actividades.filter(a => 
     a.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -135,8 +139,11 @@ export default function AdminActividades() {
           </div>
         </div>
       )}
+      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar actividad?" description="La actividad dejará de estar disponible para nuevas cargas. Los lotes existentes conservarán su información." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }
+
+
 
 

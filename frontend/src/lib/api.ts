@@ -5,7 +5,7 @@ export interface SessionUser { id: string; name: string; email: string; role: Ro
 export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; }
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
 export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; }
-export interface LotSummary { id: string; event_date: string; school_id: string; school_name: string; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; }
+export interface LotSummary { id: string; event_date: string; school_id: string; school_name: string; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }
 export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -51,6 +51,8 @@ export const api = {
   thumbnailUrl: (mediaId: string) => `${API_URL}/media/${mediaId}/thumbnail`,
   downloadUrl: (mediaId: string) => `${API_URL}/media/${mediaId}/download`,
 };
+
+
 
 
 

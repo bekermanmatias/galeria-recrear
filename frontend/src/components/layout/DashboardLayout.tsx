@@ -137,9 +137,7 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
           </div>
 
           <div style={{ padding: '24px', borderTop: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button onClick={() => window.dispatchEvent(new Event('open-account-settings'))} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#475569', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
-              <Settings size={20} color="#64748B" /> Configuración
-            </button>
+
             <button onClick={async () => { try { await api.logout(); } finally { window.location.href = '/login'; } }} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
               <LogOut size={20} color="#EF4444" /> Cerrar sesión
             </button>

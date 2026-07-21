@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { adminRequest, type School } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 interface Colegio {
   id: string;
@@ -17,6 +18,8 @@ export default function AdminColegios() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '', coordinadores: '' });
   const [searchQuery, setSearchQuery] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const load = () => adminRequest<{items: School[]}>('/schools').then(data => setColegios(data.items.map(item => ({ id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date ?? '',fechaFin:item.end_date ?? '',coordinadores:[] }))));
   useEffect(() => { load(); }, []);
   const openModal = (col?: Colegio) => {
@@ -35,7 +38,8 @@ export default function AdminColegios() {
     await adminRequest('/schools'+(editingId ? '/'+editingId : ''), { method:editingId ? 'PATCH' : 'POST', body:JSON.stringify({ name:formData.nombre, code:formData.codigo, botCode:formData.codigo.toUpperCase(), startDate:formData.fechaInicio || null, endDate:formData.fechaFin || null }) });
     setIsModalOpen(false); await load();
   };
-  const handleDelete = async (id:string) => { if(confirm('¿Eliminar este colegio?')) { await adminRequest('/schools/'+id,{method:'DELETE'}); await load(); } };
+  const handleDelete = (id:string) => setPendingDelete(id);
+  const confirmDelete = async () => { if (!pendingDelete) return; try { setDeleteBusy(true); await adminRequest('/schools/'+pendingDelete,{method:'DELETE'}); setPendingDelete(null); await load(); } finally { setDeleteBusy(false); } };
 
   const filteredColegios = colegios.filter(c => 
     c.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -158,7 +162,10 @@ export default function AdminColegios() {
           </div>
         </div>
       )}
+      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar colegio?" description="El colegio dejará de estar disponible para accesos y nuevas cargas. Su historial no se eliminará." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }
+
+
 

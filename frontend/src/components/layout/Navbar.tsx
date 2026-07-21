@@ -116,28 +116,7 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
                 <div style={{ fontSize: '12px', color: '#71717A', marginTop: '2px' }}>{session?.email ?? ''}</div>
               </div>
               <div style={{ height: '1px', background: '#E4E4E7', margin: '4px 0' }} />
-              <button
-                onClick={() => { setSettingsOpen(true); setMenuOpen(false); }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  width: '100%',
-                  padding: '8px 12px',
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  fontSize: '13px',
-                  color: '#3F3F46',
-                  borderRadius: '4px',
-                }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#F4F4F5')}
-                onMouseLeave={e => (e.currentTarget.style.background = 'none')}
-              >
-                <Settings size={14} /> Configuración
-              </button>
-              <div style={{ height: '1px', background: '#E4E4E7', margin: '4px 0' }} />
+
               <button
                 onClick={logout}
                 style={{
