@@ -25,25 +25,7 @@ jobs:
             echo "1. Pulling latest code..."
             git pull origin main
             
-            # NOTA: Ajusta estos comandos dependiendo de cómo corres la app en Hostinger
-            # --- OPCIÓN A: Si usas Docker Compose en Producción ---
-            # docker compose -f docker-compose.prod.yml up -d --build
-            
-            # --- OPCIÓN B: Si usas PM2 / Node Nativo ---
-            # echo "2. Instalando dependencias y compilando Backend..."
-            # cd backend
-            # npm install
-            # npm run build
-            # npm run migrate
-            # pm2 restart backend-api
-            #
-            # echo "3. Instalando dependencias y compilando Frontend..."
-            # cd ../frontend
-            # npm install --legacy-peer-deps
-            # npm run build
-            #
-            # Si el frontend (Astro) se sirve con Nginx estático, no hace falta reiniciar PM2.
-            # Si se usa SSR de Astro con Node, reiniciar PM2 del frontend:
-            # pm2 restart frontend-web
+            echo "2. Reiniciando contenedores con Docker Compose..."
+            docker-compose -f docker-compose.prod.yml up -d --build
             
             echo "¡Deploy completado exitosamente!"
