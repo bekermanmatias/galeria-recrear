@@ -40,7 +40,7 @@ export const api = {
   catalogs: (schoolId: string) => request<{ activities: CatalogItem[]; shifts: CatalogItem[] }>(`/lots/catalogs?schoolId=${schoolId}`),
   lots: (status?: string) => request<{ items: LotSummary[] }>(`/lots${status ? `?status=${status}` : ''}`),
   lot: (id: string) => request<{ lot: LotSummary; version: { id: string; status: string; version_number: number }; media: Media[] }>(`/lots/${id}`),
-  createLot: (body: { schoolId: string; activityId: string; shiftId: string; eventDate: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
+  createLot: (body: { schoolId: string; activityId?: string | null; shiftId?: string | null; eventDate: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
   uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
   submitLot: (lotId: string) => request<void>(`/lots/${lotId}/submit`, { method: 'POST' }),
   reopenLot: (lotId: string) => request<void>(`/lots/${lotId}/reopen`, { method: 'POST' }),
