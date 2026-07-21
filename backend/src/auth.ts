@@ -24,10 +24,10 @@ export async function createSession(user: CurrentUser) {
 }
 
 export function writeSession(res: Response, token: string) {
-  res.cookie(cookieName, token, { httpOnly: true, sameSite: 'lax', secure: config.NODE_ENV === 'production', maxAge: config.SESSION_DAYS * 86400000, path: '/' });
+  res.cookie(cookieName, token, { httpOnly: true, sameSite: 'lax', secure: config.FRONTEND_ORIGIN.startsWith('https'), maxAge: config.SESSION_DAYS * 86400000, path: '/' });
 }
 
-export function clearSession(res: Response) { res.clearCookie(cookieName, { httpOnly: true, sameSite: 'lax', secure: config.NODE_ENV === 'production', path: '/' }); }
+export function clearSession(res: Response) { res.clearCookie(cookieName, { httpOnly: true, sameSite: 'lax', secure: config.FRONTEND_ORIGIN.startsWith('https'), path: '/' }); }
 
 export async function authenticate(req: Request, _res: Response, next: NextFunction) {
   try {
