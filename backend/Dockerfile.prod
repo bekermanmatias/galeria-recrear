@@ -1,0 +1,18 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instala dependencias limpias para producción
+COPY package*.json ./
+RUN npm ci
+
+# Copia el resto del código
+COPY . .
+
+# Construye el proyecto (compila Typescript a Javascript en /dist)
+RUN npm run build
+
+EXPOSE 3000
+
+# Corre las migraciones (opcional) y luego arranca el servidor Node real
+CMD ["sh", "-c", "npm run migrate && npm start"]
