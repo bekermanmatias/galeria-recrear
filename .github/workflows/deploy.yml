@@ -1,0 +1,49 @@
+name: Deploy to Production (Hostinger VPS)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT }}
+          script: |
+            cd ${{ secrets.PROJECT_PATH }}
+            
+            echo "1. Pulling latest code..."
+            git pull origin main
+            
+            # NOTA: Ajusta estos comandos dependiendo de cómo corres la app en Hostinger
+            # --- OPCIÓN A: Si usas Docker Compose en Producción ---
+            # docker compose -f docker-compose.prod.yml up -d --build
+            
+            # --- OPCIÓN B: Si usas PM2 / Node Nativo ---
+            # echo "2. Instalando dependencias y compilando Backend..."
+            # cd backend
+            # npm install
+            # npm run build
+            # npm run migrate
+            # pm2 restart backend-api
+            #
+            # echo "3. Instalando dependencias y compilando Frontend..."
+            # cd ../frontend
+            # npm install --legacy-peer-deps
+            # npm run build
+            #
+            # Si el frontend (Astro) se sirve con Nginx estático, no hace falta reiniciar PM2.
+            # Si se usa SSR de Astro con Node, reiniciar PM2 del frontend:
+            # pm2 restart frontend-web
+            
+            echo "¡Deploy completado exitosamente!"
