@@ -102,13 +102,13 @@ export default function CoordinatorPanel() {
     const school = schools.find(item => item.name === colegio);
     const shift = shifts.find(item => item.name === turno);
     const activity = activities.find(item => item.name === actividad);
-    if (!school || !shift || !activity || !fecha || files.length === 0) return;
+    if (!school || !fecha || files.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     setError('');
     setDone(false);
     try {
-      const lot = await api.createLot({ schoolId: school.id, shiftId: shift.id, activityId: activity.id, eventDate: fecha });
+      const lot = await api.createLot({ schoolId: school.id, shiftId: shift?.id ?? null, activityId: activity?.id ?? null, eventDate: fecha });
       for (let index = 0; index < files.length; index += 1) {
         const current = files[index];
         setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item));
@@ -133,7 +133,7 @@ export default function CoordinatorPanel() {
     }
   };
 
-  const canUpload = colegio && fecha && turno && actividad && files.length > 0 && !uploading;
+  const canUpload = Boolean(colegio && fecha && files.length > 0 && !uploading);
 
   return (
     <DashboardLayout
@@ -157,14 +157,14 @@ export default function CoordinatorPanel() {
         {/* Selects */}
         <div className="responsive-grid">
           <SearchableSelect
-            label="Colegio"
+            label="Colegio *"
             value={colegio}
             onChange={setColegio}
             options={schools.map(item => item.name)}
             placeholder="Seleccionar colegio..."
           />
           <DateField
-            label="Fecha"
+            label="Fecha *"
             value={fecha}
             onChange={setFecha}
           />
@@ -173,14 +173,14 @@ export default function CoordinatorPanel() {
             value={turno}
             onChange={setTurno}
             options={shifts.map(item => item.name)}
-            placeholder="Seleccionar turno..."
+            placeholder="Opcional..."
           />
           <SearchableSelect
             label="Actividad"
             value={actividad}
             onChange={setActividad}
             options={activities.map(item => item.name)}
-            placeholder="Seleccionar actividad..."
+            placeholder="Opcional..."
           />
         </div>
 

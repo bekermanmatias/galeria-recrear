@@ -13,6 +13,12 @@ interface Colegio {
   coordinator_ids?: string[];
 }
 
+const formatDate = (d: string) => {
+  if (!d) return '-';
+  const parts = d.split('T')[0].split('-');
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
+
 export default function AdminColegios() {
   const [colegios, setColegios] = useState<Colegio[]>([]);
   const [coordinators, setCoordinators] = useState<AdminUser[]>([]);
@@ -120,7 +126,7 @@ export default function AdminColegios() {
               <tr key={col.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
                 <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{col.codigo}</td>
                 <td style={{ padding: '16px 24px', fontSize: '14px' }}>{col.nombre}</td>
-                <td style={{ padding: '16px 24px', fontSize: '13px', color: '#71717A' }}>{col.fechaInicio} a {col.fechaFin}</td>
+                <td style={{ padding: '16px 24px', fontSize: '13px', color: '#71717A' }}>{formatDate(col.fechaInicio)} a {formatDate(col.fechaFin)}</td>
                 <td style={{ padding: '16px 24px', fontSize: '13px' }}>{col.coordinadores.join(', ')}</td>
                 <td style={{ padding: '16px 24px', textAlign: 'right' }}>
                   <button onClick={() => openModal(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
