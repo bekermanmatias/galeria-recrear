@@ -1,4 +1,4 @@
-﻿-- Backfill missing school/catalog relationships for databases created before
+-- Backfill missing school/catalog relationships for databases created before
 -- catalog default triggers were introduced. Existing disabled assignments stay disabled.
 INSERT INTO school_activities (school_id, activity_id, enabled)
 SELECT s.id, a.id, TRUE
