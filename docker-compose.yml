@@ -3,7 +3,7 @@ services:
     build:
       context: ./frontend
     ports:
-      - "4321:4321"
+      - "4322:4321"
     env_file:
       - ./frontend/.env
     environment:
@@ -26,6 +26,7 @@ services:
       - ./backend/.env
     environment:
       CHOKIDAR_USEPOLLING: "true"
+      FRONTEND_ORIGIN: "http://localhost:4322"
     volumes:
       - ./backend:/app
       - backend_node_modules:/app/node_modules
@@ -54,4 +55,3 @@ volumes:
   postgres_data:
   frontend_node_modules:
   backend_node_modules:
-

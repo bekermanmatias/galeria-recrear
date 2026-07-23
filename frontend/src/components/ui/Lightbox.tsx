@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { X, ZoomIn, ZoomOut, Download, Share2, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, Download, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
 
 interface LightboxProps {
   src: string;
+  mediaType?: 'IMAGE' | 'VIDEO';
   alt?: string;
   onClose: () => void;
   actions?: React.ReactNode;
@@ -14,295 +15,180 @@ interface LightboxProps {
   onPrev?: () => void;
 }
 
-export default function Lightbox({ src, alt = '', onClose, actions, info, downloadUrl, downloadName, isDeleted, onNext, onPrev }: LightboxProps) {
-  const [zoom, setZoom] = useState(1);
+export default function Lightbox({
+  src, mediaType = 'IMAGE', alt = '', onClose, actions, info,
+  downloadUrl, downloadName, isDeleted, onNext, onPrev,
+}: LightboxProps) {
+  const isVideo = mediaType === 'VIDEO';
+  const [zoom, setZoom] = useState(.75);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState('');
-  const [isSharing, setIsSharing] = useState(false);
-  const [shareStatus, setShareStatus] = useState('');
-  const dragStart = useRef({ x: 0, y: 0 });
+  const [dragging, setDragging] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [message, setMessage] = useState('');
   const touchStart = useRef({ x: 0, y: 0, time: 0 });
-
-  const handleWheel = (e: React.WheelEvent) => {
-    setZoom(prev => {
-      const newZoom = e.deltaY < 0 ? Math.min(prev + 0.25, 4) : Math.max(prev - 0.25, 0.5);
-      if (newZoom <= 1) {
-         setPan({x: 0, y: 0});
-      }
-      return newZoom;
-    });
-  };
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (zoom <= 1) {
-      return;
-    }
-    e.preventDefault();
-    setIsDragging(true);
-    dragStart.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || zoom <= 1) return;
-    setPan({
-      x: e.clientX - dragStart.current.x,
-      y: e.clientY - dragStart.current.y
-    });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.touches[0];
-    touchStart.current = {
-      x: touch.clientX,
-      y: touch.clientY,
-      time: Date.now(),
-    };
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (zoom > 1 || e.changedTouches.length === 0) return;
-
-    const touch = e.changedTouches[0];
-    const deltaX = touch.clientX - touchStart.current.x;
-    const deltaY = touch.clientY - touchStart.current.y;
-    const elapsed = Date.now() - touchStart.current.time;
-    const isHorizontalSwipe = Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3;
-
-    if (!isHorizontalSwipe || elapsed > 700) return;
-
-    e.stopPropagation();
-    if (deltaX < 0) {
-      onNext?.();
-    } else {
-      onPrev?.();
-    }
-  };
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const didDrag = useRef(false);
 
   useEffect(() => {
-    const handleGlobalMouseUp = () => setIsDragging(false);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+    const update = () => setCompact(window.innerWidth < 640);
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
   }, []);
 
-  const handleDownload = async () => {
-    if (isDownloading) return;
+  useEffect(() => {
+    setZoom(.75);
+    setPan({ x: 0, y: 0 });
+    setMessage('');
+  }, [src]);
+
+  const download = async () => {
+    if (downloading) return;
     try {
-      setIsDownloading(true);
-      setDownloadError('');
+      setDownloading(true);
+      setMessage('');
       const response = await fetch(downloadUrl || src, { credentials: 'include' });
-      if (!response.ok) throw new Error('No se pudo descargar la imagen');
-      const blobUrl = URL.createObjectURL(await response.blob());
+      if (!response.ok) throw new Error();
+      const objectUrl = URL.createObjectURL(await response.blob());
       const link = document.createElement('a');
-      link.href = blobUrl;
+      link.href = objectUrl;
       link.download = downloadName || alt || `recrear-${Date.now()}`;
       document.body.appendChild(link);
       link.click();
       link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     } catch {
-      setDownloadError('No se pudo descargar');
+      setMessage('No se pudo descargar');
     } finally {
-      setIsDownloading(false);
+      setDownloading(false);
     }
   };
 
-  const handleShare = async () => {
-    if (isSharing) return;
+  const share = async () => {
+    if (sharing) return;
     try {
-      setIsSharing(true);
-      setShareStatus('');
+      setSharing(true);
+      setMessage('');
       const response = await fetch(downloadUrl || src, { credentials: 'include' });
-      if (!response.ok) throw new Error('No se pudo obtener la imagen');
+      if (!response.ok) throw new Error();
       const blob = await response.blob();
-      const filename = downloadName || alt || `recrear-${Date.now()}.jpg`;
-      const file = new File([blob], filename, { type: blob.type || 'image/jpeg' });
-      const shareData = { files: [file], title: 'Foto de Recrear' };
-
+      const file = new File([blob], downloadName || alt || `recrear-${Date.now()}`, { type: blob.type });
+      const shareData = { files: [file], title: isVideo ? 'Video de Recrear' : 'Foto de Recrear' };
       if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
         await navigator.share(shareData);
         return;
       }
-
-      const blobUrl = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-      setShareStatus('Se descargó para compartir');
+      await download();
+      setMessage('Archivo listo para compartir');
     } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return;
-      setShareStatus('No se pudo compartir');
+      if (!(error instanceof DOMException && error.name === 'AbortError')) setMessage('No se pudo compartir');
     } finally {
-      setIsSharing(false);
+      setSharing(false);
     }
   };
 
+  const navigate = (direction: 'prev' | 'next') => {
+    if (direction === 'prev') onPrev?.();
+    else onNext?.();
+  };
+
+  const onTouchStart = (event: React.TouchEvent) => {
+    const touch = event.touches[0];
+    touchStart.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+  };
+
+  const onTouchEnd = (event: React.TouchEvent) => {
+    if (isVideo || zoom > 1 || event.changedTouches.length === 0) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - touchStart.current.x;
+    const dy = touch.clientY - touchStart.current.y;
+    if (Date.now() - touchStart.current.time < 700 && Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      navigate(dx < 0 ? 'next' : 'prev');
+    }
+  };
+
+  const beginDrag = (event: React.PointerEvent<HTMLImageElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    didDrag.current = false;
+    dragStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
+    setDragging(true);
+  };
+
+  const moveDrag = (event: React.PointerEvent<HTMLImageElement>) => {
+    if (!dragging) return;
+    const x = event.clientX - dragStart.current.x;
+    const y = event.clientY - dragStart.current.y;
+    if (Math.abs(x) + Math.abs(y) > 3) didDrag.current = true;
+    setPan({ x: dragStart.current.panX + x, y: dragStart.current.panY + y });
+  };
+
+  const endDrag = () => setDragging(false);
+
+  const iconButton: React.CSSProperties = {
+    width: compact ? 42 : 46, height: compact ? 42 : 46, display: 'grid', placeItems: 'center',
+    border: 0, borderRadius: '50%', color: '#fff', cursor: 'pointer',
+    background: 'rgba(15,23,42,.72)', boxShadow: '0 4px 16px rgba(0,0,0,.24)',
+  };
+
   return (
-    <div 
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={isVideo ? 'Reproductor de video' : 'Vista previa de imagen'}
       onClick={onClose}
-      onWheel={handleWheel}
-      style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        background: 'rgba(0, 0, 0, 0.9)',
-        display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center',
-        overflow: 'hidden'
+      onWheel={event => {
+        if (!isVideo) {
+          event.preventDefault();
+          setZoom(value => Math.max(.5, Math.min(4, value + (event.deltaY < 0 ? .25 : -.25))));
+        }
       }}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2,6,23,.91)', display: 'grid', placeItems: 'center', padding: compact ? '64px 12px 92px' : '76px 88px 104px', boxSizing: 'border-box' }}
     >
-      <div 
-        style={{ 
-          flex: 1, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', 
-          cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'zoom-in' 
-        }}
-        onClick={onClose}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
+      <div
+        onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
+        style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', minHeight: 0, position: 'relative' }}
       >
-        <img 
-          src={src} 
-          alt={alt} 
-          draggable={false}
-          onClick={(e) => {
-            e.stopPropagation();
-            if (zoom <= 1) {
-              setZoom(2);
-            }
-          }}
-          style={{ 
-            maxWidth: '90%', maxHeight: '90%', 
-            objectFit: 'contain', 
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-            transition: isDragging ? 'none' : 'transform 0.2s ease-out',
-            opacity: isDeleted ? 0.5 : 1
-          }}
-        />
-      </div>
-
-      <button 
-        onClick={onClose}
-        style={{
-          position: 'absolute', top: '24px', right: '24px',
-          background: 'rgba(255, 255, 255, 0.1)', border: 'none',
-          borderRadius: '50%', width: '48px', height: '48px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          cursor: 'pointer', color: 'white', zIndex: 10
-        }}
-      >
-        <X size={24} />
-      </button>
-
-      {onPrev && (
-        <button
-          onClick={e => { e.stopPropagation(); onPrev(); }}
-          style={{
-            position: 'absolute', left: '24px', top: '50%', transform: 'translateY(-50%)',
-            background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#FFFFFF', transition: 'background 0.2s', zIndex: 10
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
-        >
-          <ChevronLeft size={32} strokeWidth={1.5} />
-        </button>
-      )}
-
-      {onNext && (
-        <button
-          onClick={e => { e.stopPropagation(); onNext(); }}
-          style={{
-            position: 'absolute', right: '24px', top: '50%', transform: 'translateY(-50%)',
-            background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', padding: '12px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer', color: '#FFFFFF', transition: 'background 0.2s', zIndex: 10
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.8)'}
-          onMouseLeave={e => e.currentTarget.style.background = 'rgba(0,0,0,0.5)'}
-        >
-          <ChevronRight size={32} strokeWidth={1.5} />
-        </button>
-      )}
-
-      {/* Toolbar */}
-      <div 
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          position: 'absolute', bottom: '32px',
-          background: 'rgba(39, 39, 42, 0.8)', backdropFilter: 'blur(8px)',
-          padding: '8px', borderRadius: '12px',
-          display: 'flex', gap: '8px', zIndex: 10
-        }}
-      >
-        <button 
-          onClick={() => {
-             setZoom(z => {
-                const newZoom = Math.max(0.5, z - 0.5);
-                if (newZoom <= 1) setPan({x: 0, y: 0});
-                return newZoom;
-             });
-          }}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomOut size={20} />
-        </button>
-        <span style={{ color: 'white', display: 'flex', alignItems: 'center', fontSize: '13px', minWidth: '48px', justifyContent: 'center' }}>
-          {Math.round(zoom * 100)}%
-        </span>
-        <button 
-          onClick={() => setZoom(z => Math.min(4, z + 0.5))}
-          style={{ background: 'transparent', border: 'none', color: 'white', cursor: 'pointer', padding: '8px', borderRadius: '8px' }}
-        >
-          <ZoomIn size={20} />
-        </button>
-        {info && <><div style={{ width: '1px', height: 22, background: 'rgba(255,255,255,.2)', margin: '0 4px' }} /><span style={{ color: '#fff', display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', padding: '0 4px' }}>{info}</span></>}
-        
-        {actions || (
-           <>
-              <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-              <button
-                onClick={handleShare}
-                disabled={isSharing}
-                title={shareStatus || 'Compartir en redes sociales'}
-                style={{ background: 'transparent', border: 'none', color: shareStatus.startsWith('No') ? '#FCA5A5' : 'white', cursor: isSharing ? 'wait' : 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', opacity: isSharing ? .65 : 1 }}
-              >
-                <Share2 size={20} />
-                <span style={{ fontSize: '13px', fontWeight: 500 }}>{isSharing ? 'Preparando…' : shareStatus || 'Compartir'}</span>
-              </button>
-              <button 
-                onClick={handleDownload}
-                disabled={isDownloading}
-                title={downloadError || 'Descargar archivo original'}
-                style={{ background: 'transparent', border: 'none', color: downloadError ? '#FCA5A5' : 'white', cursor: isDownloading ? 'wait' : 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', opacity: isDownloading ? .65 : 1 }}
-              >
-                <Download size={20} />
-                <span style={{ fontSize: '13px', fontWeight: 500 }}>{isDownloading ? 'Descargando…' : downloadError || 'Descargar'}</span>
-              </button>
-           </>
+        {isVideo ? (
+          <video
+            key={src}
+            src={src}
+            controls
+            autoPlay
+            playsInline
+            preload="metadata"
+            onClick={event => event.stopPropagation()}
+            style={{ display: 'block', width: 'auto', maxWidth: compact ? '100%' : '76vw', height: 'auto', maxHeight: compact ? '100%' : '72vh', borderRadius: compact ? 8 : 12, background: '#000', boxShadow: '0 18px 52px rgba(0,0,0,.38)', opacity: isDeleted ? .55 : 1 }}
+          />
+        ) : (
+          <img
+            src={src}
+            alt={alt}
+            draggable={false}
+            onPointerDown={beginDrag}
+            onPointerMove={moveDrag}
+            onPointerUp={endDrag}
+            onPointerCancel={endDrag}
+            onClick={event => event.stopPropagation()}
+            style={{ display: 'block', width: 'auto', height: 'auto', maxWidth: compact ? '92vw' : '70vw', maxHeight: compact ? 'calc(100vh - 170px)' : '66vh', objectFit: 'contain', cursor: dragging ? 'grabbing' : 'grab', transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`, transformOrigin: 'center', transition: dragging ? 'none' : 'transform .18s ease-out', userSelect: 'none', touchAction: 'none', opacity: isDeleted ? .55 : 1 }}
+          />
         )}
       </div>
+
+      <button onClick={event => { event.stopPropagation(); onClose(); }} aria-label="Cerrar" style={{ ...iconButton, position: 'absolute', top: compact ? 12 : 24, right: compact ? 12 : 24 }}><X size={compact ? 21 : 24}/></button>
+
+      {onPrev && <button onClick={event => { event.stopPropagation(); navigate('prev'); }} aria-label="Anterior" style={{ ...iconButton, position: 'absolute', left: compact ? 8 : 24, top: '50%', transform: 'translateY(-50%)' }}><ChevronLeft size={compact ? 24 : 30}/></button>}
+      {onNext && <button onClick={event => { event.stopPropagation(); navigate('next'); }} aria-label="Siguiente" style={{ ...iconButton, position: 'absolute', right: compact ? 8 : 24, top: '50%', transform: 'translateY(-50%)' }}><ChevronRight size={compact ? 24 : 30}/></button>}
+
+      <div onClick={event => event.stopPropagation()} style={{ position: 'absolute', bottom: compact ? 12 : 28, left: '50%', transform: 'translateX(-50%)', maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: compact ? 3 : 6, padding: compact ? 6 : 8, borderRadius: 12, background: 'rgba(24,24,27,.88)', backdropFilter: 'blur(10px)', boxShadow: '0 10px 26px rgba(0,0,0,.26)', color: '#fff', whiteSpace: 'nowrap' }}>
+        {!isVideo && <><button onClick={() => setZoom(value => Math.max(.5, value - .25))} aria-label="Alejar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none' }}><ZoomOut size={18}/></button><span style={{ fontSize: 12, minWidth: 42, textAlign: 'center', fontWeight: 700 }}>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} aria-label="Acercar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none' }}><ZoomIn size={18}/></button></>}
+        {info && <span style={{ borderLeft: !isVideo ? '1px solid rgba(255,255,255,.18)' : 0, padding: compact ? '0 5px' : '0 8px', fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>{info}</span>}
+        {<><button onClick={share} disabled={sharing} title="Compartir" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: sharing ? .6 : 1 }}><Share2 size={18}/></button><button onClick={download} disabled={downloading} title="Descargar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: downloading ? .6 : 1 }}><Download size={18}/></button></>}
+        {actions}
+      </div>
+      {message && <div role="status" style={{ position: 'absolute', bottom: compact ? 66 : 84, left: '50%', transform: 'translateX(-50%)', padding: '7px 10px', borderRadius: 7, background: 'rgba(15,23,42,.9)', color: '#fff', fontSize: 12 }}>{message}</div>}
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
