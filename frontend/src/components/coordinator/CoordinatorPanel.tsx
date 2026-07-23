@@ -4,6 +4,7 @@ import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
 import { api, type CatalogItem, type LotSummary, type School } from '../../lib/api';
+import { uploadInQueue } from '../../lib/uploadQueue';
 
 interface UploadFile {
   id: string;
@@ -109,17 +110,20 @@ export default function CoordinatorPanel() {
     setDone(false);
     try {
       const lot = await api.createLot({ schoolId: school.id, shiftId: shift?.id ?? null, activityId: activity?.id ?? null, eventDate: fecha });
-      for (let index = 0; index < files.length; index += 1) {
-        const current = files[index];
-        setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item));
-        try {
-          await api.uploadMedia(lot.lotId, current.file);
-          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'done' } : item));
-        } catch (reason) {
-          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'error' } : item));
-          throw reason;
-        }
-        setUploadProgress(Math.round(((index + 1) / files.length) * 100));
+      const result = await uploadInQueue(files, async current => { await api.uploadMedia(lot.lotId, current.file); }, {
+        concurrency: 3,
+        retries: 1,
+        onStart: current => setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item)),
+        onFinish: (current, success) => {
+          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: success ? 'done' : 'error' } : item));
+          setUploadProgress(previous => Math.round(Math.min(100, previous + (100 / files.length))));
+        },
+      });
+      if (result.failed.length) {
+        const failedIds = new Set(result.failed.map(item => item.id));
+        setFiles(previous => previous.filter(item => failedIds.has(item.id)).map(item => ({ ...item, status: 'error' })));
+        setError(`Se cargaron ${result.succeeded.length} de ${files.length} archivos. Quedan ${result.failed.length} para reintentar.`);
+        return;
       }
       await api.submitLot(lot.lotId);
       setLots((await api.lots()).items);
