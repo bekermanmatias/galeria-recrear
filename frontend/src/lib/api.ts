@@ -2,7 +2,7 @@ const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001/api/v1'
 
 export type Role = 'ADMIN' | 'COORDINATOR' | 'PARENT';
 export interface SessionUser { id: string; name: string; email: string; role: Role; }
-export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; coordinator_ids?: string[]; coordinators?: string[]; }
+export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; coordinator_ids?: string[]; coordinators?: string[]; public_link_active?: boolean | null; public_link_generated_at?: string | null; public_link_revoked_at?: string | null; public_link_token?: string | null; }
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
 export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; }
 export interface LotSummary { id: string; event_date: string; school_id: string; school_name: string; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }
@@ -23,6 +23,14 @@ async function parseResponse<T>(response: Response): Promise<T> {
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
+    headers: { ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init.headers },
+    ...init,
+  });
+  return parseResponse<T>(response);
+}
+
+export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, {
     headers: { ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init.headers },
     ...init,
   });
@@ -57,3 +65,12 @@ export const api = {
 
 
 
+
+export const publicGalleryApi = {
+  school: (token: string) => publicRequest<{ school: { id: string; name: string }; items: LotSummary[] }>(`/public/${encodeURIComponent(token)}`),
+  lot: (token: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/${encodeURIComponent(token)}/lots/${lotId}`),
+  downloadZip: (token: string, mediaIds: string[]) => publicRequest<Blob>(`/public/${encodeURIComponent(token)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  contentUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/content`,
+  thumbnailUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/thumbnail`,
+  downloadUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/download`,
+};

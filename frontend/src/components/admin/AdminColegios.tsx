@@ -1,203 +1,23 @@
 import { useEffect, useState } from 'react';
 import { adminRequest, type School, type AdminUser } from '../../lib/api';
-import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
+import { Copy, Edit2, Link2, Link2Off, Plus, RefreshCw, Search, Trash2, X } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
-interface Colegio {
-  id: string;
-  nombre: string;
-  codigo: string;
-  fechaInicio: string;
-  fechaFin: string;
-  coordinadores: string[];
-  coordinator_ids?: string[];
-}
-
-const formatDate = (d: string) => {
-  if (!d) return '-';
-  const parts = d.split('T')[0].split('-');
-  return `${parts[2]}/${parts[1]}/${parts[0]}`;
-};
+interface Colegio { id:string; nombre:string; codigo:string; fechaInicio:string; fechaFin:string; coordinadores:string[]; coordinator_ids?:string[]; public_link_active?:boolean | null; public_link_generated_at?:string | null; public_link_revoked_at?:string | null; public_link_token?:string | null; }
+const date = (value:string) => value ? value.slice(0,10).split('-').reverse().join('/') : '-';
+const smallButton:React.CSSProperties={height:34,display:'inline-flex',alignItems:'center',gap:6,padding:'0 10px',border:'1px solid #E2E8F0',borderRadius:7,background:'#fff',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'};
 
 export default function AdminColegios() {
-  const [colegios, setColegios] = useState<Colegio[]>([]);
-  const [coordinators, setCoordinators] = useState<AdminUser[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '' });
-  const [coordinatorIds, setCoordinatorIds] = useState<string[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [coordinatorSearch, setCoordinatorSearch] = useState('');
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  
-  const load = () => {
-    adminRequest<{items: School[]}>('/schools').then(data => setColegios(data.items.map(item => ({ id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date ?? '',fechaFin:item.end_date ?? '',coordinadores:item.coordinators || [], coordinator_ids: item.coordinator_ids || [] }))));
-    adminRequest<{items: AdminUser[]}>('/users').then(data => setCoordinators(data.items.filter(u => u.role === 'COORDINATOR')));
-  };
-  useEffect(() => { load(); }, []);
-  const openModal = (col?: Colegio) => {
-    if (col) {
-      setEditingId(col.id);
-      setFormData({ nombre: col.nombre, codigo: col.codigo, fechaInicio: col.fechaInicio, fechaFin: col.fechaFin });
-      setCoordinatorIds(col.coordinator_ids || []);
-    } else {
-      setEditingId(null);
-      setFormData({ nombre: '', codigo: '', fechaInicio: '', fechaFin: '' });
-      setCoordinatorIds([]);
-    }
-    setCoordinatorSearch('');
-    setIsModalOpen(true);
-  };
-
-  const handleSave = async () => {
-    if (!formData.nombre || !formData.codigo) return;
-    const saved = await adminRequest<School>('/schools'+(editingId ? '/'+editingId : ''), { method:editingId ? 'PATCH' : 'POST', body:JSON.stringify({ name:formData.nombre, code:formData.codigo, botCode:formData.codigo.toUpperCase(), startDate:formData.fechaInicio || null, endDate:formData.fechaFin || null }) });
-    await adminRequest('/schools/'+saved.id+'/coordinators', { method: 'PUT', body: JSON.stringify({ coordinatorIds }) });
-    setIsModalOpen(false); await load();
-  };
-  const handleDelete = (id:string) => setPendingDelete(id);
-  const confirmDelete = async () => { if (!pendingDelete) return; try { setDeleteBusy(true); await adminRequest('/schools/'+pendingDelete,{method:'DELETE'}); setPendingDelete(null); await load(); } finally { setDeleteBusy(false); } };
-
-  const filteredColegios = colegios.filter(c => 
-    c.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    c.codigo.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '32px', overflowY: 'auto' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <div>
-          <h2 style={{ margin: '0 0 4px', fontSize: '24px', color: '#1A4B77' }}>Colegios</h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Gestión de colegios y asignación de coordinadores.</p>
-        </div>
-        <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#71717A' }} />
-            <input
-              type="text"
-              placeholder="Buscar colegio..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                padding: '10px 16px 10px 36px', border: '1px solid #E4E4E7',
-                borderRadius: '6px', fontSize: '13px', outline: 'none', width: '250px'
-              }}
-              onFocus={e => e.target.style.borderColor = '#1A4B77'}
-              onBlur={e => e.target.style.borderColor = '#E4E4E7'}
-            />
-          </div>
-          <button
-            onClick={() => openModal()}
-            style={{
-              display: 'flex', alignItems: 'center', gap: '8px',
-              padding: '10px 16px', background: '#1A4B77', color: 'white',
-              border: 'none', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
-              cursor: 'pointer', transition: 'background 0.2s',
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#133656')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#1A4B77')}
-          >
-            <Plus size={16} /> Nuevo Colegio
-          </button>
-        </div>
-      </div>
-
-      <div style={{ background: '#FFFFFF' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-          <thead>
-            <tr style={{ borderBottom: '1px solid #E4E4E7' }}>
-              <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Código</th>
-              <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Nombre</th>
-              <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Rango Fechas</th>
-              <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Coordinadores</th>
-              <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase', textAlign: 'right' }}>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredColegios.length === 0 ? (
-              <tr>
-                <td colSpan={5} style={{ padding: '32px', textAlign: 'center', color: '#71717A', fontSize: '14px' }}>
-                  No se encontraron colegios con "{searchQuery}"
-                </td>
-              </tr>
-            ) : (
-              filteredColegios.map(col => (
-              <tr key={col.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
-                <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{col.codigo}</td>
-                <td style={{ padding: '16px 24px', fontSize: '14px' }}>{col.nombre}</td>
-                <td style={{ padding: '16px 24px', fontSize: '13px', color: '#71717A' }}>{formatDate(col.fechaInicio)} a {formatDate(col.fechaFin)}</td>
-                <td style={{ padding: '16px 24px', fontSize: '13px' }}>{col.coordinadores.join(', ')}</td>
-                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
-                  <button onClick={() => openModal(col)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
-                  <button onClick={() => handleDelete(col.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal */}
-      {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: 'white', padding: '32px', borderRadius: '12px', width: '100%', maxWidth: '500px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-              <h3 style={{ margin: 0, fontSize: '20px', color: '#1A4B77' }}>{editingId ? 'Editar Colegio' : 'Nuevo Colegio'}</h3>
-              <button onClick={() => setIsModalOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} color="#71717A" /></button>
-            </div>
-            
-            <div style={{ display: 'grid', gap: '16px' }}>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                Nombre del Colegio
-                <input value={formData.nombre} onChange={e => setFormData({ ...formData, nombre: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
-              </label>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                Código / Abreviatura
-                <input value={formData.codigo} onChange={e => setFormData({ ...formData, codigo: e.target.value })} placeholder="Ej: 1a" style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                  Fecha Inicio
-                  <input type="date" value={formData.fechaInicio} onChange={e => setFormData({ ...formData, fechaInicio: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
-                </label>
-                <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                  Fecha Fin
-                  <input type="date" value={formData.fechaFin} onChange={e => setFormData({ ...formData, fechaFin: e.target.value })} style={{ padding: '10px', border: '1px solid #E4E4E7', borderRadius: '6px' }} />
-                </label>
-              </div>
-              <label style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px', fontWeight: 500 }}>
-                Coordinadores Asignados
-                <input type="text" placeholder="Buscar coordinador..." value={coordinatorSearch} onChange={e => setCoordinatorSearch(e.target.value)} style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', fontSize: '13px', outline: 'none' }} onFocus={e => e.target.style.borderColor = '#1A4B77'} onBlur={e => e.target.style.borderColor = '#E4E4E7'} />
-                <div style={{ padding: '8px 12px', border: '1px solid #E4E4E7', borderRadius: '6px', background: 'white', maxHeight: '150px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {coordinators.filter(u => u.active !== false && u.name.toLowerCase().includes(coordinatorSearch.toLowerCase())).map(u => (
-                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: 400, cursor: 'pointer', padding: '2px 0' }}>
-                      <input type="checkbox" checked={coordinatorIds.includes(u.id)} onChange={e => {
-                        if (e.target.checked) setCoordinatorIds([...coordinatorIds, u.id]);
-                        else setCoordinatorIds(coordinatorIds.filter(id => id !== u.id));
-                      }} style={{ cursor: 'pointer' }} />
-                      {u.name} <span style={{ color: '#A1A1AA', fontSize: '12px' }}>({u.email})</span>
-                    </label>
-                  ))}
-                  {coordinators.filter(u => u.active !== false && u.name.toLowerCase().includes(coordinatorSearch.toLowerCase())).length === 0 && (
-                    <span style={{ color: '#A1A1AA', fontSize: '12px', fontStyle: 'italic' }}>No se encontraron coordinadores.</span>
-                  )}
-                </div>
-              </label>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '32px' }}>
-              <button onClick={() => setIsModalOpen(false)} style={{ padding: '10px 16px', background: '#F4F4F5', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Cancelar</button>
-              <button onClick={handleSave} style={{ padding: '10px 16px', background: '#1A4B77', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>Guardar</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar colegio?" description="El colegio dejará de estar disponible para accesos y nuevas cargas. Su historial no se eliminará." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
-    </div>
-  );
+  const [colegios,setColegios]=useState<Colegio[]>([]); const [coordinators,setCoordinators]=useState<AdminUser[]>([]); const [open,setOpen]=useState(false); const [editing,setEditing]=useState<string|null>(null); const [form,setForm]=useState({nombre:'',codigo:'',fechaInicio:'',fechaFin:''}); const [coordinatorIds,setCoordinatorIds]=useState<string[]>([]); const [search,setSearch]=useState(''); const [coordinatorSearch,setCoordinatorSearch]=useState(''); const [pendingDelete,setPendingDelete]=useState<string|null>(null); const [pendingRevoke,setPendingRevoke]=useState<Colegio|null>(null); const [busy,setBusy]=useState<string|null>(null); const [linkFeedback,setLinkFeedback]=useState<Record<string,string>>({});
+  const load=()=>{ adminRequest<{items:School[]}>('/schools').then(result=>setColegios(result.items.map(item=>({id:item.id,nombre:item.name,codigo:item.code,fechaInicio:item.start_date??'',fechaFin:item.end_date??'',coordinadores:item.coordinators??[],coordinator_ids:item.coordinator_ids??[],public_link_active:item.public_link_active,public_link_generated_at:item.public_link_generated_at,public_link_revoked_at:item.public_link_revoked_at,public_link_token:item.public_link_token})))); adminRequest<{items:AdminUser[]}>('/users').then(result=>setCoordinators(result.items.filter(user=>user.role==='COORDINATOR'))); };
+  useEffect(()=>{load();},[]);
+  const edit=(item?:Colegio)=>{ setEditing(item?.id??null); setForm({nombre:item?.nombre??'',codigo:item?.codigo??'',fechaInicio:item?.fechaInicio??'',fechaFin:item?.fechaFin??''}); setCoordinatorIds(item?.coordinator_ids??[]); setCoordinatorSearch(''); setOpen(true); };
+  const save=async()=>{if(!form.nombre||!form.codigo)return; const saved=await adminRequest<School>(`/schools${editing?`/${editing}`:''}`,{method:editing?'PATCH':'POST',body:JSON.stringify({name:form.nombre,code:form.codigo,botCode:form.codigo.toUpperCase(),startDate:form.fechaInicio||null,endDate:form.fechaFin||null})}); await adminRequest(`/schools/${saved.id}/coordinators`,{method:'PUT',body:JSON.stringify({coordinatorIds})}); setOpen(false);load();};
+  const notify=(schoolId:string,message:string)=>{setLinkFeedback(previous=>({...previous,[schoolId]:message}));window.setTimeout(()=>setLinkFeedback(previous=>{const next={...previous};delete next[schoolId];return next;}),4000);};
+  const generate=async(item:Colegio)=>{try{setBusy(item.id);const result=await adminRequest<{token:string}>('/schools/'+item.id+'/public-link',{method:'POST'});const url=window.location.origin+'/colegio/'+result.token;await navigator.clipboard?.writeText(url);notify(item.id,item.public_link_generated_at?'Enlace regenerado y copiado.':'Enlace generado y copiado.');load();}finally{setBusy(null);}};
+  const toggle=async(item:Colegio)=>{try{setBusy(item.id);await adminRequest('/schools/'+item.id+'/public-link',{method:'PATCH',body:JSON.stringify({active:!item.public_link_active})});notify(item.id,item.public_link_active?'Enlace revocado.':'Enlace reactivado.');load();}finally{setBusy(null);}};
+  const copyLink=async(item:Colegio)=>{if(!item.public_link_token)return;await navigator.clipboard?.writeText(window.location.origin+'/colegio/'+item.public_link_token);notify(item.id,'Enlace copiado.');};
+  const filtered=colegios.filter(item=>`${item.nombre} ${item.codigo}`.toLowerCase().includes(search.toLowerCase()));
+  return <div style={{flex:1,padding:32,overflowY:'auto'}}><header style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,flexWrap:'wrap',marginBottom:24}}><div><h2 style={{margin:'0 0 4px',fontSize:24,color:'#1A4B77'}}>Colegios</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Gestion de colegios, coordinadores y enlaces publicos para familias.</p></div><div style={{display:'flex',gap:12,alignItems:'center'}}><div style={{position:'relative'}}><Search size={16} style={{position:'absolute',left:12,top:11,color:'#71717A'}}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Buscar colegio..." style={{height:38,width:240,padding:'0 12px 0 36px',border:'1px solid #E4E4E7',borderRadius:7}}/></div><button onClick={()=>edit()} style={{...smallButton,background:'#1A4B77',borderColor:'#1A4B77',color:'#fff'}}><Plus size={16}/>Nuevo colegio</button></div></header><div style={{overflowX:'auto'}}><table style={{width:'100%',borderCollapse:'collapse',textAlign:'left',background:'#fff'}}><thead><tr style={{borderBottom:'1px solid #E4E4E7'}}>{['Codigo','Nombre','Rango fechas','Coordinadores','Enlace publico','Acciones'].map(label=><th key={label} style={{padding:'12px 16px',fontSize:12,color:'#71717A',textTransform:'uppercase'}}>{label}</th>)}</tr></thead><tbody>{filtered.length===0?<tr><td colSpan={6} style={{padding:32,textAlign:'center',color:'#71717A'}}>No se encontraron colegios con "{search}"</td></tr>:filtered.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><td style={td}>{item.codigo}</td><td style={td}>{item.nombre}</td><td style={{...td,color:'#71717A'}}>{date(item.fechaInicio)} a {date(item.fechaFin)}</td><td style={td}>{item.coordinadores.join(', ') || '-'}</td><td style={td}><div style={{display:'grid',gap:6,minWidth:250}}>{item.public_link_generated_at?<><span style={{fontSize:12,color:item.public_link_active?'#15803D':'#B91C1C'}}>{item.public_link_active?'Activo':'Revocado'} · generado {date(item.public_link_generated_at)}</span><div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{item.public_link_token&&<button onClick={()=>copyLink(item)} style={smallButton}><Copy size={14}/>Copiar</button>}<button disabled={busy===item.id} onClick={()=>generate(item)} style={smallButton}><RefreshCw size={14}/>Regenerar</button><button disabled={busy===item.id} onClick={()=>item.public_link_active?setPendingRevoke(item):toggle(item)} style={{...smallButton,color:item.public_link_active?'#B91C1C':'#15803D'}}>{item.public_link_active?<><Link2Off size={14}/>Revocar</>:<><Link2 size={14}/>Reactivar</>}</button></div>{linkFeedback[item.id]&&<span role="status" style={{fontSize:12,fontWeight:600,color:item.public_link_active?'#15803D':'#1A4B77'}}>{linkFeedback[item.id]}</span>}</>:<button disabled={busy===item.id} onClick={()=>generate(item)} style={smallButton}><Link2 size={14}/>Generar enlace publico</button>}</div></td><td style={{...td,whiteSpace:'nowrap'}}><button onClick={()=>edit(item)} title="Editar" style={iconButton}><Edit2 size={16}/></button><button onClick={()=>setPendingDelete(item.id)} title="Desactivar" style={{...iconButton,color:'#EF4444'}}><Trash2 size={16}/></button></td></tr>)}</tbody></table></div>{open&&<div style={overlay}><div style={modal}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:24}}><h3 style={{margin:0,fontSize:20,color:'#1A4B77'}}>{editing?'Editar colegio':'Nuevo colegio'}</h3><button onClick={()=>setOpen(false)} style={iconButton}><X size={20}/></button></div><div style={{display:'grid',gap:16}}><Field label="Nombre del colegio"><input value={form.nombre} onChange={event=>setForm({...form,nombre:event.target.value})} style={input}/></Field><Field label="Codigo / abreviatura"><input value={form.codigo} onChange={event=>setForm({...form,codigo:event.target.value})} style={input}/></Field><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}><Field label="Fecha inicio"><input type="date" value={form.fechaInicio} onChange={event=>setForm({...form,fechaInicio:event.target.value})} style={input}/></Field><Field label="Fecha fin"><input type="date" value={form.fechaFin} onChange={event=>setForm({...form,fechaFin:event.target.value})} style={input}/></Field></div><Field label="Coordinadores asignados"><input value={coordinatorSearch} onChange={event=>setCoordinatorSearch(event.target.value)} placeholder="Buscar coordinador..." style={input}/><div style={{padding:10,border:'1px solid #E4E4E7',borderRadius:7,maxHeight:150,overflowY:'auto'}}>{coordinators.filter(user=>user.active!==false&&user.name.toLowerCase().includes(coordinatorSearch.toLowerCase())).map(user=><label key={user.id} style={{display:'flex',gap:8,padding:4,fontSize:13}}><input type="checkbox" checked={coordinatorIds.includes(user.id)} onChange={event=>setCoordinatorIds(event.target.checked?[...coordinatorIds,user.id]:coordinatorIds.filter(id=>id!==user.id))}/>{user.name} <span style={{color:'#A1A1AA'}}>({user.email})</span></label>)}</div></Field></div><div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:28}}><button onClick={()=>setOpen(false)} style={smallButton}>Cancelar</button><button onClick={save} style={{...smallButton,background:'#1A4B77',borderColor:'#1A4B77',color:'#fff'}}>Guardar</button></div></div></div>}<ConfirmDialog open={pendingDelete!==null} title="Desactivar colegio?" description="El colegio dejara de estar disponible para accesos y nuevas cargas." confirmLabel="Desactivar" onCancel={()=>setPendingDelete(null)} onConfirm={async()=>{if(!pendingDelete)return;await adminRequest('/schools/'+pendingDelete,{method:'DELETE'});setPendingDelete(null);load();}}/><ConfirmDialog open={pendingRevoke!==null} title="¿Revocar enlace público?" description="Las familias que tengan este enlace dejarán de poder ver las galerías publicadas de este colegio hasta que lo reactives." confirmLabel="Revocar enlace" tone="danger" busy={busy===pendingRevoke?.id} onCancel={()=>setPendingRevoke(null)} onConfirm={async()=>{if(!pendingRevoke)return;const school=pendingRevoke;setPendingRevoke(null);await toggle(school);}}/></div>;
 }
-
-
-
+function Field({label,children}:{label:string;children:React.ReactNode}){return <label style={{display:'grid',gap:8,fontSize:13,fontWeight:600}}>{label}{children}</label>}; const td:React.CSSProperties={padding:'15px 16px',fontSize:13,verticalAlign:'middle'}; const iconButton:React.CSSProperties={border:0,background:'none',cursor:'pointer',color:'#64748B',padding:6}; const input:React.CSSProperties={height:38,padding:'0 10px',border:'1px solid #E4E4E7',borderRadius:7,boxSizing:'border-box'}; const overlay:React.CSSProperties={position:'fixed',inset:0,zIndex:100,display:'grid',placeItems:'center',padding:20,background:'rgba(15,23,42,.45)'}; const modal:React.CSSProperties={width:'min(100%,520px)',maxHeight:'90vh',overflowY:'auto',padding:28,borderRadius:12,background:'#fff',boxShadow:'0 18px 48px rgba(0,0,0,.22)'};

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import crypto from 'node:crypto';
 import { parse } from 'csv-parse/sync';
 import multer from 'multer';
 import { z } from 'zod';
@@ -61,17 +62,53 @@ adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query(
 
 adminRouter.get('/schools', asyncHandler(async (_req, res) => {
   const result = await query(`
-    SELECT s.*, 
+    SELECT s.*, p.active AS public_link_active, p.generated_at AS public_link_generated_at, p.revoked_at AS public_link_revoked_at, p.token_value AS public_link_token,
            COALESCE(array_agg(u.id) FILTER (WHERE u.id IS NOT NULL), ARRAY[]::uuid[]) as coordinator_ids,
            COALESCE(array_agg(u.name) FILTER (WHERE u.id IS NOT NULL), ARRAY[]::text[]) as coordinators
     FROM schools s
+    LEFT JOIN public_school_links p ON p.school_id = s.id
     LEFT JOIN user_schools us ON s.id = us.school_id AND us.membership_role = 'COORDINATOR' AND us.active = true
     LEFT JOIN users u ON us.user_id = u.id AND u.active = true
     WHERE s.deleted_at IS NULL
-    GROUP BY s.id
+    GROUP BY s.id, p.active, p.generated_at, p.revoked_at, p.token_value
     ORDER BY s.name
   `);
   res.json({ items: result.rows });
+}));
+const publicLinkActiveSchema = z.object({ active: z.boolean() });
+const publicToken = () => crypto.randomBytes(32).toString('base64url');
+const publicTokenHash = (token: string) => crypto.createHash('sha256').update(token).digest('hex');
+async function schoolExists(id: string) {
+  const school = await query('SELECT id FROM schools WHERE id=$1 AND deleted_at IS NULL', [id]);
+  if (!school.rowCount) throw new AppError(404, 'SCHOOL_NOT_FOUND', 'Colegio no encontrado');
+}
+adminRouter.get('/schools/:id/public-link', asyncHandler(async (req, res) => {
+  const schoolId = z.string().uuid().parse(req.params.id);
+  await schoolExists(schoolId);
+  const result = await query('SELECT active, generated_at, revoked_at, token_value FROM public_school_links WHERE school_id=$1', [schoolId]);
+  res.json({ exists: Boolean(result.rowCount), ...(result.rows[0] ?? {}) });
+}));
+adminRouter.post('/schools/:id/public-link', asyncHandler(async (req, res) => {
+  const schoolId = z.string().uuid().parse(req.params.id);
+  await schoolExists(schoolId);
+  const token = publicToken();
+  const result = await query(`
+    INSERT INTO public_school_links (school_id, token_hash, token_value, active, generated_at, generated_by, revoked_at, revoked_by)
+    VALUES ($1,$2,$3,true,now(),$4,NULL,NULL)
+    ON CONFLICT (school_id) DO UPDATE SET token_hash=EXCLUDED.token_hash, token_value=EXCLUDED.token_value, active=true, generated_at=now(), generated_by=EXCLUDED.generated_by, revoked_at=NULL, revoked_by=NULL
+    RETURNING active, generated_at
+  `, [schoolId, publicTokenHash(token), token, req.user!.id]);
+  await query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [req.user!.id, 'PUBLIC_LINK_GENERATED', 'school', schoolId, JSON.stringify({ regenerated: true })]);
+  res.status(201).json({ token, active: result.rows[0].active, generated_at: result.rows[0].generated_at });
+}));
+adminRouter.patch('/schools/:id/public-link', asyncHandler(async (req, res) => {
+  const input = publicLinkActiveSchema.parse(req.body);
+  const schoolId = z.string().uuid().parse(req.params.id);
+  await schoolExists(schoolId);
+  const result = await query(`UPDATE public_school_links SET active=$1, revoked_at=CASE WHEN $1 THEN NULL ELSE now() END, revoked_by=CASE WHEN $1 THEN NULL ELSE $2 END WHERE school_id=$3 RETURNING active, generated_at, revoked_at`, [input.active, req.user!.id, schoolId]);
+  if (!result.rowCount) throw new AppError(404, 'PUBLIC_LINK_NOT_FOUND', 'Primero genera el enlace publico');
+  await query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [req.user!.id, input.active ? 'PUBLIC_LINK_REACTIVATED' : 'PUBLIC_LINK_REVOKED', 'school', schoolId, JSON.stringify({ active: input.active })]);
+  res.json(result.rows[0]);
 }));
 adminRouter.post('/schools', asyncHandler(async (req, res) => {
   const input = schoolSchema.parse(req.body);
