@@ -134,3 +134,30 @@ Drive si se informan ambos métodos de autenticación.
 - [Shared Drives y cuentas de servicio](https://developers.google.com/workspace/drive/api/guides/about-shareddrives)
 - [Scopes de Drive API](https://developers.google.com/workspace/drive/api/guides/api-specific-auth)
 - [OAuth para aplicaciones web](https://developers.google.com/identity/protocols/oauth2/web-server)
+
+## Estructura manual de carpetas
+
+Las cargas nuevas se organizan para que el Shared Drive también sea fácil de
+recorrer manualmente. Debajo de la carpeta configurada en
+`DRIVE_ROOT_FOLDER_ID`, la estructura es:
+
+```text
+Galeria-Recrear/
+  Salidas/
+    MICRO-920AD7A7 - Micro 1 VCP - Villa Carlos Paz/
+      2026-07-20 - Día de Campo - 8f34c19a/
+        v1/
+          originales/
+            foto-001.jpg
+            video-001.mp4
+```
+
+- Cada salida tiene una carpeta identificable por su código público, nombre y destino.
+- Cada lote se identifica por fecha, actividad y un sufijo corto técnico que evita
+  colisiones sin afectar su lectura manual.
+- Las reaperturas del mismo lote quedan en `v2`, `v3`, etc.
+- Los archivos existentes conservan su ubicación actual; la nueva estructura se
+  aplica únicamente a cargas futuras.
+
+PostgreSQL sigue siendo la fuente de verdad: no se deben renombrar, mover o borrar
+archivos manualmente desde Drive mientras estén publicados o pendientes de revisión.

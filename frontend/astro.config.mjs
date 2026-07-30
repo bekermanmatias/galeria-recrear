@@ -3,18 +3,25 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwindcss from '@tailwindcss/vite';
 
-const publicSchoolDevFallback = {
-  name: 'public-school-dev-fallback',
+const publicRouteDevFallback = {
+  name: 'public-route-dev-fallback',
   enforce: 'pre',
   configureServer(server) {
     server.middlewares.use((req, _res, next) => {
-      if (/^\/colegio\/[^/?#]+(?:\?.*)?$/.test(req.url ?? '')) req.url = '/colegio/';
+      const url = req.url ?? '';
+      if (/^\/colegio\/[^/?#]+(?:\?.*)?$/.test(url)) {
+        req.url = '/colegio/';
+        return next();
+      }
+
+      const publicCode = /^\/([A-Za-z0-9_-]+)(?:\?.*)?$/.exec(url)?.[1];
+      const reserved = new Set(['admin', 'login', 'coordinator', 'parent', 'colegio', 'api', 'viajes']);
+      if (publicCode && !publicCode.includes('.') && !reserved.has(publicCode.toLowerCase())) req.url = '/';
       next();
     });
   },
 };
 
-// https://astro.build/config
 export default defineConfig({
   integrations: [react()],
   server: {
@@ -22,7 +29,7 @@ export default defineConfig({
     port: 4321,
   },
   vite: {
-    plugins: [publicSchoolDevFallback, tailwindcss()],
+    plugins: [publicRouteDevFallback, tailwindcss()],
     server: {
       watch: {
         usePolling: true,
