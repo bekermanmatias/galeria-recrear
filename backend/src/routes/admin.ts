@@ -44,7 +44,7 @@ adminRouter.patch('/users/:id', asyncHandler(async (req, res) => {
 }));
 adminRouter.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
   const input = z.object({ password: z.string().min(8).max(128) }).parse(req.body);
-  const result = await query('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id', [await hashPassword(input.password), req.params.id]);
+  const result = await query('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id', [await hashPassword(input.password), String(req.params.id)]);
   if (!result.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
   res.status(204).end();
 }));
@@ -58,7 +58,7 @@ adminRouter.put('/users/:id/schools', asyncHandler(async (req, res) => {
   });
   res.status(204).end();
 }));
-adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query('UPDATE users SET active = false WHERE id = $1', [req.params.id]); res.status(204).end(); }));
+adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query('UPDATE users SET active = false WHERE id = $1', [String(req.params.id)]); res.status(204).end(); }));
 
 adminRouter.get('/schools', asyncHandler(async (_req, res) => {
   const result = await query(`
@@ -117,17 +117,17 @@ adminRouter.post('/schools', asyncHandler(async (req, res) => {
 }));
 adminRouter.patch('/schools/:id', asyncHandler(async (req, res) => {
   const input = schoolSchema.partial().parse(req.body);
-  const result = await query('UPDATE schools SET name=COALESCE($1,name), code=COALESCE($2,code), bot_code=COALESCE($3,bot_code), start_date=COALESCE($4,start_date), end_date=COALESCE($5,end_date), active=COALESCE($6,active) WHERE id=$7 AND deleted_at IS NULL RETURNING *', [input.name ?? null,input.code ?? null,input.botCode ?? null,input.startDate ?? null,input.endDate ?? null,input.active ?? null,req.params.id]);
+  const result = await query('UPDATE schools SET name=COALESCE($1,name), code=COALESCE($2,code), bot_code=COALESCE($3,bot_code), start_date=COALESCE($4,start_date), end_date=COALESCE($5,end_date), active=COALESCE($6,active) WHERE id=$7 AND deleted_at IS NULL RETURNING *', [input.name ?? null,input.code ?? null,input.botCode ?? null,input.startDate ?? null,input.endDate ?? null,input.active ?? null,String(req.params.id)]);
   if (!result.rowCount) throw new AppError(404, 'SCHOOL_NOT_FOUND', 'Colegio no encontrado'); res.json(result.rows[0]);
 }));
-adminRouter.delete('/schools/:id', asyncHandler(async (req, res) => { await query('UPDATE schools SET deleted_at = now(), active = false WHERE id = $1', [req.params.id]); res.status(204).end(); }));
+adminRouter.delete('/schools/:id', asyncHandler(async (req, res) => { await query('UPDATE schools SET deleted_at = now(), active = false WHERE id = $1', [String(req.params.id)]); res.status(204).end(); }));
 
 adminRouter.put('/schools/:id/coordinators', asyncHandler(async (req, res) => {
   const input = z.object({ coordinatorIds: z.array(z.string().uuid()) }).parse(req.body);
   await transaction(async client => {
-    await client.query("UPDATE user_schools SET active=false WHERE school_id=$1 AND membership_role='COORDINATOR'", [req.params.id]);
+    await client.query("UPDATE user_schools SET active=false WHERE school_id=$1 AND membership_role='COORDINATOR'", [String(req.params.id)]);
     for (const userId of input.coordinatorIds) {
-      await client.query("INSERT INTO user_schools (user_id, school_id, membership_role, active) VALUES ($1,$2,'COORDINATOR',true) ON CONFLICT (user_id,school_id,membership_role) DO UPDATE SET active=true", [userId, req.params.id]);
+      await client.query("INSERT INTO user_schools (user_id, school_id, membership_role, active) VALUES ($1,$2,'COORDINATOR',true) ON CONFLICT (user_id,school_id,membership_role) DO UPDATE SET active=true", [userId, String(req.params.id)]);
     }
   });
   res.status(204).end();
@@ -136,8 +136,8 @@ adminRouter.put('/schools/:id/coordinators', asyncHandler(async (req, res) => {
 for (const [route, table, hasSort] of [['activities', 'activities', false], ['shifts', 'shifts', true]] as const) {
   adminRouter.get(`/${route}`, asyncHandler(async (_req, res) => { const result = await query(`SELECT * FROM ${table} ORDER BY ${hasSort ? 'sort_order, ' : ''}name`); res.json({ items: result.rows }); }));
   adminRouter.post(`/${route}`, asyncHandler(async (req, res) => { const input = catalogSchema.parse(req.body); const result = await query(`INSERT INTO ${table} (name, bot_code, active${hasSort ? ', sort_order' : ''}) VALUES ($1,$2,$3${hasSort ? ',$4' : ''}) RETURNING *`, hasSort ? [input.name,input.botCode,input.active ?? true,input.sortOrder ?? 0] : [input.name,input.botCode,input.active ?? true]); res.status(201).json(result.rows[0]); }));
-  adminRouter.patch(`/${route}/:id`, asyncHandler(async (req, res) => { const input = catalogSchema.partial().parse(req.body); const result = await query(`UPDATE ${table} SET name=COALESCE($1,name), bot_code=COALESCE($2,bot_code), active=COALESCE($3,active)${hasSort ? ', sort_order=COALESCE($4,sort_order)' : ''} WHERE id=$${hasSort ? 5 : 4} RETURNING *`, hasSort ? [input.name ?? null,input.botCode ?? null,input.active ?? null,input.sortOrder ?? null,req.params.id] : [input.name ?? null,input.botCode ?? null,input.active ?? null,req.params.id]); if (!result.rowCount) throw new AppError(404, 'CATALOG_NOT_FOUND', 'Registro no encontrado'); res.json(result.rows[0]); }));
-  adminRouter.delete(`/${route}/:id`, asyncHandler(async (req, res) => { await query(`UPDATE ${table} SET active=false WHERE id=$1`, [req.params.id]); res.status(204).end(); }));
+  adminRouter.patch(`/${route}/:id`, asyncHandler(async (req, res) => { const input = catalogSchema.partial().parse(req.body); const result = await query(`UPDATE ${table} SET name=COALESCE($1,name), bot_code=COALESCE($2,bot_code), active=COALESCE($3,active)${hasSort ? ', sort_order=COALESCE($4,sort_order)' : ''} WHERE id=$${hasSort ? 5 : 4} RETURNING *`, hasSort ? [input.name ?? null,input.botCode ?? null,input.active ?? null,input.sortOrder ?? null,req.params.id] : [input.name ?? null,input.botCode ?? null,input.active ?? null,String(req.params.id)]); if (!result.rowCount) throw new AppError(404, 'CATALOG_NOT_FOUND', 'Registro no encontrado'); res.json(result.rows[0]); }));
+  adminRouter.delete(`/${route}/:id`, asyncHandler(async (req, res) => { await query(`UPDATE ${table} SET active=false WHERE id=$1`, [String(req.params.id)]); res.status(204).end(); }));
 }
 
 adminRouter.put('/schools/:schoolId/members/:userId', asyncHandler(async (req, res) => {
@@ -152,7 +152,7 @@ adminRouter.delete('/schools/:schoolId/members/:userId', asyncHandler(async (req
 
 adminRouter.put('/schools/:schoolId/catalogs/:kind/:catalogId', asyncHandler(async (req, res) => {
   const kind = req.params.kind === 'activities' ? 'activities' : req.params.kind === 'shifts' ? 'shifts' : null;
-  if (!kind) throw new AppError(400, 'INVALID_CATALOG', 'Catálogo inválido');
+  if (!kind) throw new AppError(400, 'INVALID_CATALOG', 'CatÃ¡logo invÃ¡lido');
   const table = kind === 'activities' ? 'school_activities' : 'school_shifts'; const column = kind === 'activities' ? 'activity_id' : 'shift_id';
   await query(`INSERT INTO ${table} (school_id, ${column}, enabled) VALUES ($1,$2,true) ON CONFLICT (school_id,${column}) DO UPDATE SET enabled=true`, [req.params.schoolId,req.params.catalogId]);
   res.status(204).end();
@@ -160,7 +160,7 @@ adminRouter.put('/schools/:schoolId/catalogs/:kind/:catalogId', asyncHandler(asy
 
 adminRouter.post('/imports/:kind/preview', upload.single('file'), asyncHandler(async (req, res) => {
   const kind = z.enum(['schools', 'users', 'memberships']).parse(req.params.kind);
-  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccioná un CSV');
+  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'SeleccionÃ¡ un CSV');
   const rows = parse(req.file.buffer, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
   const required: Record<typeof kind, string[]> = { schools: ['name','code','bot_code'], users: ['name','email','password','role'], memberships: ['email','school_code','membership_role'] };
   const errors = rows.flatMap((row, index) => required[kind].filter(key => !row[key]).map(key => ({ row: index + 2, field: key, message: 'Obligatorio' })));
@@ -168,7 +168,7 @@ adminRouter.post('/imports/:kind/preview', upload.single('file'), asyncHandler(a
 }));
 adminRouter.post('/imports/:kind/commit', upload.single('file'), asyncHandler(async (req, res) => {
   const kind = z.enum(['schools', 'users', 'memberships']).parse(req.params.kind);
-  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccioná un CSV');
+  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'SeleccionÃ¡ un CSV');
   const rows = parse(req.file.buffer, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
   await transaction(async client => {
     for (const row of rows) {
@@ -178,4 +178,61 @@ adminRouter.post('/imports/:kind/commit', upload.single('file'), asyncHandler(as
     }
   });
   res.status(201).json({ imported: rows.length });
+}));
+
+const departureSchema = z.object({
+  type: z.enum(['MICRO', 'AEREO']),
+  name: z.string().min(2).max(160),
+  destination: z.string().min(2).max(160),
+  eventDate: z.string().date(),
+  active: z.boolean().optional(),
+  publicAccessActive: z.boolean().optional(),
+  publicCode: z.string().trim().min(3).max(48).regex(/^[A-Za-z0-9_-]+$/).optional(),
+});
+const idsSchema = z.object({ ids: z.array(z.string().uuid()) });
+
+async function departureExists(id: string) {
+  const result = await query('SELECT id FROM departures WHERE id=$1', [id]);
+  if (!result.rowCount) throw new AppError(404, 'DEPARTURE_NOT_FOUND', 'Salida no encontrada');
+}
+
+adminRouter.get('/departures', asyncHandler(async (_req, res) => {
+  const result = await query(`
+    SELECT d.id,d.type,d.name,d.destination,d.event_date::text,d.active,d.archived_at,d.created_at,d.public_code,d.public_access_active,
+      COUNT(DISTINCT l.id)::int AS lot_count,
+      COALESCE(array_agg(DISTINCT s.id) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::uuid[]) school_ids,
+      COALESCE(array_agg(DISTINCT s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names,
+      COALESCE(array_agg(DISTINCT u.id) FILTER (WHERE u.id IS NOT NULL),ARRAY[]::uuid[]) coordinator_ids,
+      COALESCE(array_agg(DISTINCT u.name) FILTER (WHERE u.id IS NOT NULL),ARRAY[]::text[]) coordinator_names
+    FROM departures d
+    LEFT JOIN departure_schools ds ON ds.departure_id=d.id
+    LEFT JOIN schools s ON s.id=ds.school_id
+    LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id
+    LEFT JOIN users u ON u.id=dc.user_id AND u.active
+    LEFT JOIN lots l ON l.departure_id=d.id
+    GROUP BY d.id
+    ORDER BY d.active DESC,d.event_date DESC,d.name
+  `);
+  res.json({ items: result.rows });
+}));
+adminRouter.post('/departures', asyncHandler(async (req,res) => {
+  const input=departureSchema.parse(req.body);
+  const generatedCode=[input.type,crypto.randomBytes(4).toString('hex').toUpperCase()].join('-');
+  const result=await query('INSERT INTO departures(type,name,destination,event_date,active,created_by,public_code,public_access_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id,type,name,destination,event_date::text,active,archived_at,created_at,public_code,public_access_active', [input.type,input.name,input.destination,input.eventDate,input.active??true,req.user!.id,input.publicCode??generatedCode,input.publicAccessActive??true]);  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_CREATED','departure',result.rows[0].id,JSON.stringify({type:input.type,name:input.name})]);
+  res.status(201).json(result.rows[0]);
+}));
+adminRouter.patch('/departures/:id', asyncHandler(async(req,res) => {
+  const input=departureSchema.partial().parse(req.body); await departureExists(String(req.params.id));
+  const result=await query(`UPDATE departures SET type=COALESCE($1,type),name=COALESCE($2,name),destination=COALESCE($3,destination),event_date=COALESCE($4,event_date),active=COALESCE($5,active),public_access_active=COALESCE($6,public_access_active),public_code=COALESCE($7,public_code),archived_at=CASE WHEN COALESCE($5,active) THEN NULL WHEN active THEN now() ELSE archived_at END WHERE id=$8 RETURNING id,type,name,destination,event_date::text,active,archived_at,public_code,public_access_active`,[input.type??null,input.name??null,input.destination??null,input.eventDate??null,input.active??null,input.publicAccessActive??null,input.publicCode??null,String(req.params.id)]);  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,input.active===false?'DEPARTURE_ARCHIVED':'DEPARTURE_UPDATED','departure',String(req.params.id),JSON.stringify(input)]);
+  res.json(result.rows[0]);
+}));
+adminRouter.put('/departures/:id/schools', asyncHandler(async(req,res) => {
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id));
+  await transaction(async client=>{await client.query('DELETE FROM departure_schools WHERE departure_id=$1',[String(req.params.id)]);for(const schoolId of input.ids){const school=await client.query('SELECT 1 FROM schools WHERE id=$1 AND active AND deleted_at IS NULL',[schoolId]);if(!school.rowCount)throw new AppError(400,'INVALID_SCHOOL','Colegio invÃ¡lido');await client.query('INSERT INTO departure_schools(departure_id,school_id) VALUES($1,$2)',[req.params.id,schoolId]);}});
+  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_SCHOOLS_UPDATED','departure',String(req.params.id),JSON.stringify({schoolIds:input.ids})]);res.status(204).end();
+}));
+adminRouter.put('/departures/:id/coordinators', asyncHandler(async(req,res) => {
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id));
+  await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role='COORDINATOR' AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador invÃ¡lido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
+  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_COORDINATORS_UPDATED','departure',String(req.params.id),JSON.stringify({coordinatorIds:input.ids})]);res.status(204).end();
 }));

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, LoaderCircle, Trash2, Upload, X } from 'lucide-react';
-import { api, type CatalogItem, type School } from '../../lib/api';
+import { api, type CatalogItem, type Departure } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
 
@@ -13,23 +13,22 @@ const dateInput:React.CSSProperties={width:'100%',height:44,padding:'12px 16px',
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
 
 export default function AdminCargaManual() {
-  const [schools,setSchools]=useState<School[]>([]); const [activities,setActivities]=useState<CatalogItem[]>([]); const [shifts,setShifts]=useState<CatalogItem[]>([]);
-  const [school,setSchool]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [shift,setShift]=useState(''); const [activity,setActivity]=useState('');
+  const [departures,setDepartures]=useState<Departure[]>([]); const [activities,setActivities]=useState<CatalogItem[]>([]);
+  const [departure,setDeparture]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [activity,setActivity]=useState('');
   const [files,setFiles]=useState<UploadFile[]>([]); const [dragging,setDragging]=useState(false); const [uploading,setUploading]=useState(false); const [progress,setProgress]=useState({completed:0,total:0}); const [message,setMessage]=useState(''); const [selected,setSelected]=useState<string|null>(null); const input=useRef<HTMLInputElement>(null);
-  useEffect(()=>{api.mySchools().then(data=>setSchools(data.items)).catch(reason=>setMessage(reason.message));},[]);
-  useEffect(()=>{const selectedSchool=schools.find(item=>item.name===school); setShift('');setActivity(''); if(selectedSchool)api.catalogs(selectedSchool.id).then(data=>{setActivities(data.activities);setShifts(data.shifts);}).catch(reason=>setMessage(reason.message));},[school,schools]);
+  useEffect(()=>{Promise.all([api.myDepartures(),api.catalogs()]).then(([departureData,catalogData])=>{setDepartures(departureData.items.filter(item=>item.active));setActivities(catalogData.activities);}).catch(reason=>setMessage(reason.message));},[]);
   useEffect(()=>()=>files.forEach(item=>URL.revokeObjectURL(item.preview)),[files]);
   const addFiles=(incoming:FileList|null)=>{if(!incoming)return;const raw=Array.from(incoming);const accepted=raw.filter(file=>validName.test(file.name)||validTypes.has(file.type.toLowerCase())).map(file=>({id: crypto.randomUUID(),file,preview:URL.createObjectURL(file),isVideo:file.type.startsWith('video/')||/\.(mp4|mov)$/i.test(file.name),isHeic:/\.(heic|heif)$/i.test(file.name),status:'queued' as UploadStatus}));setFiles(current=>[...current,...accepted]);setMessage(accepted.length===raw.length?'':`Se omitieron ${raw.length-accepted.length} archivo(s) con formato no permitido.`);};
   const drop=useCallback((event:React.DragEvent)=>{event.preventDefault();setDragging(false);addFiles(event.dataTransfer.files);},[]);
   const remove=(id:string)=>setFiles(current=>current.filter(item=>item.id!==id));
   const updateFile=(id:string,patch:Partial<UploadFile>)=>setFiles(current=>current.map(item=>item.id===id?{...item,...patch}:item));
   const upload=async()=>{
-    const schoolItem=schools.find(item=>item.name===school),activityItem=activities.find(item=>item.name===activity),shiftItem=shifts.find(item=>item.name===shift);
+    const departureItem=departures.find(item=>`${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`===departure),activityItem=activities.find(item=>item.name===activity);
     const pending=files.filter(item=>item.status!=='uploaded');
-    if(!schoolItem||!pending.length)return;
+    if(!departureItem||!pending.length)return;
     setUploading(true);setProgress({completed:0,total:pending.length});setMessage('');
     try {
-      const lot=await api.createLot({schoolId:schoolItem.id,activityId:activityItem?.id ?? null,shiftId:shiftItem?.id ?? null,eventDate:date});
+      const lot=await api.createLot({departureId:departureItem.id,activityId:activityItem?.id ?? null,eventDate:date});
       let cursor=0; let completed=0; let failed=0;
       const worker=async()=>{while(true){const item=pending[cursor++];if(!item)return;updateFile(item.id,{status:'uploading',error:undefined});try{await api.uploadMedia(lot.lotId,item.file);updateFile(item.id,{status:'uploaded'});}catch(reason){failed+=1;updateFile(item.id,{status:'failed',error:reason instanceof Error?reason.message:'No se pudo subir'});}finally{completed+=1;setProgress({completed,total:pending.length});}}};
       await Promise.all(Array.from({length:Math.min(MAX_PARALLEL_UPLOADS,pending.length)},worker));
@@ -39,10 +38,10 @@ export default function AdminCargaManual() {
     }catch(reason){setMessage(reason instanceof Error?reason.message:'No se pudo cargar el lote.');}
     finally{setUploading(false);}
   };
-  const canUpload=Boolean(school&&date&&files.some(item=>item.status!=='uploaded')&&!uploading); const current=files.find(item=>item.id===selected); const currentIndex=files.findIndex(item=>item.id===selected); const totalSize=files.reduce((sum,item)=>sum+item.file.size,0);
+  const canUpload=Boolean(departure&&date&&files.some(item=>item.status!=='uploaded')&&!uploading); const current=files.find(item=>item.id===selected); const currentIndex=files.findIndex(item=>item.id===selected); const totalSize=files.reduce((sum,item)=>sum+item.file.size,0);
   return <div style={{flex:1,overflowY:'auto',padding:32}}><div style={{maxWidth:720,margin:'0 auto'}}>
-    <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná turno, actividad y todas las fotos o videos del lote. Se procesan de a {MAX_PARALLEL_UPLOADS} para una carga estable.</p></div>
-    <div className="responsive-grid"><SearchableSelect label="Colegio *" value={school} onChange={setSchool} options={schools.map(item=>item.name)} placeholder="Seleccionar colegio..."/><label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={dateInput}/></label><SearchableSelect label="Turno" value={shift} onChange={setShift} options={shifts.map(item=>item.name)} placeholder="Opcional..."/><SearchableSelect label="Actividad" value={activity} onChange={setActivity} options={activities.map(item=>item.name)} placeholder="Opcional..."/></div>
+    <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná la actividad y todas las fotos o videos del lote. Se procesan de a {MAX_PARALLEL_UPLOADS} para una carga estable.</p></div>
+    <div className="responsive-grid"><SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(item=>`${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)} placeholder="Seleccionar salida..."/><label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={dateInput}/></label><SearchableSelect label="Actividad" value={activity} onChange={setActivity} options={activities.map(item=>item.name)} placeholder="Opcional..."/></div>
     <div onDrop={drop} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onClick={()=>!uploading&&input.current?.click()} style={{border:`1px solid ${dragging?'#1A4B77':'#E4E4E7'}`,background:dragging?'#FAFAFA':'#fff',padding:'64px 24px',textAlign:'center',cursor:uploading?'wait':'pointer',transition:'all .2s ease',margin:'32px 0',borderRadius:8}}>
       <input ref={input} type="file" multiple accept=".jpg,.jpeg,.jpe,.jfif,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime" hidden onChange={event=>{addFiles(event.target.files);event.currentTarget.value='';}}/>
       <Upload size={32} strokeWidth={1} color={dragging?'#1A4B77':'#A1A1AA'} style={{margin:'0 auto 16px'}}/><p style={{margin:'0 0 8px',fontWeight:500,fontSize:15,color:'#1A4B77'}}>Hacé clic o arrastrá todas las fotos y videos acá</p><p style={{margin:0,fontSize:13,color:'#A1A1AA'}}>JPG, PNG, HEIC, MP4 o MOV · hasta 500 MB por archivo · calidad original.</p>

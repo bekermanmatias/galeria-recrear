@@ -59,3 +59,12 @@ export async function assertSchoolAccess(user: CurrentUser, schoolId: string, al
   const membership = await query('SELECT 1 FROM user_schools WHERE user_id = $1 AND school_id = $2 AND membership_role = $3 AND active', [user.id, schoolId, user.role]);
   if (!membership.rowCount) throw new AppError(403, 'FORBIDDEN_SCHOOL', 'No tenés acceso a este colegio');
 }
+
+export async function assertDepartureAccess(user: CurrentUser, departureId: string, allowed: Role[] = ['COORDINATOR', 'PARENT']) {
+  if (user.role === 'ADMIN') return;
+  if (!allowed.includes(user.role)) throw new AppError(403, 'FORBIDDEN_DEPARTURE', 'No tenés acceso a esta salida');
+  const membership = user.role === 'COORDINATOR'
+    ? await query('SELECT 1 FROM departure_coordinators WHERE departure_id=$1 AND user_id=$2', [departureId, user.id])
+    : await query(`SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=$1 AND us.user_id=$2 AND us.membership_role='PARENT' AND us.active`, [departureId, user.id]);
+  if (!membership.rowCount) throw new AppError(403, 'FORBIDDEN_DEPARTURE', 'No tenés acceso a esta salida');
+}

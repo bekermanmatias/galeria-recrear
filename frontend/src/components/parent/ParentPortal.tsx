@@ -8,16 +8,15 @@ interface Album {
   id: string;
   schoolId: string;
   schoolName: string;
+  departureName?: string;
   activity: string;
   date: string;
-  shift: string;
   media: Media[];
 }
 
 const sorts = ['Más reciente', 'Más antiguo', 'Más fotos'] as const;
 const formatBytes = (bytes:number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const formatEventDate = (value:string) => { const [year,month,day]=value.slice(0,10).split('-'); return year&&month&&day?`${day}-${month}-${year}`:value; };
-const formatShift = (value:string) => /^turno\s/i.test(value) ? value : `Turno ${value}`;
 
 export default function ParentPortal() {
   const [schools, setSchools] = useState<ApiSchool[]>([]);
@@ -25,7 +24,6 @@ export default function ParentPortal() {
   const [schoolId, setSchoolId] = useState('');
   const [openAlbum, setOpenAlbum] = useState<Album | null>(null);
   const [search, setSearch] = useState('');
-  const [shift, setShift] = useState('Todos');
   const [dateFilter, setDateFilter] = useState('Todos');
   const [sort, setSort] = useState<typeof sorts[number]>('Más reciente');
   const [sortOpen, setSortOpen] = useState(false);
@@ -43,14 +41,15 @@ export default function ParentPortal() {
       if (!result) return;
       const [schoolResult, lotResult] = result;
       setSchools(schoolResult.items);
-      setSchoolId(schoolResult.items[0]?.id ?? '');
+      const fallbackSchoolId = schoolResult.items[0]?.id ?? '';
+      setSchoolId(fallbackSchoolId);
       const detailed = await Promise.all(lotResult.items.map(async lot => ({
         id: lot.id,
-        schoolId: lot.school_id,
+        schoolId: fallbackSchoolId,
         schoolName: lot.school_name,
+        departureName: lot.departure_name,
         activity: lot.activity_name,
         date: lot.event_date,
-        shift: lot.shift_name,
         media: (await api.lot(lot.id)).media,
       })));
       setAlbums(detailed);
@@ -58,11 +57,9 @@ export default function ParentPortal() {
       .finally(() => setLoading(false));
   }, []);
 
-  const shifts = useMemo(() => ['Todos', ...Array.from(new Set(albums.filter(album => album.schoolId === schoolId).map(album => album.shift)))], [albums, schoolId]);
   const uniqueDates = useMemo(() => Array.from(new Set(albums.filter(album => album.schoolId === schoolId).map(album => album.date.slice(0, 10)))).sort(), [albums, schoolId]);
   const filtered = useMemo(() => {
     let result = albums.filter(album => album.schoolId === schoolId);
-    if (shift !== 'Todos') result = result.filter(album => album.shift === shift);
     if (dateFilter !== 'Todos') result = result.filter(album => album.date.startsWith(dateFilter));
     const term = search.trim().toLowerCase();
     if (term) result = result.filter(album => `${album.activity} ${album.date}`.toLowerCase().includes(term));
@@ -70,12 +67,12 @@ export default function ParentPortal() {
     if (sort === 'Más antiguo') result = [...result].sort((a, b) => a.date.localeCompare(b.date));
     if (sort === 'Más reciente') result = [...result].sort((a, b) => b.date.localeCompare(a.date));
     return result;
-  }, [albums, schoolId, shift, search, sort, dateFilter]);
+  }, [albums, schoolId, search, sort, dateFilter]);
 
   const tabs = schools.map(school => ({ id: school.id, label: school.name, icon: School }));
   const currentSchool = schools.find(school => school.id === schoolId);
 
-  return <DashboardLayout role="parent" tabs={tabs} activeTab={schoolId} onTabChange={id => { setSchoolId(id); setOpenAlbum(null); setShift('Todos'); setDateFilter('Todos'); }}>
+  return <DashboardLayout role="parent" tabs={tabs} activeTab={schoolId} onTabChange={id => { setSchoolId(id); setOpenAlbum(null); setDateFilter('Todos'); }}>
     {openAlbum ? <AlbumView album={openAlbum} onBack={() => setOpenAlbum(null)}/> : <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       <header style={{ padding: '20px 24px', borderBottom: '1px solid #E5E7EB', background: '#fff' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
@@ -102,7 +99,7 @@ export default function ParentPortal() {
             })}
           </div>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' }}>{shifts.map(item => <button key={item} onClick={() => setShift(item)} style={{ padding: '5px 12px', border: 0, borderRadius: 20, background: shift === item ? '#1A4B77' : '#F1F5F9', color: shift === item ? '#fff' : '#475569', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{item}</button>)}<span style={{ marginLeft: 8, color: '#64748B', fontSize: 13 }}>{filtered.length} {filtered.length === 1 ? 'álbum disponible' : 'álbumes disponibles'}</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, flexWrap: 'wrap' }}><span style={{ marginLeft: 8, color: '#64748B', fontSize: 13 }}>{filtered.length} {filtered.length === 1 ? 'álbum disponible' : 'álbumes disponibles'}</span></div>
       </header>
       {error && <div style={{ margin: 24, padding: 14, color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: 8 }}>{error}</div>}
       <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
@@ -115,7 +112,7 @@ export default function ParentPortal() {
 function AlbumCard({ album, onClick }: { album: Album; onClick: () => void }) {
   return <article onClick={onClick} style={{ display:'flex', flexDirection:'column', minWidth:0, border: '1px solid #E2E8F0', borderRadius: 8, overflow: 'hidden', background: '#fff', cursor: 'pointer', boxShadow: '0 2px 6px rgba(15,23,42,.04)', transition:'transform .2s ease, box-shadow .2s ease' }} onMouseEnter={event=>{event.currentTarget.style.transform='translateY(-2px)';event.currentTarget.style.boxShadow='0 10px 24px rgba(15,23,42,.12)';}} onMouseLeave={event=>{event.currentTarget.style.transform='none';event.currentTarget.style.boxShadow='0 2px 6px rgba(15,23,42,.04)';}}>
     <AlbumCover media={album.media}/>
-    <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', minHeight:52, padding: '14px 16px', background:'#fff' }}><strong style={{ display: 'block', color: '#0F172A', fontSize: 16, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{album.activity}</strong><span style={{ display:'block', color: '#64748B', fontSize: 13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{formatEventDate(album.date)} · {formatShift(album.shift)} · {formatBytes(album.media.reduce((total,item)=>total+item.size_bytes,0))}</span></div>
+    <div style={{ position:'relative', zIndex:1, flex:'0 0 auto', minHeight:52, padding: '14px 16px', background:'#fff' }}><strong style={{ display: 'block', color: '#0F172A', fontSize: 16, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{album.activity}</strong><span style={{ display:'block', color: '#64748B', fontSize: 13, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{formatEventDate(album.date)} · {formatBytes(album.media.reduce((total,item)=>total+item.size_bytes,0))}</span></div>
   </article>;
 }
 
@@ -173,7 +170,7 @@ function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
   };
   return <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
     <header style={{ padding: '14px 24px', borderBottom: '1px solid #E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}><button onClick={onBack} style={filterButton}><ArrowLeft size={16}/>Álbumes</button><div><h1 style={{ margin: 0, color: '#1A4B77', fontSize: 21 }}>{album.activity}</h1><span style={{ color: '#64748B', fontSize: 13 }}>{formatEventDate(album.date)} · {formatShift(album.shift)} · {album.media.length} archivos</span></div></div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}><button onClick={onBack} style={filterButton}><ArrowLeft size={16}/>Álbumes</button><div><h1 style={{ margin: 0, color: '#1A4B77', fontSize: 21 }}>{album.activity}</h1><span style={{ color: '#64748B', fontSize: 13 }}>{formatEventDate(album.date)} · {album.media.length} archivos</span></div></div>
       <div style={{ display: 'flex', gap: 8 }}>{selectionMode ? <><button onClick={() => setSelected(new Set(album.media.map(item => item.id)))} style={filterButton}>Seleccionar todo</button>{selected.size > 0 && <button onClick={() => download([...selected])} style={primaryButton}><Download size={15}/>Descargar ({selected.size})</button>}<button onClick={() => { setSelectionMode(false); setSelected(new Set()); }} style={filterButton}>Cancelar</button></> : <><button onClick={() => setSelectionMode(true)} style={filterButton}><CheckSquare size={15}/>Seleccionar</button><button onClick={() => download(album.media.map(item => item.id))} style={primaryButton}><Download size={15}/>Descargar todo</button></>}</div>
     </header>
     <main style={{ flex: 1, overflowY: 'auto', padding: 24 }}><div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12 }}>{album.media.map((item, index) => { const active = selected.has(item.id); return <article key={item.id} onClick={() => selectionMode ? toggle(item.id) : setLightbox(index)} style={{ position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', cursor: 'pointer', outline: active ? '3px solid #1A4B77' : '3px solid transparent', transform: active ? 'scale(.97)' : 'none' }}><Thumb item={item}/>{selectionMode && <span style={{ position: 'absolute', top: 9, left: 9, width: 23, height: 23, borderRadius: '50%', display: 'grid', placeItems: 'center', background: active ? '#1A4B77' : '#fff', color: '#fff', boxShadow: '0 1px 5px rgba(0,0,0,.3)' }}>{active ? '✓' : ''}</span>}<span style={{position:'absolute',left:9,bottom:9,padding:'3px 6px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:10,fontWeight:600}}>{formatBytes(item.size_bytes)}</span>{!selectionMode&&<><button type="button" disabled={sharingId===item.id} onClick={event=>{event.stopPropagation();share(item);}} title="Compartir" aria-label="Compartir imagen" style={{position:'absolute',right:51,bottom:9,width:34,height:34,border:0,borderRadius:'50%',display:'grid',placeItems:'center',background:'rgba(255,255,255,.92)',color:'#1A4B77',cursor:sharingId===item.id?'wait':'pointer',opacity:sharingId===item.id ? .6 : 1,boxShadow:'0 1px 5px rgba(0,0,0,.18)'}}><Share2 size={16}/></button><a href={api.downloadUrl(item.id)} onClick={event => event.stopPropagation()} title="Descargar" style={{ position: 'absolute', right: 9, bottom: 9, width: 34, height: 34, borderRadius: '50%', display: 'grid', placeItems: 'center', background: 'rgba(255,255,255,.92)', color: '#1A4B77', boxShadow:'0 1px 5px rgba(0,0,0,.18)' }}><Download size={16}/></a></>}</article>; })}</div></main>

@@ -3,7 +3,7 @@ import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
-import { api, type CatalogItem, type LotSummary, type School } from '../../lib/api';
+import { api, type CatalogItem, type LotSummary, type Departure } from '../../lib/api';
 import { uploadInQueue } from '../../lib/uploadQueue';
 
 interface UploadFile {
@@ -20,9 +20,8 @@ const TABS = [
 
 export default function CoordinatorPanel() {
   const [activeTab, setActiveTab] = useState('carga');
-  const [colegio, setColegio] = useState('');
+  const [salida, setSalida] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
-  const [turno, setTurno] = useState('');
   const [actividad, setActividad] = useState('');
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -31,9 +30,8 @@ export default function CoordinatorPanel() {
   const [done, setDone] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [schools, setSchools] = useState<School[]>([]);
+  const [departures, setDepartures] = useState<Departure[]>([]);
   const [activities, setActivities] = useState<CatalogItem[]>([]);
-  const [shifts, setShifts] = useState<CatalogItem[]>([]);
   const [lots, setLots] = useState<LotSummary[]>([]);
   const [error, setError] = useState('');
 
@@ -44,32 +42,19 @@ export default function CoordinatorPanel() {
           window.location.href = user.role === 'ADMIN' ? '/admin' : '/parent';
           return;
         }
-        return Promise.all([api.mySchools(), api.lots()]);
+        return Promise.all([api.myDepartures(), api.lots()]);
       })
       .then(result => {
         if (!result) return;
-        setSchools(result[0].items);
+        setDepartures(result[0].items.filter(item => item.active));
         setLots(result[1].items);
       })
       .catch(() => { window.location.href = '/login'; });
   }, []);
 
   useEffect(() => {
-    const school = schools.find(item => item.name === colegio);
-    if (!school) {
-      setActivities([]);
-      setShifts([]);
-      return;
-    }
-    api.catalogs(school.id)
-      .then(data => {
-        setActivities(data.activities);
-        setShifts(data.shifts);
-        setActividad('');
-        setTurno('');
-      })
-      .catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los catálogos.'));
-  }, [colegio, schools]);
+    api.catalogs().then(data => { setActivities(data.activities); }).catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los catálogos.'));
+  }, []);
 
   const addFiles = (newFiles: FileList) => {
     const mapped: UploadFile[] = Array.from(newFiles)
@@ -100,16 +85,15 @@ export default function CoordinatorPanel() {
   };
 
   const uploadFiles = async () => {
-    const school = schools.find(item => item.name === colegio);
-    const shift = shifts.find(item => item.name === turno);
+    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}` === salida);
     const activity = activities.find(item => item.name === actividad);
-    if (!school || !fecha || files.length === 0) return;
+    if (!selectedDeparture || !fecha || files.length === 0) return;
     setUploading(true);
     setUploadProgress(0);
     setError('');
     setDone(false);
     try {
-      const lot = await api.createLot({ schoolId: school.id, shiftId: shift?.id ?? null, activityId: activity?.id ?? null, eventDate: fecha });
+      const lot = await api.createLot({ departureId: selectedDeparture.id, activityId: activity?.id ?? null, eventDate: fecha });
       const result = await uploadInQueue(files, async current => { await api.uploadMedia(lot.lotId, current.file); }, {
         concurrency: 3,
         retries: 1,
@@ -137,7 +121,7 @@ export default function CoordinatorPanel() {
     }
   };
 
-  const canUpload = Boolean(colegio && fecha && files.length > 0 && !uploading);
+  const canUpload = Boolean(salida && fecha && files.length > 0 && !uploading);
 
   return (
     <DashboardLayout
@@ -154,30 +138,23 @@ export default function CoordinatorPanel() {
             Subir material
           </h2>
           <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>
-            Seleccioná el turno, la actividad y arrastrá las fotos.
+            Seleccioná la actividad y arrastrá las fotos.
           </p>
         </div>
 
         {/* Selects */}
         <div className="responsive-grid">
           <SearchableSelect
-            label="Colegio *"
-            value={colegio}
-            onChange={setColegio}
-            options={schools.map(item => item.name)}
-            placeholder="Seleccionar colegio..."
+            label="Salida *"
+            value={salida}
+            onChange={setSalida}
+            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)}
+            placeholder="Seleccionar salida..."
           />
           <DateField
             label="Fecha *"
             value={fecha}
             onChange={setFecha}
-          />
-          <SearchableSelect
-            label="Turno"
-            value={turno}
-            onChange={setTurno}
-            options={shifts.map(item => item.name)}
-            placeholder="Opcional..."
           />
           <SearchableSelect
             label="Actividad"
@@ -322,12 +299,12 @@ export default function CoordinatorPanel() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>Lotes enviados</h2>
-            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#71717A' }}>Estado del material cargado para tus colegios.</p>
+            <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#71717A' }}>Estado del material cargado para tus salidas.</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
               {lots.map(lot => (
                 <article key={lot.id} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '18px', background: '#FFFFFF' }}>
-                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '8px' }}>{lot.school_name}</strong>
-                  <div style={{ color: '#475569', fontSize: '14px' }}>{lot.activity_name} · Turno {lot.shift_name}</div>
+                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '8px' }}>{lot.departure_name ?? lot.school_name}</strong>
+                  <div style={{ color: '#475569', fontSize: '14px' }}>{lot.activity_name}</div>
                   <div style={{ color: '#64748B', fontSize: '13px', marginTop: '4px' }}>{lot.event_date}</div>
                   <span style={{ display: 'inline-block', marginTop: '14px', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>{lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : 'En carga'}</span>
                 </article>

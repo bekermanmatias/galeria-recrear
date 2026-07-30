@@ -1,17 +1,17 @@
 import { createRequire } from 'node:module';
 import { Router } from 'express';
 import { z } from 'zod';
-import { assertSchoolAccess } from '../auth.js';
+import { assertDepartureAccess } from '../auth.js';
 import { query } from '../db.js';
 import { AppError } from '../errors.js';
 import { asyncHandler } from '../http.js';
 import { getStorage } from '../storage.js';
 const require = createRequire(import.meta.url);
 const createArchive = require('archiver') as (format:string,options:{zlib:{level:number}})=>{on(event:string,callback:(error:Error)=>void):void;pipe(destination:NodeJS.WritableStream):void;append(source:NodeJS.ReadableStream,options:{name:string}):void;finalize():Promise<void>;};
-interface MediaRecord{id:string;drive_file_id:string;original_name:string;mime_type:string;size_bytes:number;status:string;school_id:string;current_published_version_id:string|null;lot_version_id:string;}
+interface MediaRecord{id:string;drive_file_id:string;original_name:string;mime_type:string;size_bytes:number;status:string;departure_id:string;current_published_version_id:string|null;lot_version_id:string;}
 const param=(value:string|string[])=>Array.isArray(value)?value[0]:value;
-async function getMedia(id:string){const result=await query<MediaRecord>('SELECT m.id,m.drive_file_id,m.original_name,m.mime_type,m.size_bytes,m.status,l.school_id,l.current_published_version_id,m.lot_version_id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[id]);if(!result.rowCount||!result.rows[0].drive_file_id)throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');return result.rows[0];}
-async function assertMediaAccess(user:NonNullable<Express.Request['user']>,media:MediaRecord){await assertSchoolAccess(user,media.school_id,['COORDINATOR','PARENT']);if(user.role==='PARENT'&&(media.status!=='APPROVED'||media.current_published_version_id!==media.lot_version_id))throw new AppError(403,'FORBIDDEN_MEDIA','El archivo no está publicado');}
+async function getMedia(id:string){const result=await query<MediaRecord>('SELECT m.id,m.drive_file_id,m.original_name,m.mime_type,m.size_bytes,m.status,l.departure_id,l.current_published_version_id,m.lot_version_id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[id]);if(!result.rowCount||!result.rows[0].drive_file_id)throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');return result.rows[0];}
+async function assertMediaAccess(user:NonNullable<Express.Request['user']>,media:MediaRecord){await assertDepartureAccess(user,media.departure_id,['COORDINATOR','PARENT']);if(user.role==='PARENT'&&(media.status!=='APPROVED'||media.current_published_version_id!==media.lot_version_id))throw new AppError(403,'FORBIDDEN_MEDIA','El archivo no está publicado');}
 export const mediaRouter=Router();
 mediaRouter.get('/:id/content',asyncHandler(async(req,res)=>{const media=await getMedia(param(req.params.id));await assertMediaAccess(req.user!,media);const remote=await getStorage().stream(media.drive_file_id,req.headers.range);res.status(remote.status).setHeader('Content-Type',remote.mimeType||media.mime_type);res.setHeader('Content-Length',String(remote.size||media.size_bytes));res.setHeader('Cache-Control','private, max-age=300');res.setHeader('Accept-Ranges','bytes');if(remote.contentRange)res.setHeader('Content-Range',remote.contentRange);remote.stream.pipe(res);}));
 mediaRouter.get('/:id/thumbnail',asyncHandler(async(req,res)=>{const media=await getMedia(param(req.params.id));await assertMediaAccess(req.user!,media);const remote=await getStorage().stream(media.drive_file_id);res.setHeader('Content-Type',remote.mimeType||media.mime_type);res.setHeader('Cache-Control','private, max-age=300');remote.stream.pipe(res);}));
