@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bus, Camera, CheckSquare, Download, Image as ImageIcon, Plane, Search, Share2 } from 'lucide-react';
+import { ArrowLeft, Bus, Camera, CheckSquare, Download, Image as ImageIcon, LogIn, Plane, Search, Share2 } from 'lucide-react';
 import { publicDepartureApi, type LotSummary, type Media, type PublicDeparture } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -10,7 +10,7 @@ const prettyDate=(v:string)=>{const [y,m,d]=v.slice(0,10).split('-');return y&&m
 const button:React.CSSProperties={height:38,display:'inline-flex',alignItems:'center',gap:7,padding:'0 12px',border:0,borderRadius:8,background:'#F1F5F9',color:'#1A4B77',fontSize:13,fontWeight:650,cursor:'pointer'};
 const primary:React.CSSProperties={...button,background:'#1A4B77',color:'#fff'};
 function Thumb({code,item}:{code:string;item:Media}){const src=publicDepartureApi.thumbnailUrl(code,item.id);return item.kind==='VIDEO'?<video src={src} muted preload="metadata" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>:<img src={src} alt={item.original_name} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>;}
-function Header(){return <header style={{minHeight:70,padding:'12px clamp(18px,4vw,64px)',boxSizing:'border-box',display:'flex',alignItems:'center',gap:18,borderBottom:'1px solid #E2E8F0',background:'#fff'}}><img src="/logo-recrear.png" alt="Recrear" style={{width:76,maxHeight:46,objectFit:'contain'}}/><span style={{width:1,height:34,background:'#D9E2EC'}}/><strong style={{color:'#1A4B77',fontSize:20}}>Portal de Fotos</strong></header>}
+function Header(){return <header style={{minHeight:70,padding:'12px clamp(18px,4vw,64px)',boxSizing:'border-box',display:'flex',alignItems:'center',gap:18,borderBottom:'1px solid #E2E8F0',background:'#fff'}}><img src="/logo-recrear.png" alt="Recrear" style={{width:76,maxHeight:46,objectFit:'contain'}}/><span style={{width:1,height:34,background:'#D9E2EC'}}/><strong style={{color:'#1A4B77',fontSize:20}}>Portal de Fotos</strong><a href="/login" style={{marginLeft:'auto',height:38,display:'inline-flex',alignItems:'center',gap:7,padding:'0 14px',borderRadius:8,background:'#1A4B77',color:'#fff',fontSize:13,fontWeight:700,textDecoration:'none'}}><LogIn size={16}/>Ingresar</a></header>}
 function Empty({children}:{children:React.ReactNode}){return <div style={{minHeight:250,display:'grid',placeItems:'center',color:'#94A3B8',textAlign:'center'}}><div><ImageIcon size={44}/><p>{children}</p></div></div>}
 
 export default function PublicDeparturePortal(){
