@@ -3,9 +3,10 @@ const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001/api/v1'
 export type Role = 'ADMIN' | 'COORDINATOR' | 'PARENT';
 export interface SessionUser { id: string; name: string; email: string; role: Role; }
 export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; coordinator_ids?: string[]; coordinators?: string[]; public_link_active?: boolean | null; public_link_generated_at?: string | null; public_link_revoked_at?: string | null; public_link_token?: string | null; }
+export interface Departure { id: string; type: 'MICRO' | 'AEREO'; name: string; destination: string; event_date: string; active: boolean; archived_at?: string | null; public_code?: string; public_access_active?: boolean; school_ids?: string[]; school_names?: string[]; coordinator_ids?: string[]; coordinator_names?: string[]; lot_count?: number; }
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
 export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; }
-export interface LotSummary { id: string; event_date: string; school_id: string; school_name: string; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }
+export interface LotSummary { id: string; event_date: string; school_id: string | null; school_name: string; departure_id?: string; departure_name?: string; departure_destination?: string; departure_type?: 'MICRO' | 'AEREO'; school_names?: string[]; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }
 export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; }
 
 async function parseResponse<T>(response: Response): Promise<T> {
@@ -45,10 +46,11 @@ export const api = {
   me: () => request<{ user: SessionUser }>('/auth/me'),
   changePassword: (currentPassword: string, newPassword: string) => request<void>('/auth/change-password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
   mySchools: () => request<{ items: School[] }>('/lots/my-schools'),
-  catalogs: (schoolId: string) => request<{ activities: CatalogItem[]; shifts: CatalogItem[] }>(`/lots/catalogs?schoolId=${schoolId}`),
+  myDepartures: () => request<{ items: Departure[] }>('/lots/my-departures'),
+  catalogs: () => request<{ activities: CatalogItem[]; shifts: CatalogItem[] }>('/lots/catalogs'),
   lots: (status?: string) => request<{ items: LotSummary[] }>(`/lots${status ? `?status=${status}` : ''}`),
   lot: (id: string) => request<{ lot: LotSummary; version: { id: string; status: string; version_number: number }; media: Media[] }>(`/lots/${id}`),
-  createLot: (body: { schoolId: string; activityId?: string | null; shiftId?: string | null; eventDate: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
+  createLot: (body: { departureId?: string; schoolId?: string; activityId?: string | null; eventDate: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
   uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
   submitLot: (lotId: string) => request<void>(`/lots/${lotId}/submit`, { method: 'POST' }),
   reopenLot: (lotId: string) => request<void>(`/lots/${lotId}/reopen`, { method: 'POST' }),
@@ -73,4 +75,15 @@ export const publicGalleryApi = {
   contentUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/content`,
   thumbnailUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/thumbnail`,
   downloadUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/download`,
+};
+
+export interface PublicDeparture { id: string; public_code: string; name: string; destination: string; type: 'MICRO' | 'AEREO'; event_date: string; }
+export const publicDepartureApi = {
+  search: (text: string) => publicRequest<{ items: PublicDeparture[] }>(`/public/departures/search?q=${encodeURIComponent(text)}`),
+  departure: (code: string) => publicRequest<{ departure: PublicDeparture; items: LotSummary[] }>(`/public/departures/${encodeURIComponent(code)}`),
+  lot: (code: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/departures/${encodeURIComponent(code)}/lots/${lotId}`),
+  downloadZip: (code: string, mediaIds: string[]) => publicRequest<Blob>(`/public/departures/${encodeURIComponent(code)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  contentUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/content`,
+  thumbnailUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/thumbnail`,
+  downloadUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/download`,
 };
