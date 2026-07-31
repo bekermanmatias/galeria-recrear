@@ -132,18 +132,28 @@ export default function Lightbox({
     background: 'rgba(15,23,42,.72)', boxShadow: '0 4px 16px rgba(0,0,0,.24)',
   };
 
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = dialogRef.current;
+    if (!el) return;
+    const handleWheel = (event: WheelEvent) => {
+      if (!isVideo) {
+        event.preventDefault();
+        setZoom(value => Math.max(.5, Math.min(4, value + (event.deltaY < 0 ? .25 : -.25))));
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+    return () => el.removeEventListener('wheel', handleWheel);
+  }, [isVideo]);
+
   return (
     <div
+      ref={dialogRef}
       role="dialog"
       aria-modal="true"
       aria-label={isVideo ? 'Reproductor de video' : 'Vista previa de imagen'}
       onClick={onClose}
-      onWheel={event => {
-        if (!isVideo) {
-          event.preventDefault();
-          setZoom(value => Math.max(.5, Math.min(4, value + (event.deltaY < 0 ? .25 : -.25))));
-        }
-      }}
       style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(2,6,23,.91)', display: 'grid', placeItems: 'center', padding: compact ? '64px 12px 92px' : '76px 88px 104px', boxSizing: 'border-box' }}
     >
       <div
