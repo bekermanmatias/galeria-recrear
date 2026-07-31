@@ -115,7 +115,8 @@ lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(
   });
   res.status(204).end();
 }));
-lotsRouter.post('/:id/reopen',requireRoles('ADMIN'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));const created=await transaction(async client=>{const prior=await client.query<{version_number:number}>('SELECT version_number FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1 FOR UPDATE',[lot.id]);return client.query(`INSERT INTO lot_versions(lot_id,version_number,created_by,source) VALUES($1,$2,$3,'PORTAL') RETURNING *`,[lot.id,(prior.rows[0]?.version_number??0)+1,req.user!.id]);});res.status(201).json(created.rows[0]);}));
+lotsRouter.get('/:id/processing',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{res.json({items:[]});}));
+lotsRouter.post('/:id/media/:mediaId/watermark/retry',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{res.status(204).end();}));
 lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),upload.single('file'),asyncHandler(async(req,res)=>{
   const file=req.file;
   if(!file)throw new AppError(400,'FILE_REQUIRED','Selecciona un archivo');
