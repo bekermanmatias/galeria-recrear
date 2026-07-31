@@ -62,7 +62,7 @@ lotsRouter.get('/catalogs', asyncHandler(async (_req,res) => {
 }));
 lotsRouter.get('/', asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE l.deleted_at IS NULL';
-  if(req.user!.role==='COORDINATOR'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
+  if(req.user!.role==='COORDINATOR'){values.push(req.user!.id);where+=` AND l.created_by=$${values.length}`;}
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
   if(req.query.status && req.user!.role!=='PARENT'){values.push(z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).parse(req.query.status));where+=` AND v.status=$${values.length}`;}
   const visible=req.user!.role==='PARENT'?'l.current_published_version_id':'(SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1)';

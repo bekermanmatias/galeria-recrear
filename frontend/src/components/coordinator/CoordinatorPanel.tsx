@@ -21,6 +21,13 @@ const TABS = [
 
 const CUSTOM_ACTIVITY = '__personalizada__';
 const isDeletable = (lot: LotSummary) => ['DRAFT', 'UPLOADING'].includes(lot.status);
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
 
 export default function CoordinatorPanel() {
   const [activeTab, setActiveTab] = useState('carga');
@@ -349,63 +356,77 @@ export default function CoordinatorPanel() {
               </div>
             )}
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1.2fr 1fr 100px', gap: '12px', padding: '12px 16px', background: '#F8FAFC', borderRadius: '8px', fontSize: '12px', fontWeight: 600, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <div>Salida / Escuela</div>
+                <div>Álbum / Actividad</div>
+                <div>Fecha</div>
+                <div>Creador</div>
+                <div>Estado</div>
+                <div style={{ textAlign: 'right' }}>Acciones</div>
+              </div>
+
               {lots.map(lot => (
-                <article key={lot.id} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '18px', background: '#FFFFFF' }}>
-                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '4px' }}>{lot.departure_name ?? lot.school_name}</strong>
+                <div key={lot.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1.2fr 1fr 100px', gap: '12px', alignItems: 'center', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', transition: 'all 0.2s ease' }}>
+                  <div style={{ fontWeight: 600, color: '#1A4B77', fontSize: '14px' }}>
+                    {lot.departure_name ?? lot.school_name}
+                  </div>
 
-                  {editingLotId === lot.id ? (
-                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
-                      <input
-                        autoFocus
-                        value={editingName}
-                        onChange={e => setEditingName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') void saveEditName(lot.id); if (e.key === 'Escape') setEditingLotId(null); }}
-                        maxLength={160}
-                        style={{ flex: 1, height: '32px', padding: '0 8px', border: '1px solid #1A4B77', borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none' }}
-                      />
-                      <button onClick={() => void saveEditName(lot.id)} disabled={editBusy} style={{ height: '32px', width: '32px', border: 'none', borderRadius: '5px', background: '#1A4B77', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <Check size={14} />
-                      </button>
-                      <button onClick={() => setEditingLotId(null)} disabled={editBusy} style={{ height: '32px', width: '32px', border: '1px solid #E4E4E7', borderRadius: '5px', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-                      <div style={{ color: '#475569', fontSize: '14px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {lot.album_name || lot.activity_name}
-                      </div>
-                      {isDeletable(lot) && (
-                        <button onClick={() => startEditName(lot)} title="Editar nombre del álbum" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-                          <Edit2 size={13} />
+                  <div>
+                    {editingLotId === lot.id ? (
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <input
+                          autoFocus
+                          value={editingName}
+                          onChange={e => setEditingName(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') void saveEditName(lot.id); if (e.key === 'Escape') setEditingLotId(null); }}
+                          maxLength={160}
+                          style={{ width: '100%', height: '30px', padding: '0 8px', border: '1px solid #1A4B77', borderRadius: '4px', fontSize: '13px', outline: 'none' }}
+                        />
+                        <button onClick={() => void saveEditName(lot.id)} disabled={editBusy} style={{ height: '30px', width: '30px', border: 'none', borderRadius: '4px', background: '#1A4B77', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Check size={14} />
                         </button>
-                      )}
-                    </div>
-                  )}
+                        <button onClick={() => setEditingLotId(null)} disabled={editBusy} style={{ height: '30px', width: '30px', border: '1px solid #E4E4E7', borderRadius: '4px', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ color: '#334155', fontSize: '14px' }}>{lot.album_name || lot.activity_name}</span>
+                        {isDeletable(lot) && (
+                          <button onClick={() => startEditName(lot)} title="Editar nombre del álbum" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', padding: '2px', display: 'flex', alignItems: 'center' }}>
+                            <Edit2 size={13} />
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
-                  <div style={{ color: '#64748B', fontSize: '13px', marginTop: '2px' }}>{lot.event_date}</div>
+                  <div style={{ color: '#64748B', fontSize: '13px' }}>
+                    {formatDate(lot.event_date)}
+                  </div>
 
-                  {lot.created_by_name && (
-                    <div style={{ marginTop: '6px', fontSize: '11px', color: '#94A3B8' }}>
-                      Creado por <strong style={{ color: '#64748B' }}>{lot.created_by_name}</strong>
-                    </div>
-                  )}
+                  <div style={{ color: '#64748B', fontSize: '13px' }}>
+                    {lot.created_by_name || 'Coordinador'}
+                  </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
-                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>
+                  <div>
+                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : lot.status === 'PENDING' ? '#92400E' : '#475569', fontSize: '12px', fontWeight: 600 }}>
                       {lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : (lot.status === 'UPLOADING' && lot.submitted_at) ? 'Procesando' : 'En carga'}
                     </span>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
                     {isDeletable(lot) && editingLotId !== lot.id && (
-                      <button onClick={() => confirmDelete(lot.id)} title="Eliminar lote" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
+                      <button onClick={() => confirmDelete(lot.id)} title="Eliminar lote" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: '4px', fontSize: '12px', fontWeight: 500, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                         <Trash2 size={14} />
                         Eliminar
                       </button>
                     )}
                   </div>
-                </article>
+                </div>
               ))}
-              {!lots.length && <p style={{ color: '#71717A' }}>Todavía no hay lotes cargados.</p>}
+              {!lots.length && <p style={{ color: '#71717A', padding: '16px 0' }}>Todavía no hay lotes cargados.</p>}
             </div>
           </div>
         </div>
