@@ -327,9 +327,8 @@ adminRouter.delete('/departures/:id', asyncHandler(async(req,res) => {
     await client.query('UPDATE lots SET deleted_at=now(), current_published_version_id=NULL WHERE departure_id=$1', [String(req.params.id)]);
     await client.query('DELETE FROM departure_schools WHERE departure_id=$1', [String(req.params.id)]);
     await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1', [String(req.params.id)]);
-    await client.query('DELETE FROM departures WHERE id=$1', [String(req.params.id)]).catch(async () => {
-      await client.query('UPDATE departures SET active=false, archived_at=now() WHERE id=$1', [String(req.params.id)]);
-    });
+    await client.query('DELETE FROM passenger_departure_assignments WHERE departure_id=$1', [String(req.params.id)]);
+    await client.query('UPDATE departures SET active=false, archived_at=now() WHERE id=$1', [String(req.params.id)]);
   });
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id) VALUES($1,$2,$3,$4)', [req.user!.id, 'DEPARTURE_DELETED', 'departure', String(req.params.id)]);
   res.status(204).end();
