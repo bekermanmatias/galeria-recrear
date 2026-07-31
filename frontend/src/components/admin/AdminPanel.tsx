@@ -12,7 +12,7 @@ import AdminSalidas from './AdminSalidas';
 import { GalleryView } from './ConnectedViews';
 import AdminPasajeros from './AdminPasajeros';
 
-type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'pasajeros' | 'carga' | 'estado-cargas';
+type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'pasajeros' | 'carga';
 const TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
   { id: 'galeria', label: 'Galería', icon: Image },
@@ -21,7 +21,6 @@ const TABS = [
   { id: 'actividades', label: 'Actividades', icon: List },
   { id: 'usuarios', label: 'Usuarios', icon: Users },
   { id: 'carga', label: 'Carga Manual', icon: UploadIcon },
-  { id: 'estado-cargas', label: 'Estado de Lotes', icon: Activity },
   { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound },
 ] as const;
 
@@ -38,7 +37,6 @@ export default function AdminPanel() {
     {activeTab === 'actividades' && <AdminActividades />}
     {activeTab === 'usuarios' && <AdminUsuarios />}
     {activeTab === 'carga' && <AdminCargaManual />}
-    {activeTab === 'estado-cargas' && <AdminEstadoCargas />}
     {activeTab === 'pasajeros' && <AdminPasajeros />}
   </DashboardLayout>;
 }

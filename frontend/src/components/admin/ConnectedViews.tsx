@@ -77,6 +77,26 @@ export function UsersView() {
   return <div style={page}><PageHeader title="Usuarios" subtitle="Gestión de accesos, roles y contraseñas iniciales." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Usuario</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Nombre','Email','Rol','Estado','Acciones']}>{items.filter(item=>`${item.name} ${item.email}`.toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.name}</Td><Td>{item.email}</Td><Td>{item.role==='ADMIN'?'Administrador':item.role==='COORDINATOR'?'Coordinador':'Familia'}</Td><Td>{item.active?'Activo':'Inactivo'}</Td><Actions onEdit={()=>edit(item)} onDelete={()=>remove(item.id)}/></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Usuario':'Nuevo Usuario'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre completo" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Email" type="email" value={form.email} onChange={value=>setForm({...form,email:value})}/><Field label={editing?'Nueva contraseña (opcional)':'Contraseña inicial'} type="password" value={form.password} onChange={value=>setForm({...form,password:value})}/><label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>Rol<select value={form.role} onChange={event=>setForm({...form,role:event.target.value})} style={input}><option value="PARENT">Familia</option><option value="COORDINATOR">Coordinador</option><option value="ADMIN">Administrador</option></select></label></Modal>}</div>;
 }
 
+const formatDate = (dateStr?: string) => {
+  if (!dateStr) return '';
+  const clean = dateStr.split('T')[0];
+  const parts = clean.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  return dateStr;
+};
+
+function StatusBadge({ status }: { status: string }) {
+  let label = status;
+  let bg = '#F1F5F9';
+  let color = '#475569';
+  if (status === 'PUBLISHED') { label = 'Publicado'; bg = '#DCFCE7'; color = '#15803D'; }
+  else if (status === 'PENDING') { label = 'Pendiente'; bg = '#FEF3C7'; color = '#B45309'; }
+  else if (status === 'DRAFT') { label = 'Borrador'; bg = '#F1F5F9'; color = '#475569'; }
+  else if (status === 'UPLOADING') { label = 'Cargando'; bg = '#DBEAFE'; color = '#1D4ED8'; }
+  else if (status === 'REJECTED') { label = 'Descartado'; bg = '#FEE2E2'; color = '#B91C1C'; }
+  return <span style={{ display: 'inline-block', padding: '3px 9px', borderRadius: 6, background: bg, color: color, fontSize: 12, fontWeight: 700 }}>{label}</span>;
+}
+
 export function GalleryView() {
   const [lots,setLots]=useState<LotSummary[]>([]);
   const [media,setMedia]=useState<Array<Media&{lot:LotSummary}>>([]);
@@ -90,6 +110,9 @@ export function GalleryView() {
   const [showRejected,setShowRejected]=useState(false);
   const [recovering,setRecovering]=useState<string|null>(null);
   const [openMediaMenu,setOpenMediaMenu]=useState<string|null>(null);
+  const [openLotMenu,setOpenLotMenu]=useState<string|null>(null);
+  const [deletingLot,setDeletingLot]=useState<LotSummary|null>(null);
+  const [deleteBusyId,setDeleteBusyId]=useState<string|null>(null);
   const [pendingDiscard,setPendingDiscard]=useState<(Media&{lot:LotSummary})|null>(null);
   const [error,setError]=useState('');
   const [copiedCode,setCopiedCode]=useState<string|null>(null);
@@ -102,22 +125,21 @@ export function GalleryView() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  useEffect(()=>{let mounted=true;api.lots('PUBLISHED').then(async data=>{const details=await Promise.all(data.items.map(async lot=>({lot,media:(await api.lot(lot.id)).media})));if(!mounted)return;setLots(data.items);setMedia(details.flatMap(item=>item.media.map(file=>({...file,lot:item.lot}))));}).catch(reason=>mounted&&setError(reason.message));return()=>{mounted=false;};},[]);
+  useEffect(()=>{let mounted=true;api.lots().then(async data=>{const details=await Promise.all(data.items.map(async lot=>({lot,media:(await api.lot(lot.id)).media})));if(!mounted)return;setLots(data.items);setMedia(details.flatMap(item=>item.media.map(file=>({...file,lot:item.lot}))));}).catch(reason=>mounted&&setError(reason.message));return()=>{mounted=false;};},[]);
 
   const departureOptions=useMemo(()=>['Todos',...Array.from(new Set(lots.map(departureLabel)))],[lots]);
   const activityOptions=useMemo(()=>['Todos',...Array.from(new Set(lots.map(item=>item.activity_name)))],[lots]);
   const filteredLots=useMemo(()=>lots.filter(lot=>(departure==='Todos'||departureLabel(lot)===departure)&&(activity==='Todos'||lot.activity_name===activity)&&(!from||lot.event_date.slice(0,10)>=from)&&(!to||lot.event_date.slice(0,10)<=to)),[lots,departure,activity,from,to]);
   const groups=useMemo(()=>filteredLots.map(lot=>({lot,files:media.filter(file=>file.lot.id===lot.id)})),[filteredLots,media]);
-  const publishedGroups=useMemo(()=>groups.filter(group=>group.files.some(file=>file.status==='APPROVED')),[groups]);
-  const displayedGroups=useMemo(()=>openedLot?groups.filter(group=>group.lot.id===openedLot):publishedGroups,[groups,publishedGroups,openedLot]);
+  const displayedGroups=useMemo(()=>openedLot?groups.filter(group=>group.lot.id===openedLot):groups,[groups,openedLot]);
   const filesForDisplay=(group:typeof groups[number])=>openedLot&&showRejected?group.files.filter(file=>file.status==='APPROVED'||file.status==='REJECTED'):group.files.filter(file=>file.status==='APPROVED');
   const visible=useMemo(()=>displayedGroups.flatMap(filesForDisplay),[displayedGroups,openedLot,showRejected]);
   const selectedItem=selected===null?null:visible[selected]??null;
-  const currentLot=groups.find(group=>group.lot.id===activeLot)??groups[0];
+  const currentLot=groups.find(group=>group.lot.id===activeLot)??groups.find(group=>group.lot.id===openedLot)??groups[0];
   const currentRejected=currentLot?.files.filter(file=>file.status==='REJECTED')??[];
   const nextPurgeDays=currentRejected.length?Math.min(...currentRejected.map(file=>daysUntilPurge(file.purge_after))):0;
 
-  useEffect(()=>{const close=()=>setOpenMediaMenu(null);document.addEventListener('click',close);return()=>document.removeEventListener('click',close);},[]);
+  useEffect(()=>{const close=()=>{setOpenMediaMenu(null);setOpenLotMenu(null);};document.addEventListener('click',close);return()=>document.removeEventListener('click',close);},[]);
 
   const moderateGalleryMedia=async (item:Media&{lot:LotSummary},confirmed=false)=>{const restore=item.status==='REJECTED';if(!restore&&!confirmed){setOpenMediaMenu(null);setPendingDiscard(item);return;}try{setRecovering(item.id);setOpenMediaMenu(null);setError('');await api.moderateMedia(item.id,restore?'restore':'reject');setMedia(current=>current.map(file=>file.id===item.id?{...file,status:restore?'APPROVED':'REJECTED',purge_after:restore?null:new Date(Date.now()+30*86400000).toISOString()}:file));setPendingDiscard(null);}catch(reason:any){setError(reason.message||(restore?'No se pudo recuperar la foto':'No se pudo descartar la foto'));}finally{setRecovering(null);}};
 
@@ -126,7 +148,7 @@ export function GalleryView() {
   return <div style={{flex:1,display:'flex',flexDirection:'column',padding:32,overflowY:'auto'}}>
     {!openedLot&&<div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:24}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
-        <div><h2 style={{margin:'0 0 4px',fontSize:24,color:'#1A4B77'}}>Galería</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Vista global de todos los lotes publicados.</p></div>
+        <div><h2 style={{margin:'0 0 4px',fontSize:24,color:'#1A4B77'}}>Galería de Lotes</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Gestión y listado global de lotes en el sistema.</p></div>
       </div>
       <div style={{display:'flex',flexWrap:'wrap',gap:12}}>
         <SearchableSelect value={departure} onChange={setDeparture} options={departureOptions} placeholder="Todas las salidas" style={{width:240}}/>
@@ -136,7 +158,89 @@ export function GalleryView() {
       </div>
     </div>}
     <ErrorMessage value={error}/>
-    {openedLot&&currentLot&&<section style={{margin:'2px 0 28px',padding:'0 0 22px',borderBottom:'1px solid #E4E4E7'}}><div style={{display:'flex',alignItems:'end',justifyContent:'space-between',gap:16}}><div style={{display:'flex',alignItems:'start',gap:14}}><button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} style={{marginTop:2,padding:'8px 10px',border:'1px solid #DCE3EB',background:'#fff',borderRadius:6,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer'}}>←</button><div><p style={{margin:'0 0 6px',fontSize:13,fontWeight:700,color:'#64748B',textTransform:'uppercase',letterSpacing:'.04em'}}>Lote publicado</p><div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}><h2 style={{margin:0,fontSize:26,color:'#1A4B77'}}>{departureLabel(currentLot.lot)}</h2>{currentLot.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'4px 10px',fontSize:13}}><span style={{color:'#475569',fontWeight:600}}>Cód: {currentLot.lot.departure_public_code}</span><button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'2px',display:'flex',alignItems:'center',color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77'}}>{copiedCode===currentLot.lot.departure_public_code?<Check size={14}/>:<Copy size={14}/>}<span style={{fontSize:12,fontWeight:600,marginLeft:4}}>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button></div>}</div><p style={{margin:'6px 0 0',fontSize:15,color:'#64748B'}}>{currentLot.lot.activity_name} · {currentLot.lot.event_date.slice(0,10)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}</p></div></div><button onClick={()=>downloadLot(currentLot)} style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:13,fontWeight:600,cursor:'pointer'}}><Download size={16}/> Descargar lote</button></div></section>}
+
+    {!openedLot&&(
+      <div style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',padding:'12px 16px',background:'#F8FAFC',borderRadius:'8px',fontSize:'12px',fontWeight:600,color:'#64748B',textTransform:'uppercase',letterSpacing:'0.04em'}}>
+          <div>Salida / Código</div>
+          <div>Álbum / Actividad</div>
+          <div>Fecha</div>
+          <div>Creador</div>
+          <div>Estado</div>
+          <div style={{textAlign:'right'}}>Acciones</div>
+        </div>
+
+        {filteredLots.map(lot=>{
+          const group=groups.find(g=>g.lot.id===lot.id);
+          const filesCount=lot.approved_count??group?.files.length??0;
+          const menuOpen=openLotMenu===lot.id;
+          const publicCode=lot.departure_public_code;
+
+          return (
+            <div key={lot.id} style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',alignItems:'center',padding:'14px 16px',background:'#FFFFFF',border:'1px solid #E2E8F0',borderRadius:'8px',transition:'all 0.2s ease'}}>
+              <div>
+                <div style={{fontWeight:600,color:'#1A4B77',fontSize:'14px'}}>
+                  {departureLabel(lot)}
+                </div>
+                {publicCode&&(
+                  <div style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4}}>
+                    <span style={{fontSize:11,color:'#475569',fontWeight:600,background:'#F1F5F9',border:'1px solid #CBD5E1',padding:'1px 6px',borderRadius:4}}>Cód: {publicCode}</span>
+                    <button onClick={(e)=>{e.stopPropagation();void copyPublicLink(publicCode);}} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'1px 4px',color:copiedCode===publicCode?'#166534':'#1A4B77',fontSize:11,fontWeight:600}}>
+                      {copiedCode===publicCode?'¡Copiado!':'Copiar link'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <span style={{fontWeight:600,color:'#0F172A',fontSize:13}}>{lot.album_name||lot.activity_name}</span>
+              </div>
+
+              <div style={{color:'#64748B',fontSize:13}}>
+                {formatDate(lot.event_date)}
+              </div>
+
+              <div style={{color:'#64748B',fontSize:13}}>
+                {lot.created_by_name??'Coordinador'}
+              </div>
+
+              <div>
+                <StatusBadge status={lot.status}/>
+              </div>
+
+              <div style={{display:'flex',gap:6,justifyContent:'flex-end',alignItems:'center'}}>
+                <button onClick={()=>{setOpenedLot(lot.id);setActiveLot(lot.id);}} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'7px 10px',background:'#1A4B77',color:'#fff',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                  <Eye size={14}/> Ver lote ({filesCount})
+                </button>
+                {group&&(
+                  <button onClick={()=>downloadLot(group)} title="Descargar lote" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'7px 9px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                    <Download size={14}/>
+                  </button>
+                )}
+
+                <div style={{position:'relative'}}>
+                  <button onClick={(e)=>{e.stopPropagation();setOpenLotMenu(menuOpen?null:lot.id);}} title="Más opciones" style={{width:32,height:32,display:'grid',placeItems:'center',border:'1px solid #DCE3EB',borderRadius:6,background:'#fff',color:'#475569',cursor:'pointer'}}>
+                    <MoreVertical size={16}/>
+                  </button>
+
+                  {menuOpen&&(
+                    <div style={{position:'absolute',right:0,top:36,zIndex:50,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.15)',minWidth:210,padding:4}}>
+                      <button onClick={()=>{setOpenLotMenu(null);setDeletingLot(lot);}} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#DC2626',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                        <Trash2 size={15}/> Eliminar lote por completo
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+
+        {!filteredLots.length&&<Empty>No se encontraron lotes con estos filtros.</Empty>}
+      </div>
+    )}
+
+    {openedLot&&currentLot&&<section style={{margin:'2px 0 28px',padding:'0 0 22px',borderBottom:'1px solid #E4E4E7'}}><div style={{display:'flex',alignItems:'end',justifyContent:'space-between',gap:16}}><div style={{display:'flex',alignItems:'start',gap:14}}><button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} style={{marginTop:2,padding:'8px 12px',border:'1px solid #DCE3EB',background:'#fff',borderRadius:6,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>← Volver a la lista</button><div><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}><StatusBadge status={currentLot.lot.status}/></div><div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}><h2 style={{margin:0,fontSize:24,color:'#1A4B77'}}>{departureLabel(currentLot.lot)} · {currentLot.lot.album_name||currentLot.lot.activity_name}</h2>{currentLot.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'4px 10px',fontSize:13}}><span style={{color:'#475569',fontWeight:600}}>Cód: {currentLot.lot.departure_public_code}</span><button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'2px',display:'flex',alignItems:'center',color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77'}}>{copiedCode===currentLot.lot.departure_public_code?<Check size={14}/>:<Copy size={14}/>}<span style={{fontSize:12,fontWeight:600,marginLeft:4}}>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button></div>}</div><p style={{margin:'6px 0 0',fontSize:14,color:'#64748B'}}>{formatDate(currentLot.lot.event_date)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}{currentLot.lot.created_by_name?<> · por {currentLot.lot.created_by_name}</>:null}</p></div></div><button onClick={()=>downloadLot(currentLot)} style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:13,fontWeight:600,cursor:'pointer'}}><Download size={16}/> Descargar lote</button></div></section>}
     {openedLot&&currentLot&&currentRejected.length>0&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:20,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>
         <div style={{width:36,height:36,borderRadius:'50%',display:'grid',placeItems:'center',background:'#FEE2E2',color:'#DC2626',fontWeight:800}}>!</div>
@@ -144,11 +248,7 @@ export function GalleryView() {
       </div>
       <button onClick={()=>setShowRejected(!showRejected)} style={{padding:'9px 13px',border:'1px solid #FED7AA',borderRadius:7,background:'#fff',color:'#9A3412',fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>{showRejected?'Ocultar descartadas':'Revisar descartadas'}</button>
     </div>}
-    {displayedGroups.map(group=><section key={group.lot.id} style={{marginBottom:34}} onMouseEnter={()=>setActiveLot(group.lot.id)}>
-      {!openedLot&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,paddingBottom:12,borderBottom:'1px solid #E4E4E7',marginBottom:16}}>
-        <div><div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}><h3 style={{margin:0,color:'#1A4B77',fontSize:17}}>{departureLabel(group.lot)} <span style={{fontWeight:400,color:'#64748B'}}>· {group.lot.activity_name}</span></h3>{group.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'2px 8px',fontSize:12}}><span style={{color:'#475569',fontWeight:600}}>Cód: {group.lot.departure_public_code}</span><button onClick={(e)=>{e.stopPropagation();void copyPublicLink(group.lot.departure_public_code);}} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'2px',display:'flex',alignItems:'center',color:copiedCode===group.lot.departure_public_code?'#166534':'#1A4B77'}}>{copiedCode===group.lot.departure_public_code?<Check size={13}/>:<Copy size={13}/>}<span style={{fontSize:11,fontWeight:600,marginLeft:3}}>{copiedCode===group.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button></div>}</div><p style={{margin:'4px 0 0',fontSize:13,color:'#71717A'}}>{group.lot.event_date.slice(0,10)} · {group.files.length} {group.files.length===1?'archivo':'archivos'}{group.lot.created_by_name ? <> · <span style={{color:'#94A3B8'}}>por {group.lot.created_by_name}</span></> : null}</p></div>
-        <div style={{display:'flex',gap:8}}>{!openedLot&&<button onClick={()=>{setOpenedLot(group.lot.id);setActiveLot(group.lot.id);}} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 12px',background:'#1A4B77',color:'#fff',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>Ver lote</button>}<button onClick={()=>downloadLot(group)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 12px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}><Download size={15}/> Descargar lote</button></div>
-      </div>}
+    {openedLot&&displayedGroups.map(group=><section key={group.lot.id} style={{marginBottom:34}}>
       <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:24}}>
         {filesForDisplay(group).map(item=>{const index=visible.findIndex(file=>file.id===item.id);const previewable=!item.mime_type.toLowerCase().includes('heic');const isRejected=item.status==='REJECTED';const daysLeft=daysUntilPurge(item.purge_after);const menuOpen=openMediaMenu===item.id;return <article key={item.id} onClick={()=>!isRejected&&previewable&&setSelected(index)} style={{position:'relative',aspectRatio:'1',background:'#F8FAFC',cursor:!isRejected&&previewable?'pointer':'default',borderRadius:10,overflow:'hidden',transition:'transform .2s, box-shadow .2s',border:isRejected?'2px solid #EF4444':'2px solid transparent',boxShadow:isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none'}} onMouseEnter={event=>{event.currentTarget.style.transform='translateY(-3px)';event.currentTarget.style.boxShadow=isRejected?'0 10px 22px rgba(185,28,28,.16)':'0 10px 20px rgba(15,23,42,.16)';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='1');}}} onMouseLeave={event=>{event.currentTarget.style.transform='none';event.currentTarget.style.boxShadow=isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='0');}}}>
           <div style={{width:'100%',height:isRejected?'calc(100% - 58px)':'100%',display:'grid',placeItems:'center',overflow:'hidden',background:isRejected?'#FFF7F7':'#F4F4F5'}}>
@@ -162,9 +262,10 @@ export function GalleryView() {
         </article>;})}
       </div>
     </section>)}
-    {!displayedGroups.length&&<Empty>No hay fotos publicadas con estos filtros.</Empty>}
+    {openedLot&&!displayedGroups.length&&<Empty>No hay fotos publicadas en este lote.</Empty>}
     {selectedItem&&<Lightbox src={api.contentUrl(selectedItem.id)} mediaType={selectedItem.kind} downloadUrl={api.downloadUrl(selectedItem.id)} downloadName={selectedItem.original_name} info={formatBytes(selectedItem.size_bytes)} onClose={()=>setSelected(null)} onNext={selected!==null&&selected<visible.length-1?()=>setSelected(selected+1):undefined} onPrev={selected!==null&&selected>0?()=>setSelected(selected-1):undefined}/>}
     <ConfirmDialog open={pendingDiscard!==null} title="¿Descartar imagen?" description="La imagen dejará de mostrarse a las familias, pero podrás recuperarla durante los próximos 30 días." confirmLabel="Descartar imagen" busy={pendingDiscard!==null&&recovering===pendingDiscard.id} onCancel={()=>!recovering&&setPendingDiscard(null)} onConfirm={()=>{if(pendingDiscard)return moderateGalleryMedia(pendingDiscard,true);}}/>
+    <ConfirmDialog open={deletingLot!==null} title="¿Eliminar lote permanentemente?" description={`Se eliminará por completo el lote "${deletingLot?.album_name||deletingLot?.activity_name}" de la salida "${deletingLot?departureLabel(deletingLot):''}". Se borrarán todas sus fotos, videos e historial del sistema. Esta acción no se puede deshacer.`} confirmLabel="Eliminar lote por completo" tone="danger" busy={deleteBusyId!==null} onCancel={()=>!deleteBusyId&&setDeletingLot(null)} onConfirm={async()=>{if(!deletingLot)return;setDeleteBusyId(deletingLot.id);try{await api.deleteLot(deletingLot.id);setLots(current=>current.filter(item=>item.id!==deletingLot.id));setDeletingLot(null);}catch(err:any){setError(err.message||'No se pudo eliminar el lote');}finally{setDeleteBusyId(null);}}}/>
   </div>;
 }
 
