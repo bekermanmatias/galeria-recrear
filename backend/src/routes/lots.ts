@@ -20,7 +20,7 @@ const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
 const updateSchema = z.object({ albumName: albumNameSchema });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
-const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO']]);
+const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
 
 export type Lot = { id: string; departure_id: string; event_date: string; title: string | null; album_name: string; departure_name: string; departure_destination: string; departure_type: 'MICRO'|'AEREO'; departure_public_code: string | null; shift_code: string | null; activity_code: string | null; activity_name: string | null; latest_version_id: string | null; latest_status: string | null; current_published_version_id: string | null; created_by_name: string | null; created_by_id: string | null; };
