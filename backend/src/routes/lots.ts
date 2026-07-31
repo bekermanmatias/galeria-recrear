@@ -16,21 +16,24 @@ import { retryWatermark } from '../media-processing.js';
 const destination = async (done: (error: Error | null, destination: string) => void) => { try { await fs.mkdir(paths.uploads, { recursive: true }); done(null, paths.uploads); } catch (error) { done(error as Error, paths.uploads); } };
 const disk = multer.diskStorage({ destination: (_req, _file, done) => { void destination(done); }, filename: (_req, file, done) => done(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`) });
 const upload = multer({ storage: disk, limits: { fileSize: config.MAX_FILE_SIZE_MB * 1024 * 1024, files: 1 } });
-const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date() });
+const albumNameSchema = z.string().trim().min(1).max(160);
+const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
+const updateSchema = z.object({ albumName: albumNameSchema });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
 const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO']]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
 
-export type Lot = { id: string; departure_id: string; event_date: string; departure_name: string; departure_destination: string; departure_type: 'MICRO'|'AEREO'; departure_public_code: string | null; shift_code: string | null; activity_code: string | null; activity_name: string | null; latest_version_id: string | null; latest_status: string | null; current_published_version_id: string | null; };
+export type Lot = { id: string; departure_id: string; event_date: string; title: string | null; album_name: string; departure_name: string; departure_destination: string; departure_type: 'MICRO'|'AEREO'; departure_public_code: string | null; shift_code: string | null; activity_code: string | null; activity_name: string | null; latest_version_id: string | null; latest_status: string | null; current_published_version_id: string | null; created_by_name: string | null; created_by_id: string | null; };
 const driveFolderName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,120);
 const departureFolder = (lot: Lot) => driveFolderName(`${lot.departure_public_code ?? lot.departure_type} - ${lot.departure_name}${lot.departure_destination ? ` - ${lot.departure_destination}` : ''}`) || lot.departure_id;
-const lotFolder = (lot: Lot) => driveFolderName(`${lot.event_date} - ${lot.activity_name ?? 'General'} - ${lot.id.slice(0,8)}`);
+const lotFolder = (lot: Lot) => driveFolderName(`${lot.event_date} - ${lot.album_name} - ${lot.id.slice(0,8)}`);
 export async function loadLot(id: string) {
-  const result = await query<Lot>(`SELECT l.id,l.departure_id,l.event_date::text,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
+  const result = await query<Lot>(`SELECT l.id,l.departure_id,l.event_date::text,l.title,COALESCE(NULLIF(l.title,''),a.name,'General') album_name,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
     sh.bot_code shift_code,a.bot_code activity_code,a.name activity_name,l.current_published_version_id,
     (SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1) latest_version_id,
-    (SELECT status FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1) latest_status
-    FROM lots l JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id LEFT JOIN shifts sh ON sh.id=l.shift_id WHERE l.id=$1`, [id]);
+    (SELECT status FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1) latest_status,
+    u.name created_by_name,l.created_by created_by_id
+    FROM lots l JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id LEFT JOIN shifts sh ON sh.id=l.shift_id LEFT JOIN users u ON u.id=l.created_by WHERE l.id=$1 AND l.deleted_at IS NULL`, [id]);
   if (!result.rowCount) throw new AppError(404, 'LOT_NOT_FOUND', 'Lote no encontrado'); return result.rows[0];
 }
 async function editableVersion(lotId: string) {
@@ -58,7 +61,7 @@ lotsRouter.get('/catalogs', asyncHandler(async (_req,res) => {
   res.json({activities:activities.rows,shifts:[]});
 }));
 lotsRouter.get('/', asyncHandler(async (req, res) => {
-  const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE 1=1';
+  const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE l.deleted_at IS NULL';
   if(req.user!.role==='COORDINATOR'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
   if(req.query.status && req.user!.role!=='PARENT'){values.push(z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).parse(req.query.status));where+=` AND v.status=$${values.length}`;}
@@ -66,14 +69,16 @@ lotsRouter.get('/', asyncHandler(async (req, res) => {
   const orderBy=req.query.status==='PENDING'?'COALESCE(v.submitted_at,v.created_at) ASC':'l.event_date DESC,v.created_at DESC';
   values.push(pageSize,(page-1)*pageSize); const limit=values.length-1,offset=values.length;
   const result=await query(`SELECT l.id,l.event_date,d.id departure_id,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
-    d.name school_name,NULL::uuid school_id,COALESCE(a.name,'General') activity_name,''::text shift_name,
+    d.name school_name,NULL::uuid school_id,COALESCE(a.name,'General') activity_name,COALESCE(NULLIF(l.title,''),a.name,'General') album_name,''::text shift_name,
     v.id version_id,v.version_number,v.status,v.submitted_at,v.created_at version_created_at,
     COUNT(m.id) FILTER (WHERE m.status <> 'UPLOADING')::int approved_count,
-    COALESCE(array_agg(DISTINCT s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names
+    COALESCE(array_agg(DISTINCT s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names,
+    u.name created_by_name,l.created_by created_by_id
     FROM lots l JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id
     JOIN lot_versions v ON v.id=${visible} LEFT JOIN media_assets m ON m.lot_version_id=v.id
     LEFT JOIN departure_schools ds ON ds.departure_id=d.id LEFT JOIN schools s ON s.id=ds.school_id
-    ${where} GROUP BY l.id,d.id,a.id,v.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
+    LEFT JOIN users u ON u.id=l.created_by
+    ${where} GROUP BY l.id,d.id,a.id,v.id,u.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
   res.json({items:result.rows,page,pageSize});
 }));
 lotsRouter.get('/:id', asyncHandler(async(req,res)=>{
@@ -84,10 +89,31 @@ lotsRouter.get('/:id', asyncHandler(async(req,res)=>{
 }));
 lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
   const input=createSchema.parse(req.body); await assertDepartureAccess(req.user!,input.departureId,['COORDINATOR']); await assertDepartureActive(input.departureId);
-  const response=await transaction(async client=>{const existing=await client.query<{id:string}>('SELECT id FROM lots WHERE departure_id=$1 AND (activity_id=$2 OR ($2 IS NULL AND activity_id IS NULL)) AND event_date=$3 ORDER BY created_at DESC LIMIT 1 FOR UPDATE',[input.departureId,input.activityId??null,input.eventDate]);
-    if(existing.rowCount){const version=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[existing.rows[0].id]);if(version.rows[0]&&['DRAFT','UPLOADING'].includes(version.rows[0].status))return{lotId:existing.rows[0].id,versionId:version.rows[0].id,existing:true};throw new AppError(409,'LOT_PUBLISHED','El lote ya fue publicado; un administrador debe reabrirlo');}
-    const lot=await client.query<{id:string}>('INSERT INTO lots(departure_id,activity_id,shift_id,event_date,created_by) VALUES($1,$2,NULL,$3,$4) RETURNING id',[input.departureId,input.activityId??null,input.eventDate,req.user!.id]);const version=await client.query<{id:string}>('INSERT INTO lot_versions(lot_id,version_number,created_by) VALUES($1,1,$2) RETURNING id',[lot.rows[0].id,req.user!.id]);return{lotId:lot.rows[0].id,versionId:version.rows[0].id,existing:false};});
+  const response=await transaction(async client=>{const existing=await client.query<{id:string}>('SELECT id FROM lots WHERE departure_id=$1 AND (activity_id=$2 OR ($2 IS NULL AND activity_id IS NULL)) AND event_date=$3 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE',[input.departureId,input.activityId??null,input.eventDate]);
+    if(existing.rowCount){const version=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[existing.rows[0].id]);if(version.rows[0]&&['DRAFT','UPLOADING'].includes(version.rows[0].status)){if(input.albumName)await client.query('UPDATE lots SET title=$1,updated_at=now() WHERE id=$2',[input.albumName,existing.rows[0].id]);return{lotId:existing.rows[0].id,versionId:version.rows[0].id,existing:true};}throw new AppError(409,'LOT_PUBLISHED','El lote ya fue publicado; un administrador debe reabrirlo');}
+    const lot=await client.query<{id:string}>('INSERT INTO lots(departure_id,activity_id,shift_id,event_date,created_by,title) VALUES($1,$2,NULL,$3,$4,$5) RETURNING id',[input.departureId,input.activityId??null,input.eventDate,req.user!.id,input.albumName??null]);const version=await client.query<{id:string}>('INSERT INTO lot_versions(lot_id,version_number,created_by) VALUES($1,1,$2) RETURNING id',[lot.rows[0].id,req.user!.id]);return{lotId:lot.rows[0].id,versionId:version.rows[0].id,existing:false};});
   res.status(response.existing?200:201).json(response);
+}));
+lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
+  const input=updateSchema.parse(req.body);const lot=await loadLot(param(req.params.id));
+  await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
+  if(req.user!.role==='COORDINATOR'){const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_EDITABLE','Solo se pueden renombrar lotes que aún no fueron publicados');}
+  const result=await query('UPDATE lots SET title=$1,updated_at=now() WHERE id=$2 AND deleted_at IS NULL RETURNING id,title',[input.albumName,lot.id]);
+  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_RENAMED','lot',lot.id,JSON.stringify({albumName:input.albumName})]);
+  res.json(result.rows[0]);
+}));
+lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
+  const lot=await loadLot(param(req.params.id));
+  await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
+  if(req.user!.role==='COORDINATOR'){
+    const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
+    if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_DELETABLE','Solo se pueden eliminar lotes que aún no fueron publicados');
+  }
+  await transaction(async client=>{
+    await client.query('UPDATE lots SET deleted_at=now(),deleted_by=$1,current_published_version_id=NULL,updated_at=now() WHERE id=$2 AND deleted_at IS NULL',[req.user!.id,lot.id]);
+    await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_DELETED','lot',lot.id,JSON.stringify({albumName:lot.album_name,departureId:lot.departure_id})]);
+  });
+  res.status(204).end();
 }));
 lotsRouter.post('/:id/reopen',requireRoles('ADMIN'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));const created=await transaction(async client=>{const prior=await client.query<{version_number:number}>('SELECT version_number FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1 FOR UPDATE',[lot.id]);return client.query(`INSERT INTO lot_versions(lot_id,version_number,created_by,source) VALUES($1,$2,$3,'PORTAL') RETURNING *`,[lot.id,(prior.rows[0]?.version_number??0)+1,req.user!.id]);});res.status(201).json(created.rows[0]);}));
 lotsRouter.get('/:id/processing',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);const result=await query(`SELECT id,status,watermark_status,watermark_error,watermark_attempts FROM media_assets WHERE lot_version_id=(SELECT id FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1) ORDER BY sort_order,created_at`,[lot.id]);res.json({items:result.rows});}));

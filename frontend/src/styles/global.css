@@ -52,9 +52,27 @@
   gap: 16px;
   margin-bottom: 32px;
 }
+
+.upload-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.upload-fields-grid > * {
+  min-width: 0;
+}
+
 @media (max-width: 600px) {
   .responsive-grid {
     grid-template-columns: 1fr;
+  }
+
+  .upload-fields-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
   }
 }
 

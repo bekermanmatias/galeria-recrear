@@ -20,16 +20,18 @@ export const adminRouter = Router();
 adminRouter.get('/users', asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query);
   const term = String(req.query.q ?? '');
+  const includeInactive = String(req.query.includeInactive ?? '') === 'true';
   const result = await query(`
     SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
            COALESCE(array_agg(us.school_id) FILTER (WHERE us.school_id IS NOT NULL AND us.active = true), ARRAY[]::uuid[]) as school_ids
     FROM users u
     LEFT JOIN user_schools us ON u.id = us.user_id
-    WHERE u.name ILIKE $1 OR u.email ILIKE $1
+    WHERE ($4::boolean OR u.active = true)
+      AND (u.name ILIKE $1 OR u.email ILIKE $1)
     GROUP BY u.id
     ORDER BY u.name
     LIMIT $2 OFFSET $3
-  `, [`%${term}%`, pageSize, (page - 1) * pageSize]);
+  `, [`%${term}%`, pageSize, (page - 1) * pageSize, includeInactive]);
   res.json({ items: result.rows, page, pageSize });
 }));
 adminRouter.post('/users', asyncHandler(async (req, res) => {
@@ -60,7 +62,23 @@ adminRouter.put('/users/:id/schools', asyncHandler(async (req, res) => {
   });
   res.status(204).end();
 }));
-adminRouter.delete('/users/:id', asyncHandler(async (req, res) => { await query('UPDATE users SET active = false WHERE id = $1', [String(req.params.id)]); res.status(204).end(); }));
+adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
+  const userId = String(req.params.id);
+  if (userId === req.user!.id) throw new AppError(400, 'CANNOT_DELETE_SELF', 'No podés eliminar tu propia cuenta');
+  await transaction(async client => {
+    const target = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    if (!target.rowCount || !target.rows[0].active) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
+    if (target.rows[0].role === 'ADMIN') {
+      const admins = await client.query("SELECT count(*)::int AS total FROM users WHERE role='ADMIN' AND active");
+      if (admins.rows[0].total <= 1) throw new AppError(400, 'LAST_ADMIN', 'No se puede eliminar el último administrador activo');
+    }
+    await client.query('UPDATE users SET active=false WHERE id=$1', [userId]);
+    await client.query('UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [userId]);
+    await client.query('UPDATE user_schools SET active=false WHERE user_id=$1', [userId]);
+    await client.query('DELETE FROM departure_coordinators WHERE user_id=$1', [userId]);
+  });
+  res.status(204).end();
+}));
 
 adminRouter.get('/schools', asyncHandler(async (_req, res) => {
   const result = await query(`

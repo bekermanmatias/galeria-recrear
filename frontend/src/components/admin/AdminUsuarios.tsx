@@ -39,6 +39,7 @@ export default function AdminUsuarios() {
   const [schoolIds, setSchoolIds] = useState<string[]>([]);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const load = () => adminRequest<{items: AdminUser[]}>('/users').then(data => setUsuarios(data.items.map(item => ({id:item.id,nombre:item.name,email:item.email,rol:item.role==='ADMIN'?'admin':item.role==='COORDINATOR'?'coordinador':'user',school_ids:item.school_ids}))));
   useEffect(() => { load(); adminRequest<{items: School[]}>('/schools').then(data => setSchools(data.items)); }, []);
 
@@ -61,8 +62,8 @@ export default function AdminUsuarios() {
     if (role !== 'ADMIN') await adminRequest('/users/'+saved.id+'/schools',{method:'PUT',body:JSON.stringify({schoolIds, role})});
     setIsModalOpen(false); await load();
   };
-  const handleDelete = (id:string) => setPendingDelete(id);
-  const confirmDelete = async () => { if (!pendingDelete) return; try { setDeleteBusy(true); await adminRequest('/users/'+pendingDelete,{method:'DELETE'}); setPendingDelete(null); await load(); } finally { setDeleteBusy(false); } };
+  const handleDelete = (id:string) => { setDeleteError(''); setPendingDelete(id); };
+  const confirmDelete = async () => { if (!pendingDelete) return; try { setDeleteBusy(true); setDeleteError(''); await adminRequest('/users/'+pendingDelete,{method:'DELETE'}); setPendingDelete(null); await load(); } catch (reason) { setDeleteError(reason instanceof Error ? reason.message : 'No se pudo eliminar el usuario.'); } finally { setDeleteBusy(false); } };
 
   const filteredUsuarios = usuarios.filter(u =>
     u.nombre.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -217,7 +218,7 @@ export default function AdminUsuarios() {
           </div>
         </div>
       )}
-      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar usuario?" description="El usuario perderá el acceso al portal. Sus cargas y acciones anteriores permanecerán registradas." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
+      <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar usuario?" description={deleteError || "El usuario perderá el acceso y sus asignaciones. Sus cargas y acciones anteriores permanecerán registradas."} confirmLabel="Eliminar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }

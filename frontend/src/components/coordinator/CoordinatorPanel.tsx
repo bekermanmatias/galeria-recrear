@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Check, Image as ImageIcon, Trash2, ZoomIn, ZoomOut, Download, ChevronDown, Upload as UploadIcon, Image } from 'lucide-react';
+import { Upload, X, Check, Trash2, Edit2, Upload as UploadIcon, Image } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
@@ -19,11 +19,14 @@ const TABS = [
   { id: 'galeria', label: 'Ver Galería', icon: Image },
 ] as const;
 
+const isDeletable = (lot: LotSummary) => ['DRAFT', 'UPLOADING'].includes(lot.status);
+
 export default function CoordinatorPanel() {
   const [activeTab, setActiveTab] = useState('carga');
   const [salida, setSalida] = useState('');
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [actividad, setActividad] = useState('');
+  const [albumName, setAlbumName] = useState('');
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -35,6 +38,14 @@ export default function CoordinatorPanel() {
   const [activities, setActivities] = useState<CatalogItem[]>([]);
   const [lots, setLots] = useState<LotSummary[]>([]);
   const [error, setError] = useState('');
+
+  // Gallery state
+  const [editingLotId, setEditingLotId] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [deletingLotId, setDeletingLotId] = useState<string | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [galleryError, setGalleryError] = useState('');
 
   useEffect(() => {
     api.me()
@@ -56,6 +67,14 @@ export default function CoordinatorPanel() {
   useEffect(() => {
     api.catalogs().then(data => { setActivities(data.activities); }).catch(reason => setError(reason instanceof Error ? reason.message : 'No se pudieron cargar los catálogos.'));
   }, []);
+
+  const handleActividadChange = (value: string) => {
+    const prevActivity = activities.find(a => a.name === actividad);
+    setActividad(value);
+    if (!albumName || albumName === (prevActivity?.name ?? '')) {
+      setAlbumName(value);
+    }
+  };
 
   const addFiles = (newFiles: FileList) => {
     const mapped: UploadFile[] = Array.from(newFiles)
@@ -85,7 +104,23 @@ export default function CoordinatorPanel() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
-  const waitForWatermarks = async (lotId: string) => { while (true) { const state = await api.watermarkStatus(lotId); const byId = new Map(state.items.map(item => [item.id, item])); setFiles(previous => previous.map(item => { const media = item.mediaId ? byId.get(item.mediaId) : undefined; if (!media) return item; if (media.watermark_status === 'READY') return { ...item, status: 'done', error: undefined }; if (media.watermark_status === 'FAILED') return { ...item, status: 'error' }; return { ...item, status: 'processing' }; })); if (state.items.some(item => item.watermark_status === 'FAILED')) throw new Error('Hay archivos que no pudieron procesarse. Reintenta la carga.'); if (state.items.length && state.items.every(item => item.watermark_status === 'READY')) return; await new Promise(resolve => setTimeout(resolve, 2000)); } };
+  const waitForWatermarks = async (lotId: string) => {
+    while (true) {
+      const state = await api.watermarkStatus(lotId);
+      const byId = new Map(state.items.map(item => [item.id, item]));
+      setFiles(previous => previous.map(item => {
+        const media = item.mediaId ? byId.get(item.mediaId) : undefined;
+        if (!media) return item;
+        if (media.watermark_status === 'READY') return { ...item, status: 'done' };
+        if (media.watermark_status === 'FAILED') return { ...item, status: 'error' };
+        return { ...item, status: 'processing' };
+      }));
+      if (state.items.some(item => item.watermark_status === 'FAILED')) throw new Error('Hay archivos que no pudieron procesarse. Reintenta la carga.');
+      if (state.items.length && state.items.every(item => item.watermark_status === 'READY')) return;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  };
+
   const uploadFiles = async () => {
     const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}` === salida);
     const activity = activities.find(item => item.name === actividad);
@@ -94,15 +129,88 @@ export default function CoordinatorPanel() {
     if (!selectedDeparture || !fecha || (!pending.length && !retrying.length)) return;
     setUploading(true); setUploadProgress(0); setError(''); setDone(false);
     try {
-      const lot = await api.createLot({ departureId: selectedDeparture.id, activityId: activity?.id ?? null, eventDate: fecha });
-      if (retrying.length) await Promise.all(retrying.map(async item => { setFiles(previous => previous.map(file => file.id === item.id ? { ...file, status: 'processing' } : file)); await api.retryWatermark(lot.lotId, item.mediaId!); }));
-      const result = await uploadInQueue(pending, async current => { const media=await api.uploadMedia(lot.lotId, current.file); setFiles(previous => previous.map(item => item.id === current.id ? { ...item, mediaId:media.id, status:'processing' } : item)); }, { concurrency: 3, retries: 1, onStart: current => setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item)), onFinish: (current, success) => { if(!success)setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'error' } : item)); setUploadProgress(previous => Math.round(Math.min(100, previous + (100 / Math.max(1, pending.length))))); }, });
-      if (result.failed.length) { setError('Quedaron '+result.failed.length+' archivo(s) para reintentar.'); return; }
-      await waitForWatermarks(lot.lotId); await api.submitLot(lot.lotId); setLots((await api.lots()).items); files.forEach(item => URL.revokeObjectURL(item.preview)); setFiles([]); setDone(true);
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo completar la carga.'); } finally { setUploading(false); }
+      const lot = await api.createLot({
+        departureId: selectedDeparture.id,
+        activityId: activity?.id ?? null,
+        eventDate: fecha,
+        albumName: albumName.trim() || undefined,
+      });
+      if (retrying.length) await Promise.all(retrying.map(async item => {
+        setFiles(previous => previous.map(file => file.id === item.id ? { ...file, status: 'processing' } : file));
+        await api.retryWatermark(lot.lotId, item.mediaId!);
+      }));
+      const result = await uploadInQueue(pending, async current => {
+        const media = await api.uploadMedia(lot.lotId, current.file);
+        setFiles(previous => previous.map(item => item.id === current.id ? { ...item, mediaId: media.id, status: 'processing' } : item));
+      }, {
+        concurrency: 3, retries: 1,
+        onStart: current => setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item)),
+        onFinish: (current, success) => {
+          if (!success) setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'error' } : item));
+          setUploadProgress(previous => Math.round(Math.min(100, previous + (100 / Math.max(1, pending.length)))));
+        },
+      });
+      if (result.failed.length) { setError('Quedaron ' + result.failed.length + ' archivo(s) para reintentar.'); return; }
+      await waitForWatermarks(lot.lotId);
+      await api.submitLot(lot.lotId);
+      setLots((await api.lots()).items);
+      files.forEach(item => URL.revokeObjectURL(item.preview));
+      setFiles([]);
+      setAlbumName('');
+      setActividad('');
+      setDone(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'No se pudo completar la carga.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const startEditName = (lot: LotSummary) => {
+    setEditingLotId(lot.id);
+    setEditingName(lot.album_name ?? lot.activity_name ?? '');
+    setGalleryError('');
+  };
+
+  const saveEditName = async (lotId: string) => {
+    const trimmed = editingName.trim();
+    if (!trimmed) return;
+    setEditBusy(true);
+    setGalleryError('');
+    try {
+      await api.renameLot(lotId, trimmed);
+      setLots(prev => prev.map(l => l.id === lotId ? { ...l, album_name: trimmed } : l));
+      setEditingLotId(null);
+    } catch (reason) {
+      setGalleryError(reason instanceof Error ? reason.message : 'No se pudo renombrar el \u00e1lbum.');
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const confirmDelete = (lotId: string) => {
+    setDeletingLotId(lotId);
+    setGalleryError('');
+  };
+
+  const executeDelete = async () => {
+    if (!deletingLotId) return;
+    setDeleteBusy(true);
+    setGalleryError('');
+    try {
+      await api.deleteLot(deletingLotId);
+      setLots(prev => prev.filter(l => l.id !== deletingLotId));
+      setDeletingLotId(null);
+    } catch (reason) {
+      setGalleryError(reason instanceof Error ? reason.message : 'No se pudo eliminar el lote.');
+      setDeletingLotId(null);
+    } finally {
+      setDeleteBusy(false);
+    }
   };
 
   const canUpload = Boolean(salida && fecha && files.length > 0 && !uploading);
+  const activityPlaceholder = activities.find(a => a.name === actividad)?.name || 'General';
 
   return (
     <DashboardLayout
@@ -115,38 +223,52 @@ export default function CoordinatorPanel() {
       <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
       <main style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
-          <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>
-            Subir material
-          </h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>
-            Seleccioná la actividad y arrastrá las fotos.
-          </p>
+          <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>Subir material</h2>
+          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Seleccion\u00e1 la actividad y arrastr\u00e1 las fotos.</p>
         </div>
 
-        {/* Selects */}
-        <div className="responsive-grid">
+        <div className="upload-fields-grid">
           <SearchableSelect
             label="Salida *"
             value={salida}
             onChange={setSalida}
-            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)}
+            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}`)}
             placeholder="Seleccionar salida..."
           />
-          <DateField
-            label="Fecha *"
-            value={fecha}
-            onChange={setFecha}
-          />
+          <DateField label="Fecha *" value={fecha} onChange={setFecha} />
           <SearchableSelect
             label="Actividad"
             value={actividad}
-            onChange={setActividad}
+            onChange={handleActividadChange}
             options={activities.map(item => item.name)}
             placeholder="Opcional..."
           />
+          <div>
+            <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>
+              Nombre del \u00e1lbum
+            </label>
+            <input
+              type="text"
+              value={albumName}
+              onChange={e => setAlbumName(e.target.value)}
+              placeholder={activityPlaceholder}
+              maxLength={160}
+              style={{
+                width: '100%', height: '44px', padding: '0 16px',
+                border: '1px solid #E4E4E7', background: '#FFFFFF',
+                color: albumName ? '#09090B' : '#71717A',
+                fontSize: '14px', fontFamily: 'inherit', outline: 'none',
+                transition: 'border-color 0.2s', boxSizing: 'border-box', borderRadius: '6px',
+              }}
+              onFocus={e => (e.target.style.borderColor = '#1A4B77')}
+              onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
+            />
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#A1A1AA' }}>
+              Si no complet\u00e1s este campo, se usar\u00e1 el nombre de la actividad.
+            </p>
+          </div>
         </div>
 
-        {/* Dropzone */}
         <div
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -155,57 +277,29 @@ export default function CoordinatorPanel() {
           style={{
             border: `1px solid ${isDragging ? '#1A4B77' : '#E4E4E7'}`,
             background: isDragging ? '#FAFAFA' : '#FFFFFF',
-            padding: '64px 24px',
-            textAlign: 'center',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease',
-            marginBottom: '32px',
-            borderRadius: '8px',
+            padding: '64px 24px', textAlign: 'center', cursor: 'pointer',
+            transition: 'all 0.2s ease', marginBottom: '32px', marginTop: '24px', borderRadius: '8px',
           }}
         >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime"
-            multiple
-            style={{ display: 'none' }}
-            onChange={e => e.target.files && addFiles(e.target.files)}
-          />
+          <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime" multiple style={{ display: 'none' }} onChange={e => e.target.files && addFiles(e.target.files)} />
           <Upload size={32} strokeWidth={1} color={isDragging ? '#1A4B77' : '#A1A1AA'} style={{ margin: '0 auto 16px' }} />
-          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: '15px', color: '#1A4B77' }}>
-            Hacé clic o arrastrá las fotos acá
-          </p>
-          <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>
-            JPG, PNG, HEIC, MP4 y MOV. Se subirán en calidad original.
-          </p>
+          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: '15px', color: '#1A4B77' }}>Hac\u00e9 clic o arrastr\u00e1 las fotos ac\u00e1</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>JPG, PNG, HEIC, MP4 y MOV. Se subir\u00e1n en calidad original.</p>
         </div>
 
-        {/* File preview list */}
         {files.length > 0 && (
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1A4B77' }}>Archivos seleccionados</h3>
               <span style={{ fontSize: '13px', color: '#71717A' }}>{files.length} archivo(s)</span>
             </div>
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px',
-              maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
-            }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px', maxHeight: '240px', overflowY: 'auto', paddingRight: '8px' }}>
               {files.map(f => (
                 <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', borderRadius: '4px', cursor: 'pointer', outline: f.status === 'error' ? '2px solid #EF4444' : f.status === 'done' ? '2px solid #22C55E' : 'none' }}>
                   {f.file.type.startsWith('video/') || /\.(mp4|mov)$/i.test(f.file.name)
                     ? <video src={f.preview} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <img src={f.preview} alt={f.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                  <button
-                    onClick={e => { e.stopPropagation(); removeFile(f.id); }}
-                    style={{
-                      position: 'absolute', top: '4px', right: '4px',
-                      width: '20px', height: '20px',
-                      background: 'rgba(0,0,0,0.5)', border: 'none',
-                      borderRadius: '50%', cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}
-                  >
+                  <button onClick={e => { e.stopPropagation(); removeFile(f.id); }} style={{ position: 'absolute', top: '4px', right: '4px', width: '20px', height: '20px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <X size={12} color="white" />
                   </button>
                 </div>
@@ -214,7 +308,6 @@ export default function CoordinatorPanel() {
           </div>
         )}
 
-        {/* Progress bar */}
         {uploading && (
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -222,51 +315,26 @@ export default function CoordinatorPanel() {
               <span style={{ fontSize: '13px', color: '#71717A' }}>{uploadProgress}%</span>
             </div>
             <div style={{ height: '4px', background: '#F4F4F5', width: '100%', borderRadius: '2px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${uploadProgress}%`,
-                background: '#1A4B77',
-                transition: 'width 0.3s ease',
-              }} />
+              <div style={{ height: '100%', width: `${uploadProgress}%`, background: '#1A4B77', transition: 'width 0.3s ease' }} />
             </div>
           </div>
         )}
 
-        {/* Done state */}
         {done && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '12px',
-            background: '#FAFAFA', border: '1px solid #E4E4E7',
-            padding: '16px', marginBottom: '32px', borderRadius: '8px'
-          }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', background: '#FAFAFA', border: '1px solid #E4E4E7', padding: '16px', marginBottom: '32px', borderRadius: '8px' }}>
             <div style={{ width: '24px', height: '24px', background: '#1A4B77', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={14} color="#FFFFFF" strokeWidth={3} />
             </div>
-            <span style={{ fontSize: '14px', color: '#1A4B77', fontWeight: 500 }}>
-              Carga completada. El lote ha sido enviado a revisión.
-            </span>
+            <span style={{ fontSize: '14px', color: '#1A4B77', fontWeight: 500 }}>Carga completada. El lote ha sido enviado a revisi\u00f3n.</span>
           </div>
         )}
 
         {error && <div role="alert" style={{ color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>{error}</div>}
 
-        {/* Submit button */}
         <button
           onClick={uploadFiles}
           disabled={!canUpload}
-          style={{
-            width: '100%',
-            padding: '16px',
-            background: canUpload ? '#1A4B77' : '#F4F4F5',
-            color: canUpload ? '#FFFFFF' : '#A1A1AA',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '14px',
-            fontWeight: 500,
-            fontFamily: 'inherit',
-            cursor: canUpload ? 'pointer' : 'not-allowed',
-            transition: 'background 0.2s',
-          }}
+          style={{ width: '100%', padding: '16px', background: canUpload ? '#1A4B77' : '#F4F4F5', color: canUpload ? '#FFFFFF' : '#A1A1AA', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: 500, fontFamily: 'inherit', cursor: canUpload ? 'pointer' : 'not-allowed', transition: 'background 0.2s' }}
           onMouseEnter={e => canUpload && (e.currentTarget.style.background = '#133656')}
           onMouseLeave={e => canUpload && (e.currentTarget.style.background = '#1A4B77')}
         >
@@ -281,16 +349,87 @@ export default function CoordinatorPanel() {
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>
             <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>Lotes enviados</h2>
             <p style={{ margin: '0 0 24px', fontSize: '14px', color: '#71717A' }}>Estado del material cargado para tus salidas.</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+
+            {galleryError && (
+              <div role="alert" style={{ color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', padding: '12px 16px', borderRadius: '8px', marginBottom: '16px', fontSize: '13px' }}>
+                {galleryError}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
               {lots.map(lot => (
                 <article key={lot.id} style={{ border: '1px solid #E5E7EB', borderRadius: '10px', padding: '18px', background: '#FFFFFF' }}>
-                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '8px' }}>{lot.departure_name ?? lot.school_name}</strong>
-                  <div style={{ color: '#475569', fontSize: '14px' }}>{lot.activity_name}</div>
-                  <div style={{ color: '#64748B', fontSize: '13px', marginTop: '4px' }}>{lot.event_date}</div>
-                  <span style={{ display: 'inline-block', marginTop: '14px', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>{lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : 'En carga'}</span>
+                  <strong style={{ display: 'block', color: '#1A4B77', marginBottom: '4px' }}>{lot.departure_name ?? lot.school_name}</strong>
+
+                  {editingLotId === lot.id ? (
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '8px' }}>
+                      <input
+                        autoFocus
+                        value={editingName}
+                        onChange={e => setEditingName(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') void saveEditName(lot.id); if (e.key === 'Escape') setEditingLotId(null); }}
+                        maxLength={160}
+                        style={{ flex: 1, height: '32px', padding: '0 8px', border: '1px solid #1A4B77', borderRadius: '5px', fontSize: '13px', fontFamily: 'inherit', outline: 'none' }}
+                      />
+                      <button onClick={() => void saveEditName(lot.id)} disabled={editBusy} style={{ height: '32px', width: '32px', border: 'none', borderRadius: '5px', background: '#1A4B77', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <Check size={14} />
+                      </button>
+                      <button onClick={() => setEditingLotId(null)} disabled={editBusy} style={{ height: '32px', width: '32px', border: '1px solid #E4E4E7', borderRadius: '5px', background: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                      <div style={{ color: '#475569', fontSize: '14px', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {lot.album_name || lot.activity_name}
+                      </div>
+                      {isDeletable(lot) && (
+                        <button onClick={() => startEditName(lot)} title="Editar nombre del \u00e1lbum" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                          <Edit2 size={13} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  <div style={{ color: '#64748B', fontSize: '13px', marginTop: '2px' }}>{lot.event_date}</div>
+
+                  {lot.created_by_name && (
+                    <div style={{ marginTop: '6px', fontSize: '11px', color: '#94A3B8' }}>
+                      Creado por <strong style={{ color: '#64748B' }}>{lot.created_by_name}</strong>
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
+                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>
+                      {lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : 'En carga'}
+                    </span>
+                    {isDeletable(lot) && editingLotId !== lot.id && (
+                      <button onClick={() => confirmDelete(lot.id)} title="Eliminar lote" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
+                        <Trash2 size={14} />
+                        Eliminar
+                      </button>
+                    )}
+                  </div>
                 </article>
               ))}
-              {!lots.length && <p style={{ color: '#71717A' }}>Todavía no hay lotes cargados.</p>}
+              {!lots.length && <p style={{ color: '#71717A' }}>Todav\u00eda no hay lotes cargados.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deletingLotId && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.45)', display: 'grid', placeItems: 'center', padding: '16px' }}>
+          <div style={{ width: 'min(100%, 400px)', background: '#fff', borderRadius: '12px', padding: '28px', boxShadow: '0 20px 50px rgba(15,23,42,.2)' }}>
+            <h3 style={{ margin: '0 0 10px', color: '#1A4B77', fontSize: '17px' }}>\u00bfEliminar este lote?</h3>
+            <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748B' }}>Se eliminar\u00e1 el lote y todos sus archivos. Esta acci\u00f3n no se puede deshacer.</p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => setDeletingLotId(null)} disabled={deleteBusy} style={{ padding: '10px 18px', border: '1px solid #E4E4E7', borderRadius: '6px', background: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
+                Cancelar
+              </button>
+              <button onClick={() => void executeDelete()} disabled={deleteBusy} style={{ padding: '10px 18px', border: 'none', borderRadius: '6px', background: '#EF4444', color: '#fff', fontSize: '13px', fontWeight: 600, cursor: deleteBusy ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: deleteBusy ? 0.7 : 1 }}>
+                {deleteBusy ? 'Eliminando...' : 'Eliminar lote'}
+              </button>
             </div>
           </div>
         </div>
@@ -300,42 +439,14 @@ export default function CoordinatorPanel() {
         <Lightbox
           src={files.find(f => f.id === selectedPhoto)?.preview || ''}
           onClose={() => setSelectedPhoto(null)}
-          onNext={
-            files.findIndex(f => f.id === selectedPhoto) < files.length - 1
-              ? () => {
-                  const index = files.findIndex(f => f.id === selectedPhoto);
-                  setSelectedPhoto(files[index + 1].id);
-                }
-              : undefined
-          }
-          onPrev={
-            files.findIndex(f => f.id === selectedPhoto) > 0
-              ? () => {
-                  const index = files.findIndex(f => f.id === selectedPhoto);
-                  setSelectedPhoto(files[index - 1].id);
-                }
-              : undefined
-          }
+          onNext={files.findIndex(f => f.id === selectedPhoto) < files.length - 1 ? () => { const index = files.findIndex(f => f.id === selectedPhoto); setSelectedPhoto(files[index + 1].id); } : undefined}
+          onPrev={files.findIndex(f => f.id === selectedPhoto) > 0 ? () => { const index = files.findIndex(f => f.id === selectedPhoto); setSelectedPhoto(files[index - 1].id); } : undefined}
           actions={
             <>
               <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)', margin: '0 4px' }} />
-              <button
-                onClick={() => {
-                  removeFile(selectedPhoto);
-                  setSelectedPhoto(null);
-                }}
-                style={{
-                  background: 'rgba(239, 68, 68, 0.2)',
-                  border: 'none',
-                  color: '#F87171',
-                  cursor: 'pointer', padding: '8px', borderRadius: '8px',
-                  display: 'flex', alignItems: 'center', gap: '8px'
-                }}
-              >
+              <button onClick={() => { removeFile(selectedPhoto); setSelectedPhoto(null); }} style={{ background: 'rgba(239, 68, 68, 0.2)', border: 'none', color: '#F87171', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Trash2 size={20} />
-                <span style={{ fontSize: '13px', fontWeight: 500 }}>
-                  Eliminar
-                </span>
+                <span style={{ fontSize: '13px', fontWeight: 500 }}>Eliminar</span>
               </button>
             </>
           }
@@ -345,39 +456,11 @@ export default function CoordinatorPanel() {
   );
 }
 
-function DateField({
-  label, value, onChange,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div>
-      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>
-        {label}
-      </label>
-      <input
-        type="date"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{
-          width: '100%',
-          height: '44px',
-          padding: '12px 16px',
-          border: '1px solid #E4E4E7',
-          background: '#FFFFFF',
-          color: value ? '#09090B' : '#71717A',
-          fontSize: '14px',
-          fontFamily: 'inherit',
-          outline: 'none',
-          transition: 'border-color 0.2s',
-          boxSizing: 'border-box',
-          borderRadius: '6px',
-        }}
-        onFocus={e => (e.target.style.borderColor = '#1A4B77')}
-        onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
-      />
+      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>{label}</label>
+      <input type="date" value={value} onChange={e => onChange(e.target.value)} style={{ width: '100%', height: '44px', padding: '12px 16px', border: '1px solid #E4E4E7', background: '#FFFFFF', color: value ? '#09090B' : '#71717A', fontSize: '14px', fontFamily: 'inherit', outline: 'none', transition: 'border-color 0.2s', boxSizing: 'border-box', borderRadius: '6px' }} onFocus={e => (e.target.style.borderColor = '#1A4B77')} onBlur={e => (e.target.style.borderColor = '#E4E4E7')} />
     </div>
   );
 }
