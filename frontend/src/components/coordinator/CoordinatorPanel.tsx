@@ -106,23 +106,6 @@ export default function CoordinatorPanel() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
-  const waitForWatermarks = async (lotId: string) => {
-    while (true) {
-      const state = await api.watermarkStatus(lotId);
-      const byId = new Map(state.items.map(item => [item.id, item]));
-      setFiles(previous => previous.map(item => {
-        const media = item.mediaId ? byId.get(item.mediaId) : undefined;
-        if (!media) return item;
-        if (media.watermark_status === 'READY') return { ...item, status: 'done' };
-        if (media.watermark_status === 'FAILED') return { ...item, status: 'error' };
-        return { ...item, status: 'processing' };
-      }));
-      if (state.items.some(item => item.watermark_status === 'FAILED')) throw new Error('Hay archivos que no pudieron procesarse. Reintenta la carga.');
-      if (state.items.length && state.items.every(item => item.watermark_status === 'READY')) return;
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  };
-
   const uploadFiles = async () => {
     const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}` === salida);
     const activity = isCustomActivity ? null : activities.find(item => item.name === actividad);
@@ -153,7 +136,6 @@ export default function CoordinatorPanel() {
         },
       });
       if (result.failed.length) { setError('Quedaron ' + result.failed.length + ' archivo(s) para reintentar.'); return; }
-      await waitForWatermarks(lot.lotId);
       await api.submitLot(lot.lotId);
       setLots((await api.lots()).items);
       files.forEach(item => URL.revokeObjectURL(item.preview));
