@@ -5,7 +5,12 @@ import Lightbox from '../ui/Lightbox';
 
 const formatBytes = (bytes:number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const formatEventDate = (value:string) => { const date=value.slice(0,10); const [year,month,day]=date.split('-'); return year&&month&&day?`${day}-${month}-${year}`:value; };
-const departureLabel = (lot: LotSummary) => lot.departure_name ?? lot.school_name ?? 'Salida';
+const departureLabel = (lot: LotSummary) => {
+  const name = lot.departure_name ?? lot.school_name ?? 'Salida';
+  const type = lot.departure_type === 'AEREO' ? 'Aéreo' : lot.departure_type === 'MICRO' ? 'Micro' : '';
+  if (type && !name.toLowerCase().startsWith(type.toLowerCase())) return `${type} - ${name}`;
+  return name;
+};
 
 export default function AdminModeration() {
   const [lots,setLots]=useState<LotSummary[]>([]); const [selected,setSelected]=useState<LotSummary|null>(null); const [media,setMedia]=useState<Media[]>([]); const [search,setSearch]=useState(''); const [sort,setSort]=useState<'oldest'|'newest'|'fewer'|'departure'|'photos'>('oldest'); const [sortOpen,setSortOpen]=useState(false); const [selectedPhoto,setSelectedPhoto]=useState<number|null>(null); const [busy,setBusy]=useState(false); const [error,setError]=useState('');

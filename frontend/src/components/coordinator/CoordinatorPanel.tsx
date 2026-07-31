@@ -29,6 +29,13 @@ const formatDate = (dateStr?: string) => {
   return dateStr;
 };
 
+const getDepartureName = (lot: LotSummary) => {
+  const name = lot.departure_name ?? lot.school_name ?? 'Salida';
+  const type = lot.departure_type === 'AEREO' ? 'Aéreo' : lot.departure_type === 'MICRO' ? 'Micro' : '';
+  if (type && !name.toLowerCase().startsWith(type.toLowerCase())) return `${type} - ${name}`;
+  return name;
+};
+
 export default function CoordinatorPanel() {
   const [activeTab, setActiveTab] = useState('carga');
   const [salida, setSalida] = useState('');
@@ -369,7 +376,7 @@ export default function CoordinatorPanel() {
               {lots.map(lot => (
                 <div key={lot.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr 1.2fr 1fr 100px', gap: '12px', alignItems: 'center', padding: '14px 16px', background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '8px', transition: 'all 0.2s ease' }}>
                   <div style={{ fontWeight: 600, color: '#1A4B77', fontSize: '14px' }}>
-                    {lot.departure_name ?? lot.school_name}
+                    {getDepartureName(lot)}
                   </div>
 
                   <div>
