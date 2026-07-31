@@ -2,13 +2,15 @@ import { Router } from 'express';
 import crypto from 'node:crypto';
 import { parse } from 'csv-parse/sync';
 import multer from 'multer';
+import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { hashPassword } from '../auth.js';
 import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
+import { parsePassengerWorkbook, passengerSchema } from '../passengers.js';
 import { asyncHandler, parsePagination } from '../http.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 const userSchema = z.object({ name: z.string().min(2).max(160), email: z.string().email(), password: z.string().min(8).max(128), role: z.enum(['ADMIN', 'COORDINATOR', 'PARENT']) });
 const schoolSchema = z.object({ name: z.string().min(2).max(160), code: z.string().min(2).max(32).transform(v => v.toUpperCase()), botCode: z.string().min(2).max(32).transform(v => v.toUpperCase()), startDate: z.string().date().optional().nullable(), endDate: z.string().date().optional().nullable(), active: z.boolean().optional() });
 const catalogSchema = z.object({ name: z.string().min(2).max(100), botCode: z.string().min(1).max(32).transform(v => v.toUpperCase()), active: z.boolean().optional(), sortOrder: z.number().int().optional() });
@@ -180,9 +182,73 @@ adminRouter.post('/imports/:kind/commit', upload.single('file'), asyncHandler(as
   res.status(201).json({ imported: rows.length });
 }));
 
+adminRouter.get('/passengers', asyncHandler(async (req, res) => {
+  const { page, pageSize } = parsePagination(req.query);
+  const term = String(req.query.q ?? '').trim();
+  const result = await query(`
+    SELECT id,external_number,full_name,document_type,document_number,birth_date::text,document_expires_at::text,country,passenger_status,bonus,phone,mobile,email,active,created_at,updated_at,deactivated_at
+    FROM passengers
+    WHERE full_name ILIKE $1 OR document_number ILIKE $1 OR COALESCE(external_number,'') ILIKE $1
+    ORDER BY active DESC, full_name
+    LIMIT $2 OFFSET $3
+  `, [`%${term}%`, pageSize, (page - 1) * pageSize]);
+  res.set('Cache-Control', 'private, no-store').json({ items: result.rows, page, pageSize });
+}));
+adminRouter.get('/passengers/imports', asyncHandler(async (_req, res) => {
+  const result = await query(`SELECT i.id,i.file_name,i.total_rows,i.created_rows,i.updated_rows,i.rejected_rows,i.created_at,u.name AS imported_by_name FROM passenger_imports i JOIN users u ON u.id=i.imported_by ORDER BY i.created_at DESC LIMIT 30`);
+  res.set('Cache-Control', 'private, no-store').json({ items: result.rows });
+}));
+adminRouter.patch('/passengers/:id', asyncHandler(async (req, res) => {
+  const input = passengerSchema.partial().parse(req.body);
+  const result = await query(`
+    UPDATE passengers SET external_number=COALESCE($1,external_number),full_name=COALESCE($2,full_name),document_type=COALESCE($3,document_type),document_number=COALESCE($4,document_number),birth_date=COALESCE($5,birth_date),document_expires_at=COALESCE($6,document_expires_at),country=COALESCE($7,country),passenger_status=COALESCE($8,passenger_status),bonus=COALESCE($9,bonus),phone=COALESCE($10,phone),mobile=COALESCE($11,mobile),email=COALESCE($12,email),active=COALESCE($13,active),deactivated_at=CASE WHEN COALESCE($13,active) THEN NULL ELSE now() END,deactivated_by=CASE WHEN COALESCE($13,active) THEN NULL ELSE $14 END
+    WHERE id=$15
+    RETURNING id,external_number,full_name,document_type,document_number,birth_date::text,document_expires_at::text,country,passenger_status,bonus,phone,mobile,email,active,updated_at,deactivated_at
+  `, [input.externalNumber ?? null,input.fullName ?? null,input.documentType?.toUpperCase() ?? null,input.documentNumber ?? null,input.birthDate ?? null,input.documentExpiresAt ?? null,input.country ?? null,input.passengerStatus ?? null,input.bonus ?? null,input.phone ?? null,input.mobile ?? null,input.email?.toLowerCase() ?? null,input.active ?? null,req.user!.id,String(req.params.id)]);
+  if (!result.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'Pasajero no encontrado');
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGER_UPDATED','passenger',$2,'{}')`, [req.user!.id, String(req.params.id)]);
+  res.set('Cache-Control', 'private, no-store').json(result.rows[0]);
+}));
+adminRouter.delete('/passengers/:id', asyncHandler(async (req, res) => {
+  const result = await query(`UPDATE passengers SET active=false,deactivated_at=now(),deactivated_by=$1 WHERE id=$2 AND active=true RETURNING id`, [req.user!.id,String(req.params.id)]);
+  if (!result.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'Pasajero no encontrado o ya est? desactivado');
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGER_DEACTIVATED','passenger',$2,'{}')`, [req.user!.id, String(req.params.id)]);
+  res.status(204).end();
+}));
+function excelFile(req: Express.Request) {
+  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccion? un archivo Excel');
+  if (!/\.(xlsx|xls)$/i.test(req.file.originalname)) throw new AppError(400, 'INVALID_EXCEL', 'Se aceptan archivos .xlsx o .xls');
+  return req.file;
+}
+adminRouter.post('/passengers/import/preview', upload.single('file'), asyncHandler(async (req, res) => {
+  const file = excelFile(req); const parsed = parsePassengerWorkbook(file.buffer);
+  const keys = parsed.rows.map(row => `${row.documentType}\u001F${row.documentNumber}`);
+  const existing = keys.length ? await query<{document_type:string;document_number:string}>(`SELECT document_type,document_number FROM passengers WHERE document_type || chr(31) || document_number = ANY($1::text[])`, [keys]) : { rows: [] };
+  const existingKeys = new Set(existing.rows.map(row => `${row.document_type}\u001F${row.document_number}`));
+  const updates = parsed.rows.filter(row => existingKeys.has(`${row.documentType}\u001F${row.documentNumber}`)).length;
+  res.set('Cache-Control', 'private, no-store').json({ valid: parsed.errors.length===0, totalRows: parsed.totalRows, validRows: parsed.rows.length, errors: parsed.errors, summary: { create: parsed.rows.length-updates, update: updates, rejected: parsed.errors.length }, sample: parsed.rows.slice(0, 25) });
+}));
+adminRouter.post('/passengers/import/commit', upload.single('file'), asyncHandler(async (req, res) => {
+  const file = excelFile(req); const parsed = parsePassengerWorkbook(file.buffer);
+  if (parsed.errors.length) throw new AppError(400, 'INVALID_PASSENGER_IMPORT', 'El archivo tiene errores. Validalo antes de confirmar.');
+  const summary = await transaction(async client => {
+    const importResult = await client.query<{id:string}>(`INSERT INTO passenger_imports(file_name,total_rows,imported_by) VALUES($1,$2,$3) RETURNING id`, [file.originalname,parsed.totalRows,req.user!.id]);
+    let created=0, updated=0;
+    for (const row of parsed.rows) {
+      const found = await client.query<{id:string}>(`SELECT id FROM passengers WHERE document_type=$1 AND document_number=$2 FOR UPDATE`, [row.documentType,row.documentNumber]);
+      const values = [row.externalNumber,row.fullName,row.documentType,row.documentNumber,row.birthDate,row.documentExpiresAt,row.country,row.passengerStatus,row.bonus,row.phone,row.mobile,row.email,importResult.rows[0].id];
+      if (found.rowCount) { await client.query(`UPDATE passengers SET external_number=$1,full_name=$2,document_type=$3,document_number=$4,birth_date=$5,document_expires_at=$6,country=$7,passenger_status=$8,bonus=$9,phone=$10,mobile=$11,email=$12,source_import_id=$13,active=true,deactivated_at=NULL,deactivated_by=NULL WHERE id=$14`, [...values,found.rows[0].id]); updated++; }
+      else { await client.query(`INSERT INTO passengers(external_number,full_name,document_type,document_number,birth_date,document_expires_at,country,passenger_status,bonus,phone,mobile,email,source_import_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, values); created++; }
+    }
+    await client.query(`UPDATE passenger_imports SET created_rows=$1,updated_rows=$2,rejected_rows=0 WHERE id=$3`, [created,updated,importResult.rows[0].id]);
+    return { importId: importResult.rows[0].id, created, updated, rejected: 0, total: parsed.rows.length };
+  });
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGERS_IMPORTED','passenger_import',$2,$3)`, [req.user!.id,summary.importId,JSON.stringify({ created:summary.created,updated:summary.updated,total:summary.total })]);
+  res.status(201).json(summary);
+}));
 const departureSchema = z.object({
-  type: z.enum(['MICRO', 'AEREO']),
   name: z.string().min(2).max(160),
+  type: z.enum(['MICRO', 'AEREO']),
   destination: z.string().min(2).max(160),
   eventDate: z.string().date(),
   active: z.boolean().optional(),

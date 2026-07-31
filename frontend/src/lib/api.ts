@@ -7,8 +7,11 @@ export interface Departure { id: string; type: 'MICRO' | 'AEREO'; name: string; 
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
 export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; }
 export interface LotSummary { id: string; event_date: string; school_id: string | null; school_name: string; departure_id?: string; departure_name?: string; departure_destination?: string; departure_type?: 'MICRO' | 'AEREO'; school_names?: string[]; activity_name: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; }
-export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; }
+export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; watermark_status?: string | null; watermark_error?: string | null; }
+export interface MediaProcessing { id: string; status: string; watermark_status: string | null; watermark_error: string | null; watermark_attempts: number; }
+export interface Passenger { id:string; external_number?:string|null; full_name:string; document_type:string; document_number:string; birth_date?:string|null; document_expires_at?:string|null; country?:string|null; passenger_status?:string|null; bonus?:string|null; phone?:string|null; mobile?:string|null; email?:string|null; active:boolean; created_at?:string; updated_at:string; deactivated_at?:string|null; }
 
+export interface PassengerImport { id:string; file_name:string; total_rows:number; created_rows:number; updated_rows:number; rejected_rows:number; created_at:string; imported_by_name:string; }
 async function parseResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T;
   const contentType = response.headers.get('content-type') ?? '';
@@ -51,7 +54,9 @@ export const api = {
   lots: (status?: string) => request<{ items: LotSummary[] }>(`/lots${status ? `?status=${status}` : ''}`),
   lot: (id: string) => request<{ lot: LotSummary; version: { id: string; status: string; version_number: number }; media: Media[] }>(`/lots/${id}`),
   createLot: (body: { departureId?: string; schoolId?: string; activityId?: string | null; eventDate: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
-  uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
+  uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string; status: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
+  watermarkStatus: (lotId: string) => request<{ items: MediaProcessing[] }>(`/lots/${lotId}/processing`),
+  retryWatermark: (lotId: string, mediaId: string) => request<void>(`/lots/${lotId}/media/${mediaId}/watermark/retry`, { method: 'POST' }),
   submitLot: (lotId: string) => request<void>(`/lots/${lotId}/submit`, { method: 'POST' }),
   reopenLot: (lotId: string) => request<void>(`/lots/${lotId}/reopen`, { method: 'POST' }),
   approveLot: (lotId: string) => request<void>(`/lots/${lotId}/approve`, { method: 'POST' }),

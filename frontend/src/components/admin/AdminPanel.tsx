@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus } from 'lucide-react';
+import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound } from 'lucide-react';
 import { api } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
@@ -9,8 +9,9 @@ import AdminUsuarios from './AdminUsuarios';
 import AdminCargaManual from './AdminCargaManual';
 import AdminSalidas from './AdminSalidas';
 import { GalleryView } from './ConnectedViews';
+import AdminPasajeros from './AdminPasajeros';
 
-type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'carga';
+type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'pasajeros' | 'carga';
 const TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
   { id: 'galeria', label: 'Galería', icon: Image },
@@ -19,6 +20,7 @@ const TABS = [
   { id: 'actividades', label: 'Actividades', icon: List },
   { id: 'usuarios', label: 'Usuarios', icon: Users },
   { id: 'carga', label: 'Carga Manual', icon: UploadIcon },
+  { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound },
 ] as const;
 
 export default function AdminPanel() {
@@ -34,6 +36,7 @@ export default function AdminPanel() {
     {activeTab === 'actividades' && <AdminActividades />}
     {activeTab === 'usuarios' && <AdminUsuarios />}
     {activeTab === 'carga' && <AdminCargaManual />}
+    {activeTab === 'pasajeros' && <AdminPasajeros />}
   </DashboardLayout>;
 }
 

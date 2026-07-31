@@ -10,7 +10,8 @@ interface UploadFile {
   id: string;
   file: File;
   preview: string;
-  status: 'pending' | 'uploading' | 'done' | 'error';
+  status: 'pending' | 'uploading' | 'processing' | 'done' | 'error';
+  mediaId?: string;
 }
 
 const TABS = [
@@ -84,41 +85,21 @@ export default function CoordinatorPanel() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  const waitForWatermarks = async (lotId: string) => { while (true) { const state = await api.watermarkStatus(lotId); const byId = new Map(state.items.map(item => [item.id, item])); setFiles(previous => previous.map(item => { const media = item.mediaId ? byId.get(item.mediaId) : undefined; if (!media) return item; if (media.watermark_status === 'READY') return { ...item, status: 'done', error: undefined }; if (media.watermark_status === 'FAILED') return { ...item, status: 'error' }; return { ...item, status: 'processing' }; })); if (state.items.some(item => item.watermark_status === 'FAILED')) throw new Error('Hay archivos que no pudieron procesarse. Reintenta la carga.'); if (state.items.length && state.items.every(item => item.watermark_status === 'READY')) return; await new Promise(resolve => setTimeout(resolve, 2000)); } };
   const uploadFiles = async () => {
-    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}` === salida);
+    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}` === salida);
     const activity = activities.find(item => item.name === actividad);
-    if (!selectedDeparture || !fecha || files.length === 0) return;
-    setUploading(true);
-    setUploadProgress(0);
-    setError('');
-    setDone(false);
+    const pending = files.filter(item => item.status === 'pending' || (item.status === 'error' && !item.mediaId));
+    const retrying = files.filter(item => item.status === 'error' && item.mediaId);
+    if (!selectedDeparture || !fecha || (!pending.length && !retrying.length)) return;
+    setUploading(true); setUploadProgress(0); setError(''); setDone(false);
     try {
       const lot = await api.createLot({ departureId: selectedDeparture.id, activityId: activity?.id ?? null, eventDate: fecha });
-      const result = await uploadInQueue(files, async current => { await api.uploadMedia(lot.lotId, current.file); }, {
-        concurrency: 3,
-        retries: 1,
-        onStart: current => setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item)),
-        onFinish: (current, success) => {
-          setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: success ? 'done' : 'error' } : item));
-          setUploadProgress(previous => Math.round(Math.min(100, previous + (100 / files.length))));
-        },
-      });
-      if (result.failed.length) {
-        const failedIds = new Set(result.failed.map(item => item.id));
-        setFiles(previous => previous.filter(item => failedIds.has(item.id)).map(item => ({ ...item, status: 'error' })));
-        setError(`Se cargaron ${result.succeeded.length} de ${files.length} archivos. Quedan ${result.failed.length} para reintentar.`);
-        return;
-      }
-      await api.submitLot(lot.lotId);
-      setLots((await api.lots()).items);
-      files.forEach(item => URL.revokeObjectURL(item.preview));
-      setFiles([]);
-      setDone(true);
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo completar la carga.');
-    } finally {
-      setUploading(false);
-    }
+      if (retrying.length) await Promise.all(retrying.map(async item => { setFiles(previous => previous.map(file => file.id === item.id ? { ...file, status: 'processing' } : file)); await api.retryWatermark(lot.lotId, item.mediaId!); }));
+      const result = await uploadInQueue(pending, async current => { const media=await api.uploadMedia(lot.lotId, current.file); setFiles(previous => previous.map(item => item.id === current.id ? { ...item, mediaId:media.id, status:'processing' } : item)); }, { concurrency: 3, retries: 1, onStart: current => setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'uploading' } : item)), onFinish: (current, success) => { if(!success)setFiles(previous => previous.map(item => item.id === current.id ? { ...item, status: 'error' } : item)); setUploadProgress(previous => Math.round(Math.min(100, previous + (100 / Math.max(1, pending.length))))); }, });
+      if (result.failed.length) { setError('Quedaron '+result.failed.length+' archivo(s) para reintentar.'); return; }
+      await waitForWatermarks(lot.lotId); await api.submitLot(lot.lotId); setLots((await api.lots()).items); files.forEach(item => URL.revokeObjectURL(item.preview)); setFiles([]); setDone(true);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo completar la carga.'); } finally { setUploading(false); }
   };
 
   const canUpload = Boolean(salida && fecha && files.length > 0 && !uploading);
@@ -204,14 +185,14 @@ export default function CoordinatorPanel() {
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: '16px' }}>
               <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#1A4B77' }}>Archivos seleccionados</h3>
-              <span style={{ fontSize: '13px', color: '#71717A' }}>{files.length} fotos</span>
+              <span style={{ fontSize: '13px', color: '#71717A' }}>{files.length} archivo(s)</span>
             </div>
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: '8px',
               maxHeight: '240px', overflowY: 'auto', paddingRight: '8px',
             }}>
               {files.map(f => (
-                <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', borderRadius: '4px', cursor: 'pointer' }}>
+                <div key={f.id} onClick={() => setSelectedPhoto(f.id)} style={{ position: 'relative', aspectRatio: '1', overflow: 'hidden', background: '#F4F4F5', borderRadius: '4px', cursor: 'pointer', outline: f.status === 'error' ? '2px solid #EF4444' : f.status === 'done' ? '2px solid #22C55E' : 'none' }}>
                   {f.file.type.startsWith('video/') || /\.(mp4|mov)$/i.test(f.file.name)
                     ? <video src={f.preview} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     : <img src={f.preview} alt={f.file.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
@@ -237,7 +218,7 @@ export default function CoordinatorPanel() {
         {uploading && (
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#1A4B77' }}>Subiendo...</span>
+              <span style={{ fontSize: '13px', color: '#1A4B77' }}>{files.some(file => file.status === 'processing') ? 'Aplicando marca de agua...' : 'Subiendo archivos...'}</span>
               <span style={{ fontSize: '13px', color: '#71717A' }}>{uploadProgress}%</span>
             </div>
             <div style={{ height: '4px', background: '#F4F4F5', width: '100%', borderRadius: '2px', overflow: 'hidden' }}>
@@ -289,7 +270,7 @@ export default function CoordinatorPanel() {
           onMouseEnter={e => canUpload && (e.currentTarget.style.background = '#133656')}
           onMouseLeave={e => canUpload && (e.currentTarget.style.background = '#1A4B77')}
         >
-          {uploading ? 'Procesando...' : 'Subir material'}
+          {uploading ? (files.some(file => file.status === 'processing') ? 'Procesando marca de agua...' : 'Subiendo...') : files.some(file => file.status === 'error') ? 'Reintentar carga' : 'Subir material'}
         </button>
       </main>
       </div>

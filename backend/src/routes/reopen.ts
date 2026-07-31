@@ -16,8 +16,8 @@ reopenRouter.post('/:id/reopen', requireRoles('ADMIN'), asyncHandler(async (req,
     if (!publishedVersionId) throw new AppError(409, 'LOT_NOT_PUBLISHED', 'Sólo se puede reabrir un lote publicado');
     const latest = await client.query<{ version_number: number }>('SELECT version_number FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1', [lotId]);
     const version = await client.query<{ id: string }>('INSERT INTO lot_versions (lot_id,version_number,created_by,source) VALUES ($1,$2,$3,\'PORTAL\') RETURNING id', [lotId, (latest.rows[0]?.version_number ?? 0) + 1, req.user!.id]);
-    await client.query(`INSERT INTO media_assets (lot_version_id,kind,status,original_name,mime_type,size_bytes,sha256,drive_file_id,preview_drive_file_id,width,height,duration_seconds,sort_order,uploaded_by)
-      SELECT $1,kind,'READY',original_name,mime_type,size_bytes,sha256,drive_file_id,preview_drive_file_id,width,height,duration_seconds,sort_order,uploaded_by
+    await client.query(`INSERT INTO media_assets (lot_version_id,kind,status,original_name,mime_type,size_bytes,sha256,drive_file_id,preview_drive_file_id,delivery_drive_file_id,delivery_mime_type,delivery_size_bytes,delivery_name,watermark_status,watermark_attempts,width,height,duration_seconds,sort_order,uploaded_by)
+      SELECT $1,kind,'READY',original_name,mime_type,size_bytes,sha256,drive_file_id,preview_drive_file_id,delivery_drive_file_id,delivery_mime_type,delivery_size_bytes,delivery_name,watermark_status,watermark_attempts,width,height,duration_seconds,sort_order,uploaded_by
       FROM media_assets WHERE lot_version_id=$2 AND status='APPROVED'`, [version.rows[0].id, publishedVersionId]);
     return client.query('SELECT * FROM lot_versions WHERE id=$1', [version.rows[0].id]);
   });
