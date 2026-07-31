@@ -89,7 +89,7 @@ adminRouter.get('/schools', asyncHandler(async (_req, res) => {
     LEFT JOIN public_school_links p ON p.school_id = s.id
     LEFT JOIN user_schools us ON s.id = us.school_id AND us.membership_role = 'COORDINATOR' AND us.active = true
     LEFT JOIN users u ON us.user_id = u.id AND u.active = true
-    WHERE s.deleted_at IS NULL
+    WHERE s.deleted_at IS NULL AND s.active = true
     GROUP BY s.id, p.active, p.generated_at, p.revoked_at, p.token_value
     ORDER BY s.name
   `);
@@ -154,7 +154,7 @@ adminRouter.put('/schools/:id/coordinators', asyncHandler(async (req, res) => {
 }));
 
 for (const [route, table, hasSort] of [['activities', 'activities', false], ['shifts', 'shifts', true]] as const) {
-  adminRouter.get(`/${route}`, asyncHandler(async (_req, res) => { const result = await query(`SELECT * FROM ${table} ORDER BY ${hasSort ? 'sort_order, ' : ''}name`); res.json({ items: result.rows }); }));
+  adminRouter.get(`/${route}`, asyncHandler(async (_req, res) => { const result = await query(`SELECT * FROM ${table} WHERE active = true ORDER BY ${hasSort ? 'sort_order, ' : ''}name`); res.json({ items: result.rows }); }));
   adminRouter.post(`/${route}`, asyncHandler(async (req, res) => { const input = catalogSchema.parse(req.body); const result = await query(`INSERT INTO ${table} (name, bot_code, active${hasSort ? ', sort_order' : ''}) VALUES ($1,$2,$3${hasSort ? ',$4' : ''}) RETURNING *`, hasSort ? [input.name,input.botCode,input.active ?? true,input.sortOrder ?? 0] : [input.name,input.botCode,input.active ?? true]); res.status(201).json(result.rows[0]); }));
   adminRouter.patch(`/${route}/:id`, asyncHandler(async (req, res) => { const input = catalogSchema.partial().parse(req.body); const result = await query(`UPDATE ${table} SET name=COALESCE($1,name), bot_code=COALESCE($2,bot_code), active=COALESCE($3,active)${hasSort ? ', sort_order=COALESCE($4,sort_order)' : ''} WHERE id=$${hasSort ? 5 : 4} RETURNING *`, hasSort ? [input.name ?? null,input.botCode ?? null,input.active ?? null,input.sortOrder ?? null,req.params.id] : [input.name ?? null,input.botCode ?? null,input.active ?? null,String(req.params.id)]); if (!result.rowCount) throw new AppError(404, 'CATALOG_NOT_FOUND', 'Registro no encontrado'); res.json(result.rows[0]); }));
   adminRouter.delete(`/${route}/:id`, asyncHandler(async (req, res) => { await query(`UPDATE ${table} SET active=false WHERE id=$1`, [String(req.params.id)]); res.status(204).end(); }));
@@ -294,8 +294,9 @@ adminRouter.get('/departures', asyncHandler(async (_req, res) => {
     LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id
     LEFT JOIN users u ON u.id=dc.user_id AND u.active
     LEFT JOIN lots l ON l.departure_id=d.id
+    WHERE d.active = true
     GROUP BY d.id
-    ORDER BY d.active DESC,d.event_date DESC,d.name
+    ORDER BY d.event_date DESC,d.name
   `);
   res.json({ items: result.rows });
 }));
