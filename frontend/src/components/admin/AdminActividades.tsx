@@ -139,7 +139,7 @@ export default function AdminActividades() {
           </div>
         </div>
       )}
-      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar actividad?" description="La actividad dejará de estar disponible para nuevas cargas. Los lotes existentes conservarán su información." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
+      <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar actividad?" description="Se eliminará la actividad y dejará de estar disponible para nuevas cargas." confirmLabel="Eliminar" tone="danger" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }

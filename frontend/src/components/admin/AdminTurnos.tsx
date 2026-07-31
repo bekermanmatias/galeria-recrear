@@ -139,7 +139,7 @@ export default function AdminTurnos() {
           </div>
         </div>
       )}
-      <ConfirmDialog open={pendingDelete!==null} title="¿Desactivar turno?" description="El turno dejará de estar disponible para nuevas cargas. Los lotes existentes conservarán su información." confirmLabel="Desactivar" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
+      <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar turno?" description="Se eliminará el turno y dejará de estar disponible para nuevas cargas." confirmLabel="Eliminar" tone="danger" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }

@@ -320,3 +320,16 @@ adminRouter.put('/departures/:id/coordinators', asyncHandler(async(req,res) => {
   await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role='COORDINATOR' AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador invÃ¡lido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_COORDINATORS_UPDATED','departure',String(req.params.id),JSON.stringify({coordinatorIds:input.ids})]);res.status(204).end();
 }));
+adminRouter.delete('/departures/:id', asyncHandler(async(req,res) => {
+  await departureExists(String(req.params.id));
+  await transaction(async client => {
+    await client.query('UPDATE lots SET deleted_at=now(), current_published_version_id=NULL WHERE departure_id=$1', [String(req.params.id)]);
+    await client.query('DELETE FROM departure_schools WHERE departure_id=$1', [String(req.params.id)]);
+    await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1', [String(req.params.id)]);
+    await client.query('DELETE FROM departures WHERE id=$1', [String(req.params.id)]).catch(async () => {
+      await client.query('UPDATE departures SET active=false, archived_at=now() WHERE id=$1', [String(req.params.id)]);
+    });
+  });
+  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id) VALUES($1,$2,$3,$4)', [req.user!.id, 'DEPARTURE_DELETED', 'departure', String(req.params.id)]);
+  res.status(204).end();
+}));
