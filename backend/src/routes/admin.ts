@@ -265,7 +265,7 @@ adminRouter.post('/passengers/import/commit', upload.single('file'), asyncHandle
   res.status(201).json(summary);
 }));
 const departureSchema = z.object({
-  name: z.string().min(2).max(160),
+  name: z.string().min(1).max(160),
   type: z.enum(['MICRO', 'AEREO']),
   destination: z.string().min(2).max(160),
   eventDate: z.string().date(),
