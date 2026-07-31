@@ -113,9 +113,11 @@ export function GalleryView() {
   const [openLotMenu,setOpenLotMenu]=useState<string|null>(null);
   const [deletingLot,setDeletingLot]=useState<LotSummary|null>(null);
   const [deleteBusyId,setDeleteBusyId]=useState<string|null>(null);
-  const [pendingDiscard,setPendingDiscard]=useState<(Media&{lot:LotSummary})|null>(null);
-  const [error,setError]=useState('');
-  const [copiedCode,setCopiedCode]=useState<string|null>(null);
+  const [editingLot,setEditingLot]=useState<LotSummary|null>(null);
+  const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:'',status:''});
+  const [editBusy,setEditBusy]=useState(false);
+  const [departuresList,setDeparturesList]=useState<Array<{id:string;name:string;type:string}>>([]);
+  const [activitiesList,setActivitiesList]=useState<Array<{id:string;name:string}>>([]);
 
   const copyPublicLink = async (code?: string | null) => {
     if (!code) return;
@@ -125,7 +127,44 @@ export function GalleryView() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  useEffect(()=>{let mounted=true;api.lots().then(async data=>{const details=await Promise.all(data.items.map(async lot=>({lot,media:(await api.lot(lot.id)).media})));if(!mounted)return;setLots(data.items);setMedia(details.flatMap(item=>item.media.map(file=>({...file,lot:item.lot}))));}).catch(reason=>mounted&&setError(reason.message));return()=>{mounted=false;};},[]);
+  useEffect(()=>{let mounted=true;api.lots().then(async data=>{const details=await Promise.all(data.items.map(async lot=>({lot,media:(await api.lot(lot.id)).media})));if(!mounted)return;setLots(data.items);setMedia(details.flatMap(item=>item.media.map(file=>({...file,lot:item.lot}))));}).catch(reason=>mounted&&setError(reason.message));adminRequest<{items:any[]}>('/departures').then(res=>mounted&&setDeparturesList(res.items)).catch(()=>{});adminRequest<{items:any[]}>('/activities').then(res=>mounted&&setActivitiesList(res.items)).catch(()=>{});return()=>{mounted=false;};},[]);
+
+  const openEditModal = (lot: LotSummary) => {
+    setOpenLotMenu(null);
+    setEditingLot(lot);
+    setEditForm({
+      departureId: lot.departure_id,
+      activityId: lot.activity_id ?? '',
+      albumName: lot.album_name || lot.activity_name,
+      eventDate: lot.event_date.slice(0, 10),
+      status: lot.status,
+    });
+  };
+
+  const handleSaveLotEdit = async () => {
+    if (!editingLot) return;
+    setEditBusy(true);
+    setError('');
+    try {
+      await adminRequest(`/lots/${editingLot.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          departureId: editForm.departureId,
+          activityId: editForm.activityId || null,
+          albumName: editForm.albumName,
+          eventDate: editForm.eventDate,
+          status: editForm.status,
+        }),
+      });
+      const data = await api.lots();
+      setLots(data.items);
+      setEditingLot(null);
+    } catch (err: any) {
+      setError(err.message || 'No se pudo actualizar el lote');
+    } finally {
+      setEditBusy(false);
+    }
+  };
 
   const departureOptions=useMemo(()=>['Todos',...Array.from(new Set(lots.map(departureLabel)))],[lots]);
   const activityOptions=useMemo(()=>['Todos',...Array.from(new Set(lots.map(item=>item.activity_name)))],[lots]);
@@ -225,6 +264,9 @@ export function GalleryView() {
 
                   {menuOpen&&(
                     <div style={{position:'absolute',right:0,top:36,zIndex:50,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.15)',minWidth:210,padding:4}}>
+                      <button onClick={()=>openEditModal(lot)} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#334155',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#F1F5F9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                        <Edit2 size={15}/> Modificar lote
+                      </button>
                       <button onClick={()=>{setOpenLotMenu(null);setDeletingLot(lot);}} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#DC2626',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
                         <Trash2 size={15}/> Eliminar lote por completo
                       </button>
@@ -266,6 +308,35 @@ export function GalleryView() {
     {selectedItem&&<Lightbox src={api.contentUrl(selectedItem.id)} mediaType={selectedItem.kind} downloadUrl={api.downloadUrl(selectedItem.id)} downloadName={selectedItem.original_name} info={formatBytes(selectedItem.size_bytes)} onClose={()=>setSelected(null)} onNext={selected!==null&&selected<visible.length-1?()=>setSelected(selected+1):undefined} onPrev={selected!==null&&selected>0?()=>setSelected(selected-1):undefined}/>}
     <ConfirmDialog open={pendingDiscard!==null} title="¿Descartar imagen?" description="La imagen dejará de mostrarse a las familias, pero podrás recuperarla durante los próximos 30 días." confirmLabel="Descartar imagen" busy={pendingDiscard!==null&&recovering===pendingDiscard.id} onCancel={()=>!recovering&&setPendingDiscard(null)} onConfirm={()=>{if(pendingDiscard)return moderateGalleryMedia(pendingDiscard,true);}}/>
     <ConfirmDialog open={deletingLot!==null} title="¿Eliminar lote permanentemente?" description={`Se eliminará por completo el lote "${deletingLot?.album_name||deletingLot?.activity_name}" de la salida "${deletingLot?departureLabel(deletingLot):''}". Se borrarán todas sus fotos, videos e historial del sistema. Esta acción no se puede deshacer.`} confirmLabel="Eliminar lote por completo" tone="danger" busy={deleteBusyId!==null} onCancel={()=>!deleteBusyId&&setDeletingLot(null)} onConfirm={async()=>{if(!deletingLot)return;setDeleteBusyId(deletingLot.id);try{await api.deleteLot(deletingLot.id);setLots(current=>current.filter(item=>item.id!==deletingLot.id));setDeletingLot(null);}catch(err:any){setError(err.message||'No se pudo eliminar el lote');}finally{setDeleteBusyId(null);}}}/>
+
+    {editingLot&&(
+      <Modal title="Modificar Lote" onClose={()=>setEditingLot(null)} onSave={handleSaveLotEdit}>
+        <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>
+          Salida asociada
+          <select value={editForm.departureId} onChange={e=>setEditForm({...editForm,departureId:e.target.value})} style={input}>
+            {departuresList.map(dep=><option key={dep.id} value={dep.id}>{(dep.type==='MICRO'?'Micro':'Aéreo')+' - '+dep.name}</option>)}
+          </select>
+        </label>
+        <Field label="Álbum / Título" value={editForm.albumName} onChange={val=>setEditForm({...editForm,albumName:val})}/>
+        <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>
+          Actividad
+          <select value={editForm.activityId} onChange={e=>setEditForm({...editForm,activityId:e.target.value})} style={input}>
+            <option value="">(General / Ninguna)</option>
+            {activitiesList.map(act=><option key={act.id} value={act.id}>{act.name}</option>)}
+          </select>
+        </label>
+        <Field label="Fecha del evento" type="date" value={editForm.eventDate} onChange={val=>setEditForm({...editForm,eventDate:val})}/>
+        <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>
+          Estado del lote
+          <select value={editForm.status} onChange={e=>setEditForm({...editForm,status:e.target.value})} style={input}>
+            <option value="PUBLISHED">Publicado</option>
+            <option value="PENDING">Pendiente de moderación</option>
+            <option value="DRAFT">Borrador</option>
+            <option value="REJECTED">Descartado</option>
+          </select>
+        </label>
+      </Modal>
+    )}
   </div>;
 }
 
