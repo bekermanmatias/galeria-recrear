@@ -113,6 +113,9 @@ export function GalleryView() {
   const [openLotMenu,setOpenLotMenu]=useState<string|null>(null);
   const [deletingLot,setDeletingLot]=useState<LotSummary|null>(null);
   const [deleteBusyId,setDeleteBusyId]=useState<string|null>(null);
+  const [pendingDiscard,setPendingDiscard]=useState<(Media&{lot:LotSummary})|null>(null);
+  const [error,setError]=useState('');
+  const [copiedCode,setCopiedCode]=useState<string|null>(null);
   const [editingLot,setEditingLot]=useState<LotSummary|null>(null);
   const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:'',status:''});
   const [editBusy,setEditBusy]=useState(false);
@@ -133,7 +136,7 @@ export function GalleryView() {
     setOpenLotMenu(null);
     setEditingLot(lot);
     setEditForm({
-      departureId: lot.departure_id,
+      departureId: lot.departure_id ?? '',
       activityId: lot.activity_id ?? '',
       albumName: lot.album_name || lot.activity_name,
       eventDate: lot.event_date.slice(0, 10),

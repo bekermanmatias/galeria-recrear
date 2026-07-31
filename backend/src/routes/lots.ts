@@ -68,7 +68,7 @@ lotsRouter.get('/', asyncHandler(async (req, res) => {
   const visible=req.user!.role==='PARENT'?'l.current_published_version_id':'(SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1)';
   const orderBy=req.query.status==='PENDING'?'COALESCE(v.submitted_at,v.created_at) ASC':'l.event_date DESC,v.created_at DESC';
   values.push(pageSize,(page-1)*pageSize); const limit=values.length-1,offset=values.length;
-  const result=await query(`SELECT l.id,l.event_date,d.id departure_id,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
+  const result=await query(`SELECT l.id,l.event_date,l.activity_id,d.id departure_id,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
     d.name school_name,NULL::uuid school_id,COALESCE(a.name,'General') activity_name,COALESCE(NULLIF(l.title,''),a.name,'General') album_name,''::text shift_name,
     v.id version_id,v.version_number,v.status,v.submitted_at,v.created_at version_created_at,
     COUNT(m.id) FILTER (WHERE m.status <> 'UPLOADING')::int approved_count,
@@ -78,7 +78,7 @@ lotsRouter.get('/', asyncHandler(async (req, res) => {
     JOIN lot_versions v ON v.id=${visible} LEFT JOIN media_assets m ON m.lot_version_id=v.id
     LEFT JOIN departure_schools ds ON ds.departure_id=d.id LEFT JOIN schools s ON s.id=ds.school_id
     LEFT JOIN users u ON u.id=l.created_by
-    ${where} GROUP BY l.id,d.id,a.id,v.id,u.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
+    ${where} GROUP BY l.id,l.activity_id,d.id,a.id,v.id,u.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
   res.json({items:result.rows,page,pageSize});
 }));
 lotsRouter.get('/:id', asyncHandler(async(req,res)=>{
