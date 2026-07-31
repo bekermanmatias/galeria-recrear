@@ -18,7 +18,7 @@ const disk = multer.diskStorage({ destination: (_req, _file, done) => { void des
 const upload = multer({ storage: disk, limits: { fileSize: config.MAX_FILE_SIZE_MB * 1024 * 1024, files: 1 } });
 const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
-const updateSchema = z.object({ albumName: albumNameSchema });
+const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional(), status: z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).optional() });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
 const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
@@ -96,11 +96,27 @@ lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,r
 }));
 lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
   const input=updateSchema.parse(req.body);const lot=await loadLot(param(req.params.id));
-  await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
-  if(req.user!.role==='COORDINATOR'){const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_EDITABLE','Solo se pueden renombrar lotes que aún no fueron publicados');}
-  const result=await query('UPDATE lots SET title=$1,updated_at=now() WHERE id=$2 AND deleted_at IS NULL RETURNING id,title',[input.albumName,lot.id]);
-  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_RENAMED','lot',lot.id,JSON.stringify({albumName:input.albumName})]);
-  res.json(result.rows[0]);
+  if(req.user!.role==='COORDINATOR'){
+    await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
+    const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
+    if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_EDITABLE','Solo se pueden editar lotes que aún no fueron publicados');
+  }
+  await transaction(async client=>{
+    if(input.albumName!==undefined) await client.query('UPDATE lots SET title=$1,updated_at=now() WHERE id=$2',[input.albumName,lot.id]);
+    if(input.departureId!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET departure_id=$1,updated_at=now() WHERE id=$2',[input.departureId,lot.id]);
+    if(input.activityId!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET activity_id=$1,updated_at=now() WHERE id=$2',[input.activityId||null,lot.id]);
+    if(input.eventDate!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET event_date=$1,updated_at=now() WHERE id=$2',[input.eventDate,lot.id]);
+    if(input.status!==undefined && req.user!.role==='ADMIN'){
+      const version=await client.query<{id:string}>('SELECT id FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
+      if(version.rowCount){
+        await client.query('UPDATE lot_versions SET status=$1,updated_at=now() WHERE id=$2',[input.status,version.rows[0].id]);
+        if(input.status==='PUBLISHED') await client.query('UPDATE lots SET current_published_version_id=$1 WHERE id=$2',[version.rows[0].id,lot.id]);
+        else await client.query('UPDATE lots SET current_published_version_id=NULL WHERE id=$2',[lot.id]);
+      }
+    }
+  });
+  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_UPDATED','lot',lot.id,JSON.stringify(input)]);
+  res.json({success:true});
 }));
 lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
   const lot=await loadLot(param(req.params.id));
