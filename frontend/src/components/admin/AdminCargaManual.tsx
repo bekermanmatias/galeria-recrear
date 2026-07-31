@@ -11,10 +11,20 @@ const validTypes=new Set(['image/jpeg','image/pjpeg','image/png','image/heic','i
 const MAX_PARALLEL_UPLOADS=3;
 const dateInput:React.CSSProperties={width:'100%',height:44,padding:'12px 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:14,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6};
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
+const CUSTOM_ACTIVITY = '__personalizada__';
 
 export default function AdminCargaManual() {
   const [departures,setDepartures]=useState<Departure[]>([]); const [activities,setActivities]=useState<CatalogItem[]>([]);
   const [departure,setDeparture]=useState(''); const [date,setDate]=useState(new Date().toISOString().slice(0,10)); const [activity,setActivity]=useState('');
+  const [albumName,setAlbumName]=useState('');
+  const isCustomActivity = activity === CUSTOM_ACTIVITY;
+  const handleActivityChange = (value: string) => {
+    const prevActivity = activities.find(a => a.name === activity);
+    setActivity(value);
+    if (!albumName || albumName === (prevActivity?.name ?? '')) {
+      setAlbumName(value);
+    }
+  };
   const [files,setFiles]=useState<UploadFile[]>([]); const [dragging,setDragging]=useState(false); const [uploading,setUploading]=useState(false); const [progress,setProgress]=useState({completed:0,total:0}); const [message,setMessage]=useState(''); const [selected,setSelected]=useState<string|null>(null); const input=useRef<HTMLInputElement>(null);
   useEffect(()=>{Promise.all([api.myDepartures(),api.catalogs()]).then(([departureData,catalogData])=>{setDepartures(departureData.items.filter(item=>item.active));setActivities(catalogData.activities);}).catch(reason=>setMessage(reason.message));},[]);
   useEffect(()=>()=>files.forEach(item=>URL.revokeObjectURL(item.preview)),[files]);
@@ -22,22 +32,22 @@ export default function AdminCargaManual() {
   const drop=useCallback((event:React.DragEvent)=>{event.preventDefault();setDragging(false);addFiles(event.dataTransfer.files);},[]);
   const remove=(id:string)=>setFiles(current=>current.filter(item=>item.id!==id));
   const updateFile=(id:string,patch:Partial<UploadFile>)=>setFiles(current=>current.map(item=>item.id===id?{...item,...patch}:item));
-  const waitForWatermarks=async(lotId:string)=>{while(true){const state=await api.watermarkStatus(lotId);const byId=new Map(state.items.map(item=>[item.id,item]));setFiles(current=>current.map(item=>{const media=item.mediaId?byId.get(item.mediaId):undefined;if(!media)return item;if(media.watermark_status==='READY')return {...item,status:'uploaded',error:undefined};if(media.watermark_status==='FAILED')return {...item,status:'failed',error:media.watermark_error??'No se pudo aplicar la marca'};return {...item,status:'processing'};}));const failed=state.items.filter(item=>item.watermark_status==='FAILED');if(failed.length)throw new Error('Hay archivos que no pudieron procesarse. Usa Reintentar archivos fallidos.');if(state.items.length&&state.items.every(item=>item.watermark_status==='READY'))return;await new Promise(resolve=>setTimeout(resolve,2000));}};
+
   const upload=async()=>{
     const departureItem=departures.find(item=>`${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}`===departure),activityItem=activities.find(item=>item.name===activity);
     const failedFiles=files.filter(item=>item.status==='failed'&&item.mediaId);const pending=files.filter(item=>item.status==='queued'||(item.status==='failed'&&!item.mediaId));
     if(!departureItem||(!pending.length&&!failedFiles.length))return;
     setUploading(true);setProgress({completed:0,total:pending.length||failedFiles.length});setMessage('');
-    try {const lot=await api.createLot({departureId:departureItem.id,activityId:activityItem?.id ?? null,eventDate:date});
+    try {const lot=await api.createLot({departureId:departureItem.id,activityId:activityItem?.id ?? null,eventDate:date,albumName:albumName.trim()||undefined});
       if(failedFiles.length&&!pending.length){await Promise.all(failedFiles.map(async item=>{updateFile(item.id,{status:'processing',error:undefined});await api.retryWatermark(lot.lotId,item.mediaId!);}));}
       else {let cursor=0;let completed=0;let failed=0;const worker=async()=>{while(true){const item=pending[cursor++];if(!item)return;updateFile(item.id,{status:'uploading',error:undefined});try{const result=await api.uploadMedia(lot.lotId,item.file);updateFile(item.id,{status:'processing',mediaId:result.id});}catch(reason){failed+=1;updateFile(item.id,{status:'failed',error:reason instanceof Error?reason.message:'No se pudo subir'});}finally{completed+=1;setProgress({completed,total:pending.length});}}};await Promise.all(Array.from({length:Math.min(MAX_PARALLEL_UPLOADS,pending.length)},worker));if(failed){setMessage(failed+' archivo(s) no pudieron subirse.');return;}}
-      setMessage('Aplicando marca de agua a los archivos...');await waitForWatermarks(lot.lotId);await api.submitLot(lot.lotId);setFiles([]);setMessage('Carga completada y enviada a moderacion.');
+      await api.submitLot(lot.lotId);setFiles([]);setAlbumName('');setActivity('');setMessage('Carga completada y enviada a moderacion.');
     }catch(reason){setMessage(reason instanceof Error?reason.message:'No se pudo cargar el lote.');}finally{setUploading(false);}
   };
   const canUpload=Boolean(departure&&date&&files.some(item=>item.status!=='uploaded')&&!uploading); const current=files.find(item=>item.id===selected); const currentIndex=files.findIndex(item=>item.id===selected); const totalSize=files.reduce((sum,item)=>sum+item.file.size,0);
   return <div style={{flex:1,overflowY:'auto',padding:32}}><div style={{maxWidth:720,margin:'0 auto'}}>
     <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná la actividad y todas las fotos o videos del lote. Se procesan de a {MAX_PARALLEL_UPLOADS} para una carga estable.</p></div>
-    <div className="upload-fields-grid"><SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(item=>`${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)} placeholder="Seleccionar salida..."/><label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={dateInput}/></label><SearchableSelect label="Actividad" value={activity} onChange={setActivity} options={activities.map(item=>item.name)} placeholder="Opcional..."/></div>
+    <div className="upload-fields-grid"><SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(item=>`${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)} placeholder="Seleccionar salida..."/><label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={dateInput}/></label><div style={{display:'grid',gap:8}}><SearchableSelect label="Actividad" value={activity} onChange={handleActivityChange} options={[...activities.map(item=>item.name),CUSTOM_ACTIVITY]} renderOption={(option: string)=>option===CUSTOM_ACTIVITY?'Personalizada...':option} placeholder="Opcional..."/>{activity&&<input type="text" value={albumName} onChange={e=>setAlbumName(e.target.value)} placeholder={isCustomActivity?'Escribí el nombre del álbum...':(activities.find(a=>a.name===activity)?.name||'General')} maxLength={160} style={{width:'100%',height:44,padding:isCustomActivity?'0 16px 0 34px':'0 16px',border:`1px solid ${isCustomActivity?'#1A4B77':'#E4E4E7'}`,background:'#fff',color:albumName?'#09090B':'#71717A',fontSize:14,fontFamily:'inherit',outline:'none',transition:'border-color .2s',boxSizing:'border-box',borderRadius:6}} onFocus={e=>(e.target.style.borderColor='#1A4B77')} onBlur={e=>(e.target.style.borderColor=isCustomActivity?'#1A4B77':'#E4E4E7')}/>}</div></div>
     <div onDrop={drop} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onClick={()=>!uploading&&input.current?.click()} style={{border:`1px solid ${dragging?'#1A4B77':'#E4E4E7'}`,background:dragging?'#FAFAFA':'#fff',padding:'64px 24px',textAlign:'center',cursor:uploading?'wait':'pointer',transition:'all .2s ease',margin:'32px 0',borderRadius:8}}>
       <input ref={input} type="file" multiple accept=".jpg,.jpeg,.jpe,.jfif,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime" hidden onChange={event=>{addFiles(event.target.files);event.currentTarget.value='';}}/>
       <Upload size={32} strokeWidth={1} color={dragging?'#1A4B77':'#A1A1AA'} style={{margin:'0 auto 16px'}}/><p style={{margin:'0 0 8px',fontWeight:500,fontSize:15,color:'#1A4B77'}}>Hacé clic o arrastrá todas las fotos y videos acá</p><p style={{margin:0,fontSize:13,color:'#A1A1AA'}}>JPG, PNG, HEIC, MP4 o MOV · hasta 500 MB por archivo · calidad original.</p>

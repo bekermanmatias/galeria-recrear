@@ -8,10 +8,11 @@ interface SearchableSelectProps {
   placeholder: string;
   label?: string;
   style?: React.CSSProperties;
+  renderOption?: (option: string) => React.ReactNode;
 }
 
 export default function SearchableSelect({
-  value, onChange, options, placeholder, label, style
+  value, onChange, options, placeholder, label, style, renderOption
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -66,7 +67,7 @@ export default function SearchableSelect({
           />
         ) : (
           <span style={{ width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {value === 'Todos' ? placeholder : (value || placeholder)}
+            {value === 'Todos' ? placeholder : (value ? (renderOption ? renderOption(value) : value) : placeholder)}
           </span>
         )}
         <ChevronDown size={16} strokeWidth={1.5} style={{
@@ -87,18 +88,30 @@ export default function SearchableSelect({
           {filteredOptions.length === 0 ? (
             <div style={{ padding: '12px 16px', fontSize: '13px', color: '#71717A' }}>No se encontraron resultados</div>
           ) : (
-            filteredOptions.map(o => (
+            filteredOptions.map(option => (
               <div
-                key={o}
-                onClick={() => { onChange(o); setIsOpen(false); }}
-                style={{
-                  padding: '10px 16px', fontSize: label ? '14px' : '13px', color: '#09090B', cursor: 'pointer',
-                  background: value === o ? '#F1F5F9' : 'transparent',
+                key={option}
+                onClick={() => {
+                  onChange(option);
+                  setIsOpen(false);
+                  setSearch('');
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
-                onMouseLeave={e => e.currentTarget.style.background = value === o ? '#F1F5F9' : 'transparent'}
+                style={{
+                  padding: '10px 16px',
+                  cursor: 'pointer',
+                  background: value === option ? '#F1F5F9' : 'transparent',
+                  color: value === option ? '#1A4B77' : '#334155',
+                  fontWeight: value === option ? 600 : 400,
+                  fontSize: '14px',
+                }}
+                onMouseEnter={(e) => {
+                  if (value !== option) (e.target as HTMLDivElement).style.background = '#F8FAFC';
+                }}
+                onMouseLeave={(e) => {
+                  if (value !== option) (e.target as HTMLDivElement).style.background = 'transparent';
+                }}
               >
-                {o === 'Todos' ? placeholder : o}
+                {option === 'Todos' ? placeholder : (renderOption ? renderOption(option) : option)}
               </div>
             ))
           )}
