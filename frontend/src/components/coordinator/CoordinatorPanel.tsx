@@ -322,7 +322,7 @@ export default function CoordinatorPanel() {
         {uploading && (
           <div style={{ marginBottom: '32px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-              <span style={{ fontSize: '13px', color: '#1A4B77' }}>{files.some(file => file.status === 'processing') ? 'Aplicando marca de agua...' : 'Subiendo archivos...'}</span>
+              <span style={{ fontSize: '13px', color: '#1A4B77' }}>{files.some(file => file.status === 'processing') ? 'Procesando...' : 'Subiendo archivos...'}</span>
               <span style={{ fontSize: '13px', color: '#71717A' }}>{uploadProgress}%</span>
             </div>
             <div style={{ height: '4px', background: '#F4F4F5', width: '100%', borderRadius: '2px', overflow: 'hidden' }}>
@@ -349,7 +349,7 @@ export default function CoordinatorPanel() {
           onMouseEnter={e => canUpload && (e.currentTarget.style.background = '#133656')}
           onMouseLeave={e => canUpload && (e.currentTarget.style.background = '#1A4B77')}
         >
-          {uploading ? (files.some(file => file.status === 'processing') ? 'Procesando marca de agua...' : 'Subiendo...') : files.some(file => file.status === 'error') ? 'Reintentar carga' : 'Subir material'}
+          {uploading ? (files.some(file => file.status === 'processing') ? 'Procesando...' : 'Subiendo...') : files.some(file => file.status === 'error') ? 'Reintentar carga' : 'Subir material'}
         </button>
       </main>
       </div>
@@ -412,7 +412,7 @@ export default function CoordinatorPanel() {
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '14px' }}>
                     <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '14px', background: lot.status === 'PUBLISHED' ? '#DCFCE7' : lot.status === 'PENDING' ? '#FEF3C7' : '#E2E8F0', color: lot.status === 'PUBLISHED' ? '#166534' : '#475569', fontSize: '12px', fontWeight: 700 }}>
-                      {lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : 'En carga'}
+                      {lot.status === 'PUBLISHED' ? 'Publicado' : lot.status === 'PENDING' ? 'Pendiente' : (lot.status === 'UPLOADING' && lot.submitted_at) ? 'Procesando' : 'En carga'}
                     </span>
                     {isDeletable(lot) && editingLotId !== lot.id && (
                       <button onClick={() => confirmDelete(lot.id)} title="Eliminar lote" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#EF4444', padding: '4px', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', fontWeight: 500 }}>
