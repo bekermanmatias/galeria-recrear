@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Check, Trash2, Edit2, Upload as UploadIcon, Image } from 'lucide-react';
+import { Upload, X, Check, Trash2, Edit2, PenLine, Upload as UploadIcon, Image } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
@@ -19,6 +19,7 @@ const TABS = [
   { id: 'galeria', label: 'Ver Galería', icon: Image },
 ] as const;
 
+const CUSTOM_ACTIVITY = '__personalizada__';
 const isDeletable = (lot: LotSummary) => ['DRAFT', 'UPLOADING'].includes(lot.status);
 
 export default function CoordinatorPanel() {
@@ -40,6 +41,7 @@ export default function CoordinatorPanel() {
   const [error, setError] = useState('');
 
   // Gallery state
+  const isCustomActivity = actividad === CUSTOM_ACTIVITY;
   const [editingLotId, setEditingLotId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [editBusy, setEditBusy] = useState(false);
@@ -122,8 +124,8 @@ export default function CoordinatorPanel() {
   };
 
   const uploadFiles = async () => {
-    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}` === salida);
-    const activity = activities.find(item => item.name === actividad);
+    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}` === salida);
+    const activity = isCustomActivity ? null : activities.find(item => item.name === actividad);
     const pending = files.filter(item => item.status === 'pending' || (item.status === 'error' && !item.mediaId));
     const retrying = files.filter(item => item.status === 'error' && item.mediaId);
     if (!selectedDeparture || !fecha || (!pending.length && !retrying.length)) return;
@@ -182,7 +184,7 @@ export default function CoordinatorPanel() {
       setLots(prev => prev.map(l => l.id === lotId ? { ...l, album_name: trimmed } : l));
       setEditingLotId(null);
     } catch (reason) {
-      setGalleryError(reason instanceof Error ? reason.message : 'No se pudo renombrar el \u00e1lbum.');
+      setGalleryError(reason instanceof Error ? reason.message : 'No se pudo renombrar el álbum.');
     } finally {
       setEditBusy(false);
     }
@@ -224,7 +226,7 @@ export default function CoordinatorPanel() {
       <main style={{ maxWidth: '720px', margin: '0 auto' }}>
         <div style={{ marginBottom: '32px' }}>
           <h2 style={{ margin: '0 0 8px', fontSize: '24px', color: '#1A4B77' }}>Subir material</h2>
-          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Seleccion\u00e1 la actividad y arrastr\u00e1 las fotos.</p>
+          <p style={{ margin: 0, fontSize: '14px', color: '#71717A' }}>Seleccioná la actividad y arrastrá las fotos.</p>
         </div>
 
         <div className="upload-fields-grid">
@@ -232,7 +234,7 @@ export default function CoordinatorPanel() {
             label="Salida *"
             value={salida}
             onChange={setSalida}
-            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}`)}
+            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)}
             placeholder="Seleccionar salida..."
           />
           <DateField label="Fecha *" value={fecha} onChange={setFecha} />
@@ -245,26 +247,35 @@ export default function CoordinatorPanel() {
           />
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: '#09090B', marginBottom: '8px' }}>
-              Nombre del \u00e1lbum
+              Nombre del álbum{isCustomActivity && <span style={{ color: '#EF4444', marginLeft: 2 }}>*</span>}
             </label>
-            <input
-              type="text"
-              value={albumName}
-              onChange={e => setAlbumName(e.target.value)}
-              placeholder={activityPlaceholder}
-              maxLength={160}
-              style={{
-                width: '100%', height: '44px', padding: '0 16px',
-                border: '1px solid #E4E4E7', background: '#FFFFFF',
-                color: albumName ? '#09090B' : '#71717A',
-                fontSize: '14px', fontFamily: 'inherit', outline: 'none',
-                transition: 'border-color 0.2s', boxSizing: 'border-box', borderRadius: '6px',
-              }}
-              onFocus={e => (e.target.style.borderColor = '#1A4B77')}
-              onBlur={e => (e.target.style.borderColor = '#E4E4E7')}
-            />
-            <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#A1A1AA' }}>
-              Si no complet\u00e1s este campo, se usar\u00e1 el nombre de la actividad.
+            <div style={{ position: 'relative' }}>
+              {isCustomActivity && (
+                <PenLine size={15} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#1A4B77', pointerEvents: 'none' }} />
+              )}
+              <input
+                type="text"
+                value={albumName}
+                onChange={e => setAlbumName(e.target.value)}
+                placeholder={isCustomActivity ? 'Escribí el nombre del álbum...' : (activities.find(a => a.name === actividad)?.name || 'General')}
+                maxLength={160}
+                style={{
+                  width: '100%', height: '44px',
+                  padding: isCustomActivity ? '0 16px 0 34px' : '0 16px',
+                  border: `1px solid ${isCustomActivity ? '#1A4B77' : '#E4E4E7'}`,
+                  background: '#FFFFFF',
+                  color: albumName ? '#09090B' : '#71717A',
+                  fontSize: '14px', fontFamily: 'inherit', outline: 'none',
+                  transition: 'border-color 0.2s', boxSizing: 'border-box', borderRadius: '6px',
+                }}
+                onFocus={e => (e.target.style.borderColor = '#1A4B77')}
+                onBlur={e => (e.target.style.borderColor = isCustomActivity ? '#1A4B77' : '#E4E4E7')}
+              />
+            </div>
+            <p style={{ margin: '4px 0 0', fontSize: '11px', color: isCustomActivity ? '#1A4B77' : '#A1A1AA' }}>
+              {isCustomActivity
+                ? 'Se usará este nombre como nombre de la actividad y del álbum.'
+                : 'Opcional. Si lo dejás vacío, se usa el nombre de la actividad.'}
             </p>
           </div>
         </div>
@@ -283,8 +294,8 @@ export default function CoordinatorPanel() {
         >
           <input ref={fileInputRef} type="file" accept=".jpg,.jpeg,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime" multiple style={{ display: 'none' }} onChange={e => e.target.files && addFiles(e.target.files)} />
           <Upload size={32} strokeWidth={1} color={isDragging ? '#1A4B77' : '#A1A1AA'} style={{ margin: '0 auto 16px' }} />
-          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: '15px', color: '#1A4B77' }}>Hac\u00e9 clic o arrastr\u00e1 las fotos ac\u00e1</p>
-          <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>JPG, PNG, HEIC, MP4 y MOV. Se subir\u00e1n en calidad original.</p>
+          <p style={{ margin: '0 0 8px', fontWeight: 500, fontSize: '15px', color: '#1A4B77' }}>Hacé clic o arrastrá las fotos acá</p>
+          <p style={{ margin: 0, fontSize: '13px', color: '#A1A1AA' }}>JPG, PNG, HEIC, MP4 y MOV. Se subirán en calidad original.</p>
         </div>
 
         {files.length > 0 && (
@@ -325,7 +336,7 @@ export default function CoordinatorPanel() {
             <div style={{ width: '24px', height: '24px', background: '#1A4B77', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={14} color="#FFFFFF" strokeWidth={3} />
             </div>
-            <span style={{ fontSize: '14px', color: '#1A4B77', fontWeight: 500 }}>Carga completada. El lote ha sido enviado a revisi\u00f3n.</span>
+            <span style={{ fontSize: '14px', color: '#1A4B77', fontWeight: 500 }}>Carga completada. El lote ha sido enviado a revisión.</span>
           </div>
         )}
 
@@ -384,7 +395,7 @@ export default function CoordinatorPanel() {
                         {lot.album_name || lot.activity_name}
                       </div>
                       {isDeletable(lot) && (
-                        <button onClick={() => startEditName(lot)} title="Editar nombre del \u00e1lbum" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                        <button onClick={() => startEditName(lot)} title="Editar nombre del álbum" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94A3B8', padding: '2px', display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                           <Edit2 size={13} />
                         </button>
                       )}
@@ -412,7 +423,7 @@ export default function CoordinatorPanel() {
                   </div>
                 </article>
               ))}
-              {!lots.length && <p style={{ color: '#71717A' }}>Todav\u00eda no hay lotes cargados.</p>}
+              {!lots.length && <p style={{ color: '#71717A' }}>Todavía no hay lotes cargados.</p>}
             </div>
           </div>
         </div>
@@ -421,8 +432,8 @@ export default function CoordinatorPanel() {
       {deletingLotId && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(15,23,42,0.45)', display: 'grid', placeItems: 'center', padding: '16px' }}>
           <div style={{ width: 'min(100%, 400px)', background: '#fff', borderRadius: '12px', padding: '28px', boxShadow: '0 20px 50px rgba(15,23,42,.2)' }}>
-            <h3 style={{ margin: '0 0 10px', color: '#1A4B77', fontSize: '17px' }}>\u00bfEliminar este lote?</h3>
-            <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748B' }}>Se eliminar\u00e1 el lote y todos sus archivos. Esta acci\u00f3n no se puede deshacer.</p>
+            <h3 style={{ margin: '0 0 10px', color: '#1A4B77', fontSize: '17px' }}>¿Eliminar este lote?</h3>
+            <p style={{ margin: '0 0 24px', fontSize: '13px', color: '#64748B' }}>Se eliminará el lote y todos sus archivos. Esta acción no se puede deshacer.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
               <button onClick={() => setDeletingLotId(null)} disabled={deleteBusy} style={{ padding: '10px 18px', border: '1px solid #E4E4E7', borderRadius: '6px', background: '#fff', fontSize: '13px', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Cancelar
