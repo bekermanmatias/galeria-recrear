@@ -12,7 +12,12 @@ const primary: React.CSSProperties = { display: 'inline-flex', alignItems: 'cent
 const formatBytes = (bytes:number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const daysUntilPurge = (date?: string | null) => date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)) : 0;
 const input: React.CSSProperties = { padding: '10px 12px', border: '1px solid #E4E4E7', borderRadius: 6, font: 'inherit', fontSize: 13 };
-const departureLabel = (lot: LotSummary) => lot.departure_name ?? lot.school_name ?? 'Salida';
+const departureLabel = (lot: LotSummary) => {
+  const name = lot.departure_name ?? lot.school_name ?? 'Salida';
+  const type = lot.departure_type === 'AEREO' ? 'Aéreo' : lot.departure_type === 'MICRO' ? 'Micro' : '';
+  if (type && !name.toLowerCase().startsWith(type.toLowerCase())) return `${type} - ${name}`;
+  return name;
+};
 
 function ErrorMessage({ value }: { value: string }) {
   return value ? <div role="alert" style={{ margin: '16px 0', padding: '12px 16px', borderRadius: 8, color: '#B91C1C', background: '#FEF2F2', border: '1px solid #FECACA', fontSize: 13 }}>{value}</div> : null;
