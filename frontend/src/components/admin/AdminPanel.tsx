@@ -1,11 +1,9 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Activity } from 'lucide-react';
 import { api } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
-import AdminColegios from './AdminColegios';
-import AdminActividades from './AdminActividades';
-import AdminUsuarios from './AdminUsuarios';
+import { UsersView, CatalogView, SchoolsView } from './ConnectedViews';
 import AdminCargaManual from './AdminCargaManual';
 import AdminEstadoCargas from './AdminEstadoCargas';
 import AdminSalidas from './AdminSalidas';
@@ -33,13 +31,16 @@ export default function AdminPanel() {
     {activeTab === 'moderacion' && <AdminModeration />}
     {activeTab === 'galeria' && <GalleryView />}
     {activeTab === 'salidas' && <AdminSalidas />}
-    {activeTab === 'colegios' && <AdminColegios />}
-    {activeTab === 'actividades' && <AdminActividades />}
-    {activeTab === 'usuarios' && <AdminUsuarios />}
+    {activeTab === 'colegios' && <SchoolsView />}
+    {activeTab === 'actividades' && <CatalogView kind="activities" />}
+    {activeTab === 'usuarios' && <UsersView />}
     {activeTab === 'carga' && <AdminCargaManual />}
     {activeTab === 'pasajeros' && <AdminPasajeros />}
   </DashboardLayout>;
 }
+
+
+
 
 
 

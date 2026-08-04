@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Edit2, Check, X, Trash2 } from 'lucide-react';
 import { api, type LotSummary } from '../../lib/api';
 
@@ -186,3 +186,4 @@ export default function AdminEstadoCargas() {
     </div>
   );
 }
+
