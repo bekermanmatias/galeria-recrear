@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminDeparturePassengers from '../../components/admin/AdminDeparturePassengers';
+---
+<BaseLayout title="Pasajeros de la salida">
+  <AdminDeparturePassengers client:only="react" />
+</BaseLayout>

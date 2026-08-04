@@ -342,20 +342,53 @@ adminRouter.post('/schools/:schoolId/passengers/import/commit', upload.single('f
 adminRouter.get('/passengers', asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query);
   const term = String(req.query.q ?? '').trim();
+  const schoolId = req.query.schoolId ? z.string().uuid().parse(req.query.schoolId) : null;
+  const departureId = req.query.departureId ? z.string().uuid().parse(req.query.departureId) : null;
+  const active = req.query.active === undefined || req.query.active === '' ? null : z.enum(['true','false']).transform(value=>value==='true').parse(req.query.active);
+  const updatedFrom = req.query.updatedFrom ? z.string().date().parse(req.query.updatedFrom) : null;
+  const updatedTo = req.query.updatedTo ? z.string().date().parse(req.query.updatedTo) : null;
+  const values: unknown[] = [`%${term}%`, schoolId, departureId, active, updatedFrom, updatedTo, pageSize, (page - 1) * pageSize];
   const result = await query(`
-    SELECT id,external_number,full_name,document_type,document_number,birth_date::text,document_expires_at::text,country,passenger_status,bonus,phone,mobile,email,active,created_at,updated_at,deactivated_at
-    FROM passengers
-    WHERE full_name ILIKE $1 OR document_number ILIKE $1 OR COALESCE(external_number,'') ILIKE $1
-    ORDER BY active DESC, full_name
-    LIMIT $2 OFFSET $3
-  `, [`%${term}%`, pageSize, (page - 1) * pageSize]);
-  res.set('Cache-Control', 'private, no-store').json({ items: result.rows, page, pageSize });
-}));
-adminRouter.get('/passengers/imports', asyncHandler(async (_req, res) => {
+    SELECT p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.created_at,p.updated_at,p.deactivated_at,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'code',s.code) ORDER BY s.name) FROM passenger_school_assignments psa JOIN schools s ON s.id=psa.school_id WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL), '[]'::jsonb) AS schools,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('id',d.id,'name',d.name,'code',d.public_code,'type',d.type) ORDER BY d.start_date DESC,d.name) FROM passenger_departure_assignments pda JOIN departures d ON d.id=pda.departure_id WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL), '[]'::jsonb) AS departures
+    FROM passengers p
+    WHERE (p.full_name ILIKE $1 OR p.document_number ILIKE $1 OR COALESCE(p.external_number,'') ILIKE $1 OR COALESCE(p.email,'') ILIKE $1 OR COALESCE(p.mobile,'') ILIKE $1 OR COALESCE(p.phone,'') ILIKE $1 OR EXISTS(SELECT 1 FROM passenger_school_assignments psa JOIN schools s ON s.id=psa.school_id WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL AND (s.name ILIKE $1 OR s.code ILIKE $1)) OR EXISTS(SELECT 1 FROM passenger_departure_assignments pda JOIN departures d ON d.id=pda.departure_id WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL AND (d.name ILIKE $1 OR COALESCE(d.public_code,'') ILIKE $1)))
+      AND ($2::uuid IS NULL OR EXISTS(SELECT 1 FROM passenger_school_assignments WHERE passenger_id=p.id AND school_id=$2 AND unassigned_at IS NULL))
+      AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM passenger_departure_assignments WHERE passenger_id=p.id AND departure_id=$3 AND unassigned_at IS NULL))
+      AND ($4::boolean IS NULL OR p.active=$4)
+      AND ($5::date IS NULL OR p.updated_at >= $5::date)
+      AND ($6::date IS NULL OR p.updated_at < ($6::date + interval '1 day'))
+    ORDER BY p.active DESC,p.full_name LIMIT $7 OFFSET $8`, values);
+  const [schools,departures] = await Promise.all([
+    query(`SELECT id,name,code FROM schools WHERE active AND deleted_at IS NULL ORDER BY name`),
+    query(`SELECT id,name,public_code AS code,type FROM departures WHERE active ORDER BY start_date DESC,name`)
+  ]);
+  res.set('Cache-Control', 'private, no-store').json({ items: result.rows, page, pageSize, filters: { schools: schools.rows, departures: departures.rows } });
+}));adminRouter.get('/passengers/imports', asyncHandler(async (_req, res) => {
   const result = await query(`SELECT i.id,i.file_name,i.total_rows,i.created_rows,i.updated_rows,i.rejected_rows,i.school_id,i.created_at,u.name AS imported_by_name,s.code AS school_code,s.name AS school_name FROM passenger_imports i JOIN users u ON u.id=i.imported_by LEFT JOIN schools s ON s.id=i.school_id ORDER BY i.created_at DESC LIMIT 30`);
   res.set('Cache-Control', 'private, no-store').json({ items: result.rows });
 }));
-adminRouter.patch('/passengers/:id', asyncHandler(async (req, res) => {
+adminRouter.post('/passengers/:passengerId/schools/:schoolId', asyncHandler(async (req, res) => {
+  const passengerId = z.string().uuid().parse(req.params.passengerId);
+  const schoolId = await passengerSchoolExists(z.string().uuid().parse(req.params.schoolId));
+  await transaction(async client => {
+    const passenger = await client.query('SELECT id FROM passengers WHERE id=$1 FOR UPDATE', [passengerId]);
+    if (!passenger.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'Pasajero no encontrado');
+    await client.query('UPDATE passenger_school_assignments SET unassigned_at=NULL,assigned_by=$3 WHERE passenger_id=$1 AND school_id=$2 AND unassigned_at IS NOT NULL', [passengerId, schoolId, req.user!.id]);
+    await client.query('INSERT INTO passenger_school_assignments(passenger_id,school_id,assigned_by) SELECT $1,$2,$3 WHERE NOT EXISTS (SELECT 1 FROM passenger_school_assignments WHERE passenger_id=$1 AND school_id=$2 AND unassigned_at IS NULL)', [passengerId, schoolId, req.user!.id]);
+  });
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGER_SCHOOL_ASSIGNED','passenger',$2,$3)`, [req.user!.id, passengerId, JSON.stringify({ schoolId, source: 'global_passenger' })]);
+  res.set('Cache-Control','private, no-store').status(204).end();
+}));
+adminRouter.delete('/passengers/:passengerId/schools/:schoolId', asyncHandler(async (req, res) => {
+  const passengerId = z.string().uuid().parse(req.params.passengerId);
+  const schoolId = await passengerSchoolExists(z.string().uuid().parse(req.params.schoolId));
+  const result = await query('UPDATE passenger_school_assignments SET unassigned_at=now(),assigned_by=$3 WHERE passenger_id=$1 AND school_id=$2 AND unassigned_at IS NULL RETURNING id', [passengerId, schoolId, req.user!.id]);
+  if (!result.rowCount) throw new AppError(404, 'PASSENGER_SCHOOL_NOT_FOUND', 'Pasajero no asociado a este colegio');
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGER_SCHOOL_UNASSIGNED','passenger',$2,$3)`, [req.user!.id, passengerId, JSON.stringify({ schoolId, source: 'global_passenger' })]);
+  res.set('Cache-Control','private, no-store').status(204).end();
+}));adminRouter.patch('/passengers/:id', asyncHandler(async (req, res) => {
   const input = passengerSchema.partial().parse(req.body);
   const result = await query(`
     UPDATE passengers SET external_number=COALESCE($1,external_number),full_name=COALESCE($2,full_name),document_type=COALESCE($3,document_type),document_number=COALESCE($4,document_number),birth_date=COALESCE($5,birth_date),document_expires_at=COALESCE($6,document_expires_at),country=COALESCE($7,country),passenger_status=COALESCE($8,passenger_status),bonus=COALESCE($9,bonus),phone=COALESCE($10,phone),mobile=COALESCE($11,mobile),email=COALESCE($12,email),active=COALESCE($13,active),deactivated_at=CASE WHEN COALESCE($13,active) THEN NULL ELSE now() END,deactivated_by=CASE WHEN COALESCE($13,active) THEN NULL ELSE $14 END
@@ -380,7 +413,7 @@ adminRouter.delete('/passengers/:id', asyncHandler(async (req, res) => {
   });
   res.set('Cache-Control','private, no-store').status(204).end();
 }));function excelFile(req: Express.Request) {
-  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccion? un archivo Excel');
+  if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccioná un archivo Excel');
   if (!/\.(xlsx|xls)$/i.test(req.file.originalname)) throw new AppError(400, 'INVALID_EXCEL', 'Se aceptan archivos .xlsx o .xls');
   return req.file;
 }

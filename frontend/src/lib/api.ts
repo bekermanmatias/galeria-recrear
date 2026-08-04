@@ -13,7 +13,12 @@ export interface UserPermissions { role: Role; customized: boolean; permissions:
 export interface LotSummary { id: string; event_date: string; school_id: string | null; school_name: string; departure_id?: string; departure_name?: string; departure_destination?: string; departure_type?: 'MICRO' | 'AEREO'; departure_public_code?: string | null; school_names?: string[]; activity_id?: string | null; activity_name: string; album_name?: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; created_by_name?: string | null; created_by_id?: string | null; }
 export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; watermark_status?: string | null; watermark_error?: string | null; }
 export interface MediaProcessing { id: string; status: string; watermark_status: string | null; watermark_error: string | null; watermark_attempts: number; }
-export interface Passenger { id:string; external_number?:string|null; full_name:string; document_type:string; document_number:string; birth_date?:string|null; document_expires_at?:string|null; country?:string|null; passenger_status?:string|null; bonus?:string|null; phone?:string|null; mobile?:string|null; email?:string|null; active:boolean; created_at?:string; updated_at:string; deactivated_at?:string|null; }
+export interface PassengerAssociation { id:string; name:string; code?:string|null; type?:'MICRO'|'AEREO'; }
+export interface Passenger { id:string; external_number?:string|null; full_name:string; document_type:string; document_number:string; birth_date?:string|null; document_expires_at?:string|null; country?:string|null; passenger_status?:string|null; bonus?:string|null; phone?:string|null; mobile?:string|null; email?:string|null; active:boolean; created_at?:string; updated_at:string; deactivated_at?:string|null; schools?:PassengerAssociation[]; departures?:PassengerAssociation[]; }
+export interface DeparturePassenger extends Passenger { school_id: string; school_name: string; school_code: string; }
+export interface DeparturePassengerSchool { id: string; name: string; code: string; passenger_count: number; }
+export interface DeparturePassengerData { departure: Pick<Departure, 'id'|'name'|'type'|'destination'|'start_date'|'end_date'|'active'>; schools: DeparturePassengerSchool[]; total: number; items: DeparturePassenger[]; page: number; pageSize: number; }
+export interface PassengerInput { externalNumber?: string | null; fullName: string; documentType: string; documentNumber: string; birthDate?: string | null; documentExpiresAt?: string | null; country?: string | null; passengerStatus?: string | null; bonus?: string | null; phone?: string | null; mobile?: string | null; email?: string | null; active?: boolean; }
 
 export interface PassengerImport { id:string; file_name:string; total_rows:number; created_rows:number; updated_rows:number; rejected_rows:number; created_at:string; imported_by_name:string; school_id?:string|null; school_code?:string|null; school_name?:string|null; }
 export class ApiError extends Error {
@@ -107,7 +112,13 @@ export const api = {
   deleteLot: (lotId: string) => request<void>(`/lots/${lotId}`, { method: 'DELETE' }),
   approveLot: (lotId: string) => request<void>(`/lots/${lotId}/approve`, { method: 'POST' }),
   moderateMedia: (mediaId: string, action: 'reject' | 'restore') => request<void>(`/lots/media/${mediaId}/moderation`, { method: 'PATCH', body: JSON.stringify({ action }) }),
-  downloadZip: (mediaIds: string[]) => request<Blob>('/media/downloads/zip', { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  departurePassengers: (departureId: string, options: { schoolId?: string; q?: string } = {}) => { const params = new URLSearchParams(); if (options.schoolId) params.set('schoolId', options.schoolId); if (options.q) params.set('q', options.q); const suffix = params.size ? `?${params}` : ''; return request<DeparturePassengerData>(`/departures/${departureId}/passengers${suffix}`); },
+  availableDeparturePassengers: (departureId: string, schoolId: string, q = '') => request<{ items: Passenger[] }>(`/departures/${departureId}/schools/${schoolId}/passengers/available${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  addDeparturePassenger: (departureId: string, passengerId: string, schoolId: string) => request<void>(`/departures/${departureId}/passengers/${passengerId}`, { method: 'POST', body: JSON.stringify({ schoolId }) }),
+  createDeparturePassenger: (departureId: string, schoolId: string, passenger: PassengerInput) => request<{ id: string }>(`/departures/${departureId}/passengers`, { method: 'POST', body: JSON.stringify({ schoolId, passenger }) }),
+  previewDeparturePassengerImport: (departureId: string, schoolId: string, file: File) => { const body = new FormData(); body.append('schoolId', schoolId); body.append('file', file); return request<{ valid:boolean; totalRows:number; validRows:number; errors:{row:number;field:string;message:string}[]; summary:{create:number;update:number;associate:number;rejected:number} }>(`/departures/${departureId}/passengers/import/preview`, { method: 'POST', body }); },
+  commitDeparturePassengerImport: (departureId: string, schoolId: string, file: File) => { const body = new FormData(); body.append('schoolId', schoolId); body.append('file', file); return request<{ created:number;updated:number;associated:number }>(`/departures/${departureId}/passengers/import/commit`, { method: 'POST', body }); },
+  removeDeparturePassenger: (departureId: string, passengerId: string) => request<void>(`/departures/${departureId}/passengers/${passengerId}`, { method: 'DELETE' }),  downloadZip: (mediaIds: string[]) => request<Blob>('/media/downloads/zip', { method: 'POST', body: JSON.stringify({ mediaIds }) }),
   contentUrl: (mediaId: string) => `${API_URL}/media/${mediaId}/content`,
   thumbnailUrl: (mediaId: string) => `${API_URL}/media/${mediaId}/thumbnail`,
   downloadUrl: (mediaId: string) => `${API_URL}/media/${mediaId}/download`,
@@ -130,7 +141,6 @@ export const publicGalleryApi = {
 
 export interface PublicDeparture { id: string; public_code: string; name: string; destination: string; type: 'MICRO' | 'AEREO'; event_date: string; start_date: string; end_date: string; }
 export const publicDepartureApi = {
-  search: (text: string) => publicRequest<{ items: PublicDeparture[] }>(`/public/departures/search?q=${encodeURIComponent(text)}`),
   departure: (code: string) => publicRequest<{ departure: PublicDeparture; items: LotSummary[] }>(`/public/departures/${encodeURIComponent(code)}`),
   lot: (code: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/departures/${encodeURIComponent(code)}/lots/${lotId}`),
   downloadZip: (code: string, mediaIds: string[]) => publicRequest<Blob>(`/public/departures/${encodeURIComponent(code)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
