@@ -11,7 +11,7 @@ import { parsePassengerWorkbook, passengerSchema } from '../passengers.js';
 import { asyncHandler, parsePagination } from '../http.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
-const userSchema = z.object({ name: z.string().min(2).max(160), email: z.string().email(), password: z.string().min(8).max(128), role: z.enum(['ADMIN', 'COORDINATOR', 'PARENT']) });
+const userSchema = z.object({ name: z.string().min(2).max(160), email: z.string().email(), password: z.string().min(8).max(128), role: z.enum(['ADMIN', 'COORDINATOR']).default('COORDINATOR'), departureIds: z.array(z.string().uuid()).default([]), active: z.boolean().optional() });
 const schoolSchema = z.object({ name: z.string().min(2).max(160), code: z.string().min(2).max(32).transform(v => v.toUpperCase()), botCode: z.string().min(2).max(32).transform(v => v.toUpperCase()), startDate: z.string().date().optional().nullable(), endDate: z.string().date().optional().nullable(), active: z.boolean().optional() });
 const catalogSchema = z.object({ name: z.string().min(2).max(100), botCode: z.string().min(1).max(32).transform(v => v.toUpperCase()), active: z.boolean().optional(), sortOrder: z.number().int().optional() });
 
@@ -23,12 +23,12 @@ adminRouter.get('/users', asyncHandler(async (req, res) => {
   const includeInactive = String(req.query.includeInactive ?? '') === 'true';
   const result = await query(`
     SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
-           COALESCE(array_agg(us.school_id) FILTER (WHERE us.school_id IS NOT NULL AND us.active = true), ARRAY[]::uuid[]) as school_ids
+           COALESCE((SELECT array_agg(us.school_id ORDER BY us.school_id) FROM user_schools us WHERE us.user_id=u.id AND us.active=true), ARRAY[]::uuid[]) AS school_ids,
+           COALESCE((SELECT array_agg(dc.departure_id ORDER BY d.event_date DESC, d.name) FROM departure_coordinators dc JOIN departures d ON d.id=dc.departure_id WHERE dc.user_id=u.id), ARRAY[]::uuid[]) AS departure_ids,
+           COALESCE((SELECT array_agg((d.type::text || ' - ' || d.name) ORDER BY d.event_date DESC, d.name) FROM departure_coordinators dc JOIN departures d ON d.id=dc.departure_id WHERE dc.user_id=u.id), ARRAY[]::text[]) AS departure_names
     FROM users u
-    LEFT JOIN user_schools us ON u.id = us.user_id
     WHERE ($4::boolean OR u.active = true)
       AND (u.name ILIKE $1 OR u.email ILIKE $1)
-    GROUP BY u.id
     ORDER BY u.name
     LIMIT $2 OFFSET $3
   `, [`%${term}%`, pageSize, (page - 1) * pageSize, includeInactive]);
@@ -36,17 +36,55 @@ adminRouter.get('/users', asyncHandler(async (req, res) => {
 }));
 adminRouter.post('/users', asyncHandler(async (req, res) => {
   const input = userSchema.parse(req.body);
-  const result = await query('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, active', [input.name, input.email, await hashPassword(input.password), input.role]);
-  res.status(201).json(result.rows[0]);
+  const departureIds = [...new Set(input.departureIds)];
+  if (input.role !== 'COORDINATOR' && departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores');
+  const result = await transaction(async client => {
+    if (departureIds.length) {
+      const valid = await client.query('SELECT id FROM departures WHERE id = ANY($1::uuid[]) AND active', [departureIds]);
+      if (valid.rowCount !== departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE', 'Una o mas salidas no existen o estan archivadas');
+    }
+    const created = await client.query('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, active', [input.name, input.email, await hashPassword(input.password), input.role]);
+    for (const departureId of departureIds) await client.query('INSERT INTO departure_coordinators (departure_id, user_id) VALUES ($1, $2)', [departureId, created.rows[0].id]);
+    return created.rows[0];
+  });
+  res.status(201).json(result);
 }));
 adminRouter.patch('/users/:id', asyncHandler(async (req, res) => {
   const input = userSchema.partial().parse(req.body);
-  const values = [input.name ?? null, input.email ?? null, input.role ?? null, input.password ? await hashPassword(input.password) : null, req.params.id];
-  const result = await query('UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), role = COALESCE($3, role), password_hash = COALESCE($4, password_hash) WHERE id = $5 RETURNING id, name, email, role, active', values);
-  if (!result.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
-  res.json(result.rows[0]);
-}));
-adminRouter.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
+  const departureIds = input.departureIds === undefined ? undefined : [...new Set(input.departureIds)];
+  const targetId = String(req.params.id);
+  if (input.active === false && targetId === req.user!.id) throw new AppError(400, 'CANNOT_DEACTIVATE_SELF', 'No podés desactivar tu propia cuenta');
+  const result = await transaction(async client => {
+    const current = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [targetId]);
+    if (!current.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
+    const nextRole = input.role ?? current.rows[0].role;
+    if (nextRole !== 'COORDINATOR' && departureIds?.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores');
+    if (departureIds && input.active !== false) {
+      const valid = await client.query('SELECT id FROM departures WHERE id = ANY($1::uuid[]) AND active', [departureIds]);
+      if (valid.rowCount !== departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE', 'Una o mas salidas no existen o estan archivadas');
+    }
+    if (input.active === false && current.rows[0].role === 'ADMIN' && current.rows[0].active) {
+      const admins = await client.query("SELECT count(*)::int AS total FROM users WHERE role='ADMIN' AND active");
+      if (admins.rows[0].total <= 1) throw new AppError(400, 'LAST_ADMIN', 'No se puede desactivar el último administrador activo');
+    }
+    const values = [input.name ?? null, input.email ?? null, input.role ?? null, input.password ? await hashPassword(input.password) : null, input.active ?? null, targetId];
+    const updated = await client.query('UPDATE users SET name = COALESCE($1, name), email = COALESCE($2, email), role = COALESCE($3, role), password_hash = COALESCE($4, password_hash), active = COALESCE($5, active) WHERE id = $6 RETURNING id, name, email, role, active', values);
+    if (departureIds) {
+      await client.query('DELETE FROM departure_coordinators WHERE user_id=$1', [targetId]);
+      for (const departureId of departureIds) await client.query('INSERT INTO departure_coordinators (departure_id, user_id) VALUES ($1, $2)', [departureId, targetId]);
+    } else if (nextRole !== 'COORDINATOR' || input.active === false) {
+      await client.query('DELETE FROM departure_coordinators WHERE user_id=$1', [targetId]);
+    }
+    if (input.active === false) {
+      await client.query('UPDATE sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL', [targetId]);
+    }
+    return updated.rows[0];
+  });
+  if (input.active !== undefined) {
+    await query('INSERT INTO audit_log (actor_id, action, entity_type, entity_id, metadata) VALUES ($1,$2,$3,$4,$5)', [req.user!.id, input.active ? 'USER_REACTIVATED' : 'USER_DEACTIVATED', 'user', targetId, JSON.stringify({ active: input.active })]);
+  }
+  res.json(result);
+}));adminRouter.post('/users/:id/reset-password', asyncHandler(async (req, res) => {
   const input = z.object({ password: z.string().min(8).max(128) }).parse(req.body);
   const result = await query('UPDATE users SET password_hash = $1 WHERE id = $2 RETURNING id', [await hashPassword(input.password), String(req.params.id)]);
   if (!result.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
@@ -80,7 +118,8 @@ adminRouter.delete('/users/:id', asyncHandler(async (req, res) => {
   res.status(204).end();
 }));
 
-adminRouter.get('/schools', asyncHandler(async (_req, res) => {
+adminRouter.get('/schools', asyncHandler(async (req, res) => {
+  const includeInactive = String(req.query.includeInactive ?? '') === 'true';
   const result = await query(`
     SELECT s.*, p.active AS public_link_active, p.generated_at AS public_link_generated_at, p.revoked_at AS public_link_revoked_at, p.token_value AS public_link_token,
            COALESCE(array_agg(u.id) FILTER (WHERE u.id IS NOT NULL), ARRAY[]::uuid[]) as coordinator_ids,
@@ -89,10 +128,10 @@ adminRouter.get('/schools', asyncHandler(async (_req, res) => {
     LEFT JOIN public_school_links p ON p.school_id = s.id
     LEFT JOIN user_schools us ON s.id = us.school_id AND us.membership_role = 'COORDINATOR' AND us.active = true
     LEFT JOIN users u ON us.user_id = u.id AND u.active = true
-    WHERE s.deleted_at IS NULL AND s.active = true
+    WHERE s.deleted_at IS NULL AND ($1::boolean OR s.active = true)
     GROUP BY s.id, p.active, p.generated_at, p.revoked_at, p.token_value
     ORDER BY s.name
-  `);
+  `, [includeInactive]);
   res.json({ items: result.rows });
 }));
 const publicLinkActiveSchema = z.object({ active: z.boolean() });
@@ -138,7 +177,7 @@ adminRouter.post('/schools', asyncHandler(async (req, res) => {
 adminRouter.patch('/schools/:id', asyncHandler(async (req, res) => {
   const input = schoolSchema.partial().parse(req.body);
   const result = await query('UPDATE schools SET name=COALESCE($1,name), code=COALESCE($2,code), bot_code=COALESCE($3,bot_code), start_date=COALESCE($4,start_date), end_date=COALESCE($5,end_date), active=COALESCE($6,active) WHERE id=$7 AND deleted_at IS NULL RETURNING *', [input.name ?? null,input.code ?? null,input.botCode ?? null,input.startDate ?? null,input.endDate ?? null,input.active ?? null,String(req.params.id)]);
-  if (!result.rowCount) throw new AppError(404, 'SCHOOL_NOT_FOUND', 'Colegio no encontrado'); res.json(result.rows[0]);
+  if (!result.rowCount) throw new AppError(404, 'SCHOOL_NOT_FOUND', 'Colegio no encontrado'); if (input.active !== undefined) { await query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [req.user!.id, input.active ? 'SCHOOL_REACTIVATED' : 'SCHOOL_DEACTIVATED', 'school', String(req.params.id), JSON.stringify({ active: input.active })]); } res.json(result.rows[0]);
 }));
 adminRouter.delete('/schools/:id', asyncHandler(async (req, res) => { await query('UPDATE schools SET deleted_at = now(), active = false WHERE id = $1', [String(req.params.id)]); res.status(204).end(); }));
 
@@ -154,9 +193,9 @@ adminRouter.put('/schools/:id/coordinators', asyncHandler(async (req, res) => {
 }));
 
 for (const [route, table, hasSort] of [['activities', 'activities', false], ['shifts', 'shifts', true]] as const) {
-  adminRouter.get(`/${route}`, asyncHandler(async (_req, res) => { const result = await query(`SELECT * FROM ${table} WHERE active = true ORDER BY ${hasSort ? 'sort_order, ' : ''}name`); res.json({ items: result.rows }); }));
+  adminRouter.get(`/${route}`, asyncHandler(async (req, res) => { const includeInactive = String(req.query.includeInactive ?? '') === 'true'; const result = await query(`SELECT * FROM ${table} WHERE ($1::boolean OR active = true) ORDER BY ${hasSort ? 'sort_order, ' : ''}name`, [includeInactive]); res.json({ items: result.rows }); }));
   adminRouter.post(`/${route}`, asyncHandler(async (req, res) => { const input = catalogSchema.parse(req.body); const result = await query(`INSERT INTO ${table} (name, bot_code, active${hasSort ? ', sort_order' : ''}) VALUES ($1,$2,$3${hasSort ? ',$4' : ''}) RETURNING *`, hasSort ? [input.name,input.botCode,input.active ?? true,input.sortOrder ?? 0] : [input.name,input.botCode,input.active ?? true]); res.status(201).json(result.rows[0]); }));
-  adminRouter.patch(`/${route}/:id`, asyncHandler(async (req, res) => { const input = catalogSchema.partial().parse(req.body); const result = await query(`UPDATE ${table} SET name=COALESCE($1,name), bot_code=COALESCE($2,bot_code), active=COALESCE($3,active)${hasSort ? ', sort_order=COALESCE($4,sort_order)' : ''} WHERE id=$${hasSort ? 5 : 4} RETURNING *`, hasSort ? [input.name ?? null,input.botCode ?? null,input.active ?? null,input.sortOrder ?? null,req.params.id] : [input.name ?? null,input.botCode ?? null,input.active ?? null,String(req.params.id)]); if (!result.rowCount) throw new AppError(404, 'CATALOG_NOT_FOUND', 'Registro no encontrado'); res.json(result.rows[0]); }));
+  adminRouter.patch(`/${route}/:id`, asyncHandler(async (req, res) => { const input = catalogSchema.partial().parse(req.body); const result = await query(`UPDATE ${table} SET name=COALESCE($1,name), bot_code=COALESCE($2,bot_code), active=COALESCE($3,active)${hasSort ? ', sort_order=COALESCE($4,sort_order)' : ''} WHERE id=$${hasSort ? 5 : 4} RETURNING *`, hasSort ? [input.name ?? null,input.botCode ?? null,input.active ?? null,input.sortOrder ?? null,req.params.id] : [input.name ?? null,input.botCode ?? null,input.active ?? null,String(req.params.id)]); if (!result.rowCount) throw new AppError(404, 'CATALOG_NOT_FOUND', 'Registro no encontrado'); if (input.active !== undefined) await query('INSERT INTO audit_log (actor_id,action,entity_type,entity_id,metadata) VALUES ($1,$2,$3,$4,$5)', [req.user!.id, route === 'activities' ? (input.active ? 'ACTIVITY_REACTIVATED' : 'ACTIVITY_DEACTIVATED') : (input.active ? 'SHIFT_REACTIVATED' : 'SHIFT_DEACTIVATED'), route === 'activities' ? 'activity' : 'shift', String(req.params.id), JSON.stringify({ active: input.active })]); res.json(result.rows[0]); }));
   adminRouter.delete(`/${route}/:id`, asyncHandler(async (req, res) => { await query(`UPDATE ${table} SET active=false WHERE id=$1`, [String(req.params.id)]); res.status(204).end(); }));
 }
 
@@ -280,7 +319,8 @@ async function departureExists(id: string) {
   if (!result.rowCount) throw new AppError(404, 'DEPARTURE_NOT_FOUND', 'Salida no encontrada');
 }
 
-adminRouter.get('/departures', asyncHandler(async (_req, res) => {
+adminRouter.get('/departures', asyncHandler(async (req, res) => {
+  const includeInactive = String(req.query.includeInactive ?? '') === 'true';
   const result = await query(`
     SELECT d.id,d.type,d.name,d.destination,d.event_date::text,d.active,d.archived_at,d.created_at,d.public_code,d.public_access_active,
       COUNT(DISTINCT l.id)::int AS lot_count,
@@ -294,10 +334,10 @@ adminRouter.get('/departures', asyncHandler(async (_req, res) => {
     LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id
     LEFT JOIN users u ON u.id=dc.user_id AND u.active
     LEFT JOIN lots l ON l.departure_id=d.id
-    WHERE d.active = true
+    WHERE ($1::boolean OR d.active = true)
     GROUP BY d.id
     ORDER BY d.event_date DESC,d.name
-  `);
+  `, [includeInactive]);
   res.json({ items: result.rows });
 }));
 adminRouter.post('/departures', asyncHandler(async (req,res) => {
@@ -308,16 +348,16 @@ adminRouter.post('/departures', asyncHandler(async (req,res) => {
 }));
 adminRouter.patch('/departures/:id', asyncHandler(async(req,res) => {
   const input=departureSchema.partial().parse(req.body); await departureExists(String(req.params.id));
-  const result=await query(`UPDATE departures SET type=COALESCE($1,type),name=COALESCE($2,name),destination=COALESCE($3,destination),event_date=COALESCE($4,event_date),active=COALESCE($5,active),public_access_active=COALESCE($6,public_access_active),public_code=COALESCE($7,public_code),archived_at=CASE WHEN COALESCE($5,active) THEN NULL WHEN active THEN now() ELSE archived_at END WHERE id=$8 RETURNING id,type,name,destination,event_date::text,active,archived_at,public_code,public_access_active`,[input.type??null,input.name??null,input.destination??null,input.eventDate??null,input.active??null,input.publicAccessActive??null,input.publicCode??null,String(req.params.id)]);  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,input.active===false?'DEPARTURE_ARCHIVED':'DEPARTURE_UPDATED','departure',String(req.params.id),JSON.stringify(input)]);
+  const result=await query(`UPDATE departures SET type=COALESCE($1,type),name=COALESCE($2,name),destination=COALESCE($3,destination),event_date=COALESCE($4,event_date),active=COALESCE($5,active),public_access_active=COALESCE($6,public_access_active),public_code=COALESCE($7,public_code),archived_at=CASE WHEN COALESCE($5,active) THEN NULL WHEN active THEN now() ELSE archived_at END WHERE id=$8 RETURNING id,type,name,destination,event_date::text,active,archived_at,public_code,public_access_active`,[input.type??null,input.name??null,input.destination??null,input.eventDate??null,input.active??null,input.publicAccessActive??null,input.publicCode??null,String(req.params.id)]);  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,input.active===false?'DEPARTURE_ARCHIVED':input.active===true?'DEPARTURE_REACTIVATED':'DEPARTURE_UPDATED','departure',String(req.params.id),JSON.stringify(input)]);
   res.json(result.rows[0]);
 }));
 adminRouter.put('/departures/:id/schools', asyncHandler(async(req,res) => {
-  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id));
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe');
   await transaction(async client=>{await client.query('DELETE FROM departure_schools WHERE departure_id=$1',[String(req.params.id)]);for(const schoolId of input.ids){const school=await client.query('SELECT 1 FROM schools WHERE id=$1 AND active AND deleted_at IS NULL',[schoolId]);if(!school.rowCount)throw new AppError(400,'INVALID_SCHOOL','Colegio invÃ¡lido');await client.query('INSERT INTO departure_schools(departure_id,school_id) VALUES($1,$2)',[req.params.id,schoolId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_SCHOOLS_UPDATED','departure',String(req.params.id),JSON.stringify({schoolIds:input.ids})]);res.status(204).end();
 }));
 adminRouter.put('/departures/:id/coordinators', asyncHandler(async(req,res) => {
-  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id));
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe');
   await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role='COORDINATOR' AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador invÃ¡lido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_COORDINATORS_UPDATED','departure',String(req.params.id),JSON.stringify({coordinatorIds:input.ids})]);res.status(204).end();
 }));

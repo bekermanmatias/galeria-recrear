@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import { LogOut, Settings, User, ChevronDown, Menu } from 'lucide-react';
 import { api, type SessionUser } from '../../lib/api';
 
@@ -172,3 +172,6 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
     </nav>
   );
 }
+
+
+

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Camera, CheckSquare, ChevronDown, Download, Image as ImageIcon, School, Search, Share2, SlidersHorizontal } from 'lucide-react';
 import { api, type Media, type School as ApiSchool } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
@@ -183,6 +183,9 @@ const coverCell: React.CSSProperties = { minWidth:0, minHeight:0, overflow:'hidd
 const mediaStyle: React.CSSProperties = { width: '100%', height: '100%', minWidth:0, minHeight:0, objectFit: 'cover', display: 'block' };
 const filterButton: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 12px', height: 38, border: 0, borderRadius: 8, background: '#F1F5F9', color: '#475569', fontSize: 13, fontWeight: 500, cursor: 'pointer', whiteSpace: 'nowrap', boxSizing: 'border-box' };
 const primaryButton: React.CSSProperties = { ...filterButton, background: '#1A4B77', color: '#fff', fontWeight: 600 };
+
+
+
 
 
 

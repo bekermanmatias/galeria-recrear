@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, LoaderCircle, Trash2, Upload, X } from 'lucide-react';
 import { api, type CatalogItem, type Departure } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';

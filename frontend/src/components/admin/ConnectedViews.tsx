@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
 import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -55,28 +55,126 @@ export function ModerationView() {
 
 type ResourceKind = 'activities' | 'shifts';
 export function CatalogView({ kind }: { kind: ResourceKind }) {
-  const [items, setItems] = useState<CatalogItem[]>([]); const [search, setSearch] = useState(''); const [editing, setEditing] = useState<CatalogItem | null>(null); const [open, setOpen] = useState(false); const [name, setName] = useState(''); const [code, setCode] = useState(''); const [error, setError] = useState('');
-  const label = kind === 'activities' ? 'Actividad' : 'Turno'; const load = () => adminRequest<{items: CatalogItem[]}>(`/${kind}`).then(data => setItems(data.items)); useEffect(() => { load().catch(reason => setError(reason.message)); }, [kind]);
-  const edit = (item?: CatalogItem) => { setEditing(item ?? null); setName(item?.name ?? ''); setCode(item?.bot_code ?? ''); setOpen(true); };
-  const save = async () => { try { await adminRequest(`/${kind}${editing ? `/${editing.id}` : ''}`, { method: editing ? 'PATCH' : 'POST', body: JSON.stringify({ name, botCode: code }) }); setOpen(false); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'No se pudo guardar.'); } };
-  const remove = async (id: string) => { if (!confirm(`¿Desactivar ${label.toLowerCase()}?`)) return; await adminRequest(`/${kind}/${id}`, { method: 'DELETE' }); await load(); };
-  return <div style={page}><PageHeader title={`${label}s`} subtitle={`Gestión del catálogo global de ${label.toLowerCase()}s.`} action={<button onClick={() => edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item => `${item.name} ${item.bot_code}`.toLowerCase().includes(search.toLowerCase())).map(item => <tr key={item.id} style={{ borderBottom: '1px solid #E4E4E7' }}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td>{item.active === false ? 'Inactivo' : 'Activo'}</Td><Actions onEdit={() => edit(item)} onDelete={() => remove(item.id)}/></tr>)}</DataTable>{open && <Modal title={editing ? `Editar ${label}` : `Nuevo ${label}`} onClose={() => setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
+  const [items,setItems]=useState<CatalogItem[]>([]); const [search,setSearch]=useState(''); const [editing,setEditing]=useState<CatalogItem|null>(null); const [open,setOpen]=useState(false); const [name,setName]=useState(''); const [code,setCode]=useState(''); const [error,setError]=useState('');
+  const label=kind==='activities'?'Actividad':'Turno'; const load=()=>adminRequest<{items:CatalogItem[]}>('/'+kind+'?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudo cargar el catálogo.'));},[kind]);
+  const edit=(item?:CatalogItem)=>{setEditing(item??null);setName(item?.name??'');setCode(item?.bot_code??'');setOpen(true);};
+  const save=async()=>{try{await adminRequest('/'+kind+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({name,botCode:code})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
+  const updateStatus=async(item:CatalogItem,active:boolean)=>{if(!active&&!confirm('?Inactivar esta '+label.toLowerCase()+'? No aparecer? en nuevas cargas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/'+kind+'/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
+  return <div style={page}><PageHeader title={label+'s'} subtitle={'Gestión del catálogo global de '+label.toLowerCase()+'s.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><Actions onEdit={()=>edit(item)}/></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
 }
-
+export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const close = (event: MouseEvent) => { if (ref.current && !ref.current.contains(event.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+  const choose = (next: boolean) => { setOpen(false); if (next !== active) onChange(next); };
+  return <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+    <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="listbox" aria-expanded={open} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'space-between', gap: 18, minWidth: 105, padding: '6px 8px 6px 10px', border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', color: '#334155', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+      {active ? activeLabel : inactiveLabel}<ChevronDown size={14} color="#64748B" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }} />
+    </button>
+    {open && <div role="listbox" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '100%', zIndex: 30, padding: 4, border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.12)' }}>
+      {[true, false].map(value => <button key={String(value)} type="button" role="option" aria-selected={active === value} onClick={() => choose(value)} style={{ display: 'block', width: '100%', padding: '7px 9px', border: 0, borderRadius: 4, background: active === value ? '#F8FAFC' : '#fff', color: '#334155', textAlign: 'left', font: 'inherit', fontSize: 12, cursor: 'pointer' }}>{value ? activeLabel : inactiveLabel}</button>)}
+    </div>}
+  </div>;
+}
 export function SchoolsView() {
   const [items,setItems]=useState<School[]>([]); const [search,setSearch]=useState(''); const [editing,setEditing]=useState<School|null>(null); const [open,setOpen]=useState(false); const [form,setForm]=useState({name:'',code:'',botCode:'',startDate:'',endDate:''}); const [error,setError]=useState('');
-  const load=()=>adminRequest<{items:School[]}>('/schools').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason.message));},[]); const edit=(item?:School)=>{setEditing(item??null);setForm({name:item?.name??'',code:item?.code??'',botCode:item?.bot_code??'',startDate:item?.start_date??'',endDate:item?.end_date??''});setOpen(true);};
-  const save=async()=>{try{await adminRequest(`/schools${editing?`/${editing.id}`:''}`,{method:editing?'PATCH':'POST',body:JSON.stringify({...form,startDate:form.startDate||null,endDate:form.endDate||null})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}}; const remove=async(id:string)=>{if(!confirm('¿Eliminar este colegio?'))return;await adminRequest(`/schools/${id}`,{method:'DELETE'});await load();};
-  return <div style={page}><PageHeader title="Colegios" subtitle="Gestión de colegios y códigos de integración." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Código bot','Rango de fechas','Acciones']}>{items.filter(item=>`${item.name} ${item.code}`.toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.code}</Td><Td>{item.name}</Td><Td>{item.bot_code}</Td><Td>{item.start_date||'—'} a {item.end_date||'—'}</Td><Actions onEdit={()=>edit(item)} onDelete={()=>remove(item.id)}/></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}</div>;
+  const load=()=>adminRequest<{items:School[]}>('/schools?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los colegios.'));},[]);
+  const edit=(item?:School)=>{setEditing(item??null);setForm({name:item?.name??'',code:item?.code??'',botCode:item?.bot_code??'',startDate:item?.start_date??'',endDate:item?.end_date??''});setOpen(true);};
+  const save=async()=>{try{await adminRequest('/schools'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({...form,startDate:form.startDate||null,endDate:form.endDate||null})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
+  const updateStatus=async(item:School,active:boolean)=>{if(!active&&!confirm('?Inactivar este colegio? No aparecer? al configurar nuevas salidas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/schools/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
+  return <div style={page}><PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Código bot','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.code}</Td><Td>{item.name}</Td><Td>{item.bot_code}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/></Td><Actions onEdit={()=>edit(item)}/></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}</div>;
 }
-
 export function UsersView() {
-  const [items,setItems]=useState<AdminUser[]>([]); const [search,setSearch]=useState(''); const [editing,setEditing]=useState<AdminUser|null>(null); const [open,setOpen]=useState(false); const [form,setForm]=useState({name:'',email:'',password:'',role:'PARENT'}); const [error,setError]=useState('');
-  const load=()=>adminRequest<{items:AdminUser[]}>(`/users?q=${encodeURIComponent(search)}`).then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason.message));},[]); const edit=(item?:AdminUser)=>{setEditing(item??null);setForm({name:item?.name??'',email:item?.email??'',password:'',role:item?.role??'PARENT'});setOpen(true);};
-  const save=async()=>{try{const body:any={name:form.name,email:form.email,role:form.role};if(form.password)body.password=form.password;if(!editing&&!form.password)throw new Error('La contraseña inicial es obligatoria.');await adminRequest(`/users${editing?`/${editing.id}`:''}`,{method:editing?'PATCH':'POST',body:JSON.stringify(body)});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}}; const remove=async(id:string)=>{if(!confirm('¿Desactivar este usuario?'))return;await adminRequest(`/users/${id}`,{method:'DELETE'});await load();};
-  return <div style={page}><PageHeader title="Usuarios" subtitle="Gestión de accesos, roles y contraseñas iniciales." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Usuario</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Nombre','Email','Rol','Estado','Acciones']}>{items.filter(item=>`${item.name} ${item.email}`.toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.name}</Td><Td>{item.email}</Td><Td>{item.role==='ADMIN'?'Administrador':item.role==='COORDINATOR'?'Coordinador':'Familia'}</Td><Td>{item.active?'Activo':'Inactivo'}</Td><Actions onEdit={()=>edit(item)} onDelete={()=>remove(item.id)}/></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Usuario':'Nuevo Usuario'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre completo" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Email" type="email" value={form.email} onChange={value=>setForm({...form,email:value})}/><Field label={editing?'Nueva contraseña (opcional)':'Contraseña inicial'} type="password" value={form.password} onChange={value=>setForm({...form,password:value})}/><label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>Rol<select value={form.role} onChange={event=>setForm({...form,role:event.target.value})} style={input}><option value="PARENT">Familia</option><option value="COORDINATOR">Coordinador</option><option value="ADMIN">Administrador</option></select></label></Modal>}</div>;
-}
+  const [items,setItems]=useState<AdminUser[]>([]);
+  const [departures,setDepartures]=useState<Departure[]>([]);
+  const [search,setSearch]=useState('');
+  const [departureSearch,setDepartureSearch]=useState('');
+  const [editing,setEditing]=useState<AdminUser|null>(null);
+  const [open,setOpen]=useState(false);
+  const [form,setForm]=useState({name:'',email:'',password:'',role:'COORDINATOR',departureIds:[] as string[]});
+  const [error,setError]=useState('');
 
+  const load=async()=>{
+    const [users,departureData]=await Promise.all([
+      adminRequest<{items:AdminUser[]}>('/users?includeInactive=true&q=' + encodeURIComponent(search)),
+      adminRequest<{items:Departure[]}>('/departures')
+    ]);
+    setItems(users.items);
+    setDepartures(departureData.items.filter(item=>item.active));
+  };
+  useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los usuarios.'));},[]);
+  const edit=(item?:AdminUser)=>{
+    setEditing(item??null);
+    setDepartureSearch('');
+    setForm({name:item?.name??'',email:item?.email??'',password:'',role:item?.role??'COORDINATOR',departureIds:item?.departure_ids??[]});
+    setOpen(true);
+  };
+  const toggleDeparture=(id:string)=>{
+    setForm(current=>({...current,departureIds:current.departureIds.includes(id)?current.departureIds.filter(item=>item!==id):[...current.departureIds,id]}));
+  };
+  const visibleDepartures=departures.filter(item=>[item.name,item.destination,item.public_code??''].join(' ').toLowerCase().includes(departureSearch.toLowerCase()));
+  const toggleAll=()=>{
+    const ids=visibleDepartures.map(item=>item.id);
+    const all=ids.length>0&&ids.every(id=>form.departureIds.includes(id));
+    setForm(current=>({...current,departureIds:all?current.departureIds.filter(id=>!ids.includes(id)):[...new Set([...current.departureIds,...ids])]}));
+  };
+  const save=async()=>{
+    try{
+      const body:any={name:form.name,email:form.email,role:form.role,departureIds:form.role==='COORDINATOR'?form.departureIds:[]};
+      if(form.password)body.password=form.password;
+      if(!editing&&!form.password)throw new Error('La contraseña inicial es obligatoria.');
+      await adminRequest('/users' + (editing ? '/' + editing.id : ''),{method:editing?'PATCH':'POST',body:JSON.stringify(body)});
+      setOpen(false); await load();
+    }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}
+  };
+  const remove=async(id:string)=>{if(!confirm('¿Desactivar este usuario?'))return;await adminRequest('/users/' + id,{method:'DELETE'});await load();};
+  const updateStatus=async(item:AdminUser,nextActive:boolean)=>{
+    if(!nextActive&&!confirm('¿Desactivar este usuario? Se revocarán sus sesiones y dejará de acceder a sus salidas.'))return;
+    const previous=item.active;
+    setItems(current=>current.map(user=>user.id===item.id?{...user,active:nextActive}:user));
+    try{await adminRequest('/users/'+item.id,{method:'PATCH',body:JSON.stringify({active:nextActive})});}
+    catch(reason){setItems(current=>current.map(user=>user.id===item.id?{...user,active:previous}:user));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}
+  };
+  const filteredItems=items.filter(item=>[item.name,item.email].join(' ').toLowerCase().includes(search.toLowerCase()));
+  return <div style={page}>
+    <PageHeader title="Usuarios" subtitle="Gestión de accesos, roles y salidas asignadas." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Usuario</button>} search={search} onSearch={setSearch}/>
+    <ErrorMessage value={error}/>
+    <DataTable headers={['Nombre','Email','Rol','Salidas','Estado','Acciones']}>
+      {filteredItems.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}>
+        <Td strong>{item.name}</Td><Td>{item.email}</Td>
+        <Td>{item.role==='ADMIN'?'Administrador':item.role==='COORDINATOR'?'Coordinador':'Familia'}</Td>
+        <Td>{item.role==='COORDINATOR'?(item.departure_names?.length?item.departure_names.join(', '):'Sin salidas'):'—'}</Td>
+        <Td><AdminStatusSelect active={item.active} onChange={next=>void updateStatus(item,next)}/></Td><Actions onEdit={()=>edit(item)} onDelete={()=>remove(item.id)}/>
+      </tr>)}
+    </DataTable>
+    {open&&<Modal title={editing?'Editar Usuario':'Nuevo Usuario'} onClose={()=>setOpen(false)} onSave={save}>
+      <Field label="Nombre completo" value={form.name} onChange={value=>setForm({...form,name:value})}/>
+      <Field label="Email" type="email" value={form.email} onChange={value=>setForm({...form,email:value})}/>
+      <Field label={editing?'Nueva contraseña (opcional)':'Contraseña inicial'} type="password" value={form.password} onChange={value=>setForm({...form,password:value})}/>
+      <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>Rol
+        <select value={form.role} onChange={event=>setForm({...form,role:event.target.value,departureIds:event.target.value==='COORDINATOR'?form.departureIds:[]})} style={input}>
+          <option value="COORDINATOR">Coordinador</option><option value="ADMIN">Administrador</option>
+        </select>
+      </label>
+      {form.role==='COORDINATOR'&&<div style={{display:'grid',gap:8}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:8}}><label style={{fontSize:13,fontWeight:600}}>Salidas asignadas</label><button type="button" onClick={toggleAll} style={{border:0,background:'none',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'}}>Marcar/desmarcar todas</button></div>
+        <div style={{position:'relative'}}><Search size={14} style={{position:'absolute',left:10,top:10,color:'#94A3B8'}}/><input value={departureSearch} onChange={event=>setDepartureSearch(event.target.value)} placeholder="Buscar salida..." style={{...input,width:'100%',paddingLeft:32,boxSizing:'border-box'}}/></div>
+        <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #E4E4E7',borderRadius:6,padding:6,display:'grid',gap:2}}>
+          {visibleDepartures.map(item=><label key={item.id} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'8px 7px',borderRadius:5,cursor:'pointer',fontSize:13,fontWeight:400}}>
+            <input type="checkbox" checked={form.departureIds.includes(item.id)} onChange={()=>toggleDeparture(item.id)}/>
+            <span><strong style={{color:'#1A4B77'}}>{item.type==='MICRO'?'Micro':'Aéreo'} · {item.name}</strong><small style={{display:'block',color:'#64748B',marginTop:2}}>{item.destination} · {item.event_date}</small></span>
+          </label>)}
+          {!visibleDepartures.length&&<span style={{padding:10,color:'#94A3B8',fontSize:12}}>No hay salidas activas.</span>}
+        </div>
+        <span style={{fontSize:12,color:'#64748B'}}>{form.departureIds.length} salida(s) seleccionada(s)</span>
+      </div>}
+    </Modal>}
+  </div>;
+}
 const formatDate = (dateStr?: string) => {
   if (!dateStr) return '';
   const clean = dateStr.split('T')[0];
@@ -356,11 +454,15 @@ export function ManualUploadView() {
 export function ImportView(){const [kind,setKind]=useState('schools');const [file,setFile]=useState<File|null>(null);const [preview,setPreview]=useState<any>(null);const [message,setMessage]=useState('');const send=async(commit=false)=>{if(!file)return;const body=new FormData();body.append('file',file);const data=await adminRequest<any>(`/imports/${kind}/${commit?'commit':'preview'}`,{method:'POST',body});if(commit){setMessage(`${data.imported} registros importados.`);setPreview(null);}else setPreview(data);};return <div style={page}><h2 style={title}>Importar CSV</h2><p style={{...muted,marginBottom:24}}>Validá el archivo antes de confirmar; un CSV inválido no crea registros parciales.</p><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><select value={kind} onChange={event=>setKind(event.target.value)} style={input}><option value="schools">Colegios</option><option value="users">Usuarios</option><option value="memberships">Asignaciones</option></select><input type="file" accept=".csv,text/csv" onChange={event=>setFile(event.target.files?.[0]??null)} style={input}/><button onClick={()=>send(false)} style={primary}>Validar</button></div>{preview&&<div style={{marginTop:24,padding:18,border:'1px solid #E2E8F0',borderRadius:8}}><strong>{preview.valid?'Archivo válido':'Archivo inválido'}</strong><p>{preview.rows?.length??0} filas · {preview.errors?.length??0} errores</p>{preview.errors?.map((item:any,index:number)=><div key={index} style={{color:'#B91C1C',fontSize:13}}>Fila {item.row}: {item.field} — {item.message}</div>)}{preview.valid&&<button onClick={()=>send(true)} style={{...primary,marginTop:12}}><Check size={16}/> Confirmar importación</button>}</div>}{message&&<p style={{color:'#15803D'}}>{message}</p>}</div>}
 
 function PageHeader({title:heading,subtitle,action,search,onSearch}:{title:string;subtitle:string;action?:React.ReactNode;search?:string;onSearch?:(value:string)=>void}){return <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,marginBottom:24}}><div><h2 style={title}>{heading}</h2><p style={muted}>{subtitle}</p></div><div style={{display:'flex',alignItems:'center',gap:12}}>{onSearch&&<div style={{position:'relative'}}><Search size={15} style={{position:'absolute',left:11,top:11,color:'#94A3B8'}}/><input value={search} onChange={event=>onSearch(event.target.value)} placeholder="Buscar..." style={{...input,paddingLeft:34,width:220}}/></div>}{action}</div></div>}
-function DataTable({headers,children}:{headers:string[];children:React.ReactNode}){return <table style={{width:'100%',borderCollapse:'collapse',textAlign:'left'}}><thead><tr style={{borderBottom:'1px solid #E4E4E7'}}>{headers.map(header=><th key={header} style={{padding:'12px 20px',fontSize:12,color:'#71717A',textTransform:'uppercase'}}>{header}</th>)}</tr></thead><tbody>{children}</tbody></table>}
+function DataTable({headers,children}:{headers:string[];children:React.ReactNode}){return <table style={{width:'100%',borderCollapse:'collapse',textAlign:'left',fontFamily:'inherit'}}><thead><tr style={{borderBottom:'1px solid #E4E4E7'}}>{headers.map((header,index)=><th key={header} style={{padding:'12px 20px',fontSize:12,fontWeight:600,letterSpacing:'.02em',color:'#64748B',textTransform:'uppercase',textAlign:index===headers.length-1?'right':'left',width:index===headers.length-1?128:undefined}}>{header}</th>)}</tr></thead><tbody>{children}</tbody></table>}
 function Td({children,strong=false}:{children:React.ReactNode;strong?:boolean}){return <td style={{padding:'16px 20px',fontSize:13,color:'#334155',fontWeight:strong?600:400}}>{children}</td>}
-function Actions({onEdit,onDelete}:{onEdit:()=>void;onDelete:()=>void}){return <td style={{padding:'16px 20px',textAlign:'right'}}><button onClick={onEdit} style={{border:0,background:'none',cursor:'pointer',color:'#64748B',marginRight:12}}><Edit2 size={16}/></button><button onClick={onDelete} style={{border:0,background:'none',cursor:'pointer',color:'#EF4444'}}><Trash2 size={16}/></button></td>}
+function Actions({onEdit,onDelete}:{onEdit:()=>void;onDelete?:()=>void}){return <td style={{padding:'12px 20px',textAlign:'right',width:128,boxSizing:'border-box'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:10}}><button onClick={onEdit} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>{onDelete&&<button onClick={onDelete} aria-label="Eliminar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#EF4444'}}><Trash2 size={16}/></button>}</div></td>}
 function Field({label,value,onChange,type='text'}:{label:string;value:string;onChange:(value:string)=>void;type?:string}){return <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>{label}<input type={type} value={value} onChange={event=>onChange(event.target.value)} style={input}/></label>}
 function Modal({title:heading,onClose,onSave,children}:{title:string;onClose:()=>void;onSave:()=>void;children:React.ReactNode}){return <div style={{position:'fixed',inset:0,zIndex:100,background:'rgba(15,23,42,.45)',display:'grid',placeItems:'center',padding:16}}><div style={{width:'min(100%,480px)',background:'#fff',borderRadius:12,padding:28,boxShadow:'0 20px 50px rgba(15,23,42,.2)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22}}><h3 style={{margin:0,color:'#1A4B77'}}>{heading}</h3><button onClick={onClose} style={{border:0,background:'none',cursor:'pointer'}}><X size={20}/></button></div><div style={{display:'grid',gap:16}}>{children}</div><div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:24}}><button onClick={onClose} style={{...primary,background:'#F1F5F9',color:'#475569'}}>Cancelar</button><button onClick={onSave} style={primary}>Guardar</button></div></div></div>}
+
+
+
+
 
 
 

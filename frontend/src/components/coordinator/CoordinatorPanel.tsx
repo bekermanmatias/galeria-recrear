@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+﻿import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Check, Trash2, Edit2, PenLine, Upload as UploadIcon, Image } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -485,3 +485,4 @@ function DateField({ label, value, onChange }: { label: string; value: string; o
     </div>
   );
 }
+

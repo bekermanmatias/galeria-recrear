@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Image as ImageIcon, Download, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
@@ -164,3 +164,5 @@ export default function AdminGaleria() {
     </div>
   );
 }
+
+

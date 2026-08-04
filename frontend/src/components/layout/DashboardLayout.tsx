@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { ChevronRight, ChevronLeft, X, LogOut, Settings } from 'lucide-react';
 import Navbar from './Navbar';
 import { api } from '../../lib/api';
@@ -147,3 +147,4 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
     </div>
   );
 }
+

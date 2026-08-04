@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+﻿import { useEffect, useRef } from 'react';
 import { AlertTriangle, CheckCircle2, X } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -103,3 +103,4 @@ export default function ConfirmDialog({
     </div>
   );
 }
+

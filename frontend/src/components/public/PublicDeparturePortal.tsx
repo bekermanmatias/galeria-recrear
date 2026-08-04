@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Bus, Camera, CheckSquare, Download, Image as ImageIcon, LogIn, Plane, Search, Share2 } from 'lucide-react';
 import { publicDepartureApi, type LotSummary, type Media, type PublicDeparture } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';

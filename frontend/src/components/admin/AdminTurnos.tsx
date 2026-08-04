@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -143,6 +143,7 @@ export default function AdminTurnos() {
     </div>
   );
 }
+
 
 
 
