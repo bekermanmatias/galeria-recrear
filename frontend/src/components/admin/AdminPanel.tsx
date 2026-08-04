@@ -1,5 +1,5 @@
-﻿import { useEffect, useState } from 'react';
-import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Activity } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Activity, Shield } from 'lucide-react';
 import { api } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
@@ -9,8 +9,9 @@ import AdminEstadoCargas from './AdminEstadoCargas';
 import AdminSalidas from './AdminSalidas';
 import { GalleryView } from './ConnectedViews';
 import AdminPasajeros from './AdminPasajeros';
+import RolesView from './RolesView';
 
-type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'pasajeros' | 'carga';
+type TabId = 'moderacion' | 'galeria' | 'salidas' | 'colegios' | 'actividades' | 'usuarios' | 'roles' | 'pasajeros' | 'carga';
 const TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
   { id: 'galeria', label: 'Galería', icon: Image },
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'colegios', label: 'Colegios', icon: School },
   { id: 'actividades', label: 'Actividades', icon: List },
   { id: 'usuarios', label: 'Usuarios', icon: Users },
+  { id: 'roles', label: 'Roles', icon: Shield },
   { id: 'carga', label: 'Carga Manual', icon: UploadIcon },
   { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound },
 ] as const;
@@ -34,6 +36,7 @@ export default function AdminPanel() {
     {activeTab === 'colegios' && <SchoolsView />}
     {activeTab === 'actividades' && <CatalogView kind="activities" />}
     {activeTab === 'usuarios' && <UsersView />}
+    {activeTab === 'roles' && <RolesView />}
     {activeTab === 'carga' && <AdminCargaManual />}
     {activeTab === 'pasajeros' && <AdminPasajeros />}
   </DashboardLayout>;

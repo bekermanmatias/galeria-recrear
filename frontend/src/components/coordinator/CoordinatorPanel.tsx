@@ -1,10 +1,11 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Check, Trash2, Edit2, PenLine, Upload as UploadIcon, Image } from 'lucide-react';
+import { Upload, X, Check, Trash2, Edit2, PenLine, Upload as UploadIcon, Image, ContactRound } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
 import Lightbox from '../ui/Lightbox';
 import { api, type CatalogItem, type LotSummary, type Departure } from '../../lib/api';
 import { uploadInQueue } from '../../lib/uploadQueue';
+import DeparturePassengers from '../passengers/DeparturePassengers';
 
 interface UploadFile {
   id: string;
@@ -17,6 +18,7 @@ interface UploadFile {
 const TABS = [
   { id: 'carga', label: 'Subir Material', icon: UploadIcon },
   { id: 'galeria', label: 'Ver Galería', icon: Image },
+  { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound },
 ] as const;
 
 const CUSTOM_ACTIVITY = '__personalizada__';
@@ -53,6 +55,7 @@ export default function CoordinatorPanel() {
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [departures, setDepartures] = useState<Departure[]>([]);
+  const [passengerDepartureId, setPassengerDepartureId] = useState('');
   const [activities, setActivities] = useState<CatalogItem[]>([]);
   const [lots, setLots] = useState<LotSummary[]>([]);
   const [error, setError] = useState('');
@@ -354,6 +357,7 @@ export default function CoordinatorPanel() {
       </div>
       )}
 
+      {activeTab === 'pasajeros' && <div style={{flex:1,display:'flex',flexDirection:'column',minHeight:0}}>{!passengerDepartureId?<div style={{padding:32,maxWidth:620}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Pasajeros por salida</h2><p style={{margin:'0 0 20px',fontSize:14,color:'#64748B'}}>Elegí una salida asignada para consultar su lista de viaje.</p><select value={passengerDepartureId} onChange={event=>setPassengerDepartureId(event.target.value)} style={{width:'100%',height:42,padding:'0 10px',border:'1px solid #DCE3EB',borderRadius:7,font:'inherit'}}><option value="">Seleccionar salida…</option>{departures.map(item=><option key={item.id} value={item.id}>{departureOption(item)}</option>)}</select></div>:<DeparturePassengers departureId={passengerDepartureId} readOnly onBack={()=>setPassengerDepartureId('')}/>}</div>}
       {activeTab === 'galeria' && (
         <div style={{ flex: 1, overflowY: 'auto', padding: '32px' }}>
           <div style={{ maxWidth: '1100px', margin: '0 auto' }}>

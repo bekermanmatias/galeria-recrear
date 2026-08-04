@@ -1,7 +1,7 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import { pinoHttp } from 'pino-http';
-import { authenticate, requireRoles } from './auth.js';
+import { authenticate, requireAdmin } from './auth.js';
 import { config } from './config.js';
 import { errorHandler, notFound } from './errors.js';
 import { authRouter } from './routes/auth.js';
@@ -10,6 +10,8 @@ import { lotsRouter } from './routes/lots.js';
 import { mediaRouter } from './routes/media.js';
 import { reopenRouter } from './routes/reopen.js';
 import { publicRouter } from './routes/public.js';
+import { departurePassengersRouter } from './routes/departure-passengers.js';
+import { rolesRouter } from './routes/roles.js';
 import { query } from './db.js';
 
 export function createApp() {
@@ -29,8 +31,10 @@ export function createApp() {
   app.get('/api/health', async (_req, res, next) => { try { await query('SELECT 1'); res.json({ status: 'ok' }); } catch (error) { next(error); } });
   app.use('/api/v1/auth', (req, res, next) => req.path === '/me' || req.path === '/change-password' ? authenticate(req, res, next) : next(), authRouter);
   app.use('/api/v1/public', publicRouter);
-  app.use('/api/v1/admin', authenticate, requireRoles('ADMIN'), adminRouter);
+  app.use('/api/v1/admin', authenticate, requireAdmin, adminRouter);
+  app.use('/api/v1/admin/roles', authenticate, requireAdmin, rolesRouter);
   app.use('/api/v1/lots', authenticate, reopenRouter, lotsRouter);
+  app.use('/api/v1/departures', authenticate, departurePassengersRouter);
   app.use('/api/v1/media', authenticate, mediaRouter);
   app.use(notFound);
   app.use(errorHandler);
