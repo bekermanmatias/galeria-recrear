@@ -33,11 +33,11 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
   try {
     const bearer = req.header('authorization')?.replace(/^Bearer\s+/i, '');
     const token = req.cookies?.[cookieName] || bearer;
-    if (!token) throw new AppError(401, 'UNAUTHENTICATED', 'Iniciá sesión para continuar');
+    if (!token) throw new AppError(401, 'UNAUTHENTICATED', 'Inici? sesión para continuar');
     const payload = jwt.verify(token, config.SESSION_SECRET) as jwt.JwtPayload;
     if (!payload.sub || !payload.sid) throw new AppError(401, 'INVALID_SESSION', 'Sesión inválida');
     const result = await query<CurrentUser>('SELECT u.id, u.name, u.email, u.role FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = $1 AND s.token_hash = $2 AND s.revoked_at IS NULL AND s.expires_at > now() AND u.active', [payload.sid, hash(token)]);
-    if (!result.rowCount) throw new AppError(401, 'SESSION_EXPIRED', 'La sesión venció o fue revocada');
+    if (!result.rowCount) throw new AppError(401, 'SESSION_EXPIRED', 'La sesión venci? o fue revocada');
     req.user = result.rows[0];
     next();
   } catch (error) {
@@ -47,12 +47,21 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
 
 export function requireRoles(...roles: Role[]) {
   return (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.user) return next(new AppError(401, 'UNAUTHENTICATED', 'Iniciá sesión para continuar'));
+    if (!req.user) return next(new AppError(401, 'UNAUTHENTICATED', 'Inici? sesión para continuar'));
     if (!roles.includes(req.user.role)) return next(new AppError(403, 'FORBIDDEN_ROLE', 'No tenés permisos para esta acción'));
     next();
   };
 }
 
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+export type PermissionModule = 'departures' | 'lots' | 'moderation' | 'gallery' | 'activities' | 'schools' | 'passengers' | 'users' | 'imports';
+const defaultPermissions: Record<PermissionModule, Record<PermissionAction, boolean>> = {
+  departures:{view:true,create:false,edit:false,delete:false}, lots:{view:true,create:true,edit:true,delete:false}, moderation:{view:false,create:false,edit:false,delete:false}, gallery:{view:true,create:false,edit:false,delete:false}, activities:{view:false,create:false,edit:false,delete:false}, schools:{view:false,create:false,edit:false,delete:false}, passengers:{view:false,create:false,edit:false,delete:false}, users:{view:false,create:false,edit:false,delete:false}, imports:{view:false,create:false,edit:false,delete:false}
+};
+export function getDefaultPermissions(role: Role) { if (role === 'ADMIN') return Object.fromEntries(Object.keys(defaultPermissions).map(module => [module,{view:true,create:true,edit:true,delete:true}])) as Record<PermissionModule,Record<PermissionAction,boolean>>; return Object.fromEntries(Object.keys(defaultPermissions).map(module => [module,{...defaultPermissions[module as PermissionModule]}])) as Record<PermissionModule,Record<PermissionAction,boolean>>; }
+export async function hasPermission(user: CurrentUser, module: PermissionModule, action: PermissionAction) { if (user.role === 'ADMIN') return true; if (user.role === 'PARENT') return action === 'view' && (module === 'lots' || module === 'gallery'); const result = await query<{can_view:boolean;can_create:boolean;can_edit:boolean;can_delete:boolean}>('SELECT can_view,can_create,can_edit,can_delete FROM user_permissions WHERE user_id=$1 AND module=$2',[user.id,module]); const row=result.rows[0]; return row ? Boolean(row[`can_${action}` as keyof typeof row]) : getDefaultPermissions(user.role)[module][action]; }
+export function requirePermission(module: PermissionModule, action: PermissionAction) { return async (req: Request, _res: Response, next: NextFunction) => { try { if (!req.user) throw new AppError(401,'UNAUTHENTICATED','Iniciá sesión para continuar'); if (!(await hasPermission(req.user,module,action))) throw new AppError(403,'FORBIDDEN_PERMISSION','No tenés permisos para esta acción'); next(); } catch (error) { next(error); } }; }
+export { defaultPermissions };
 export async function assertSchoolAccess(user: CurrentUser, schoolId: string, allowed: Role[] = ['COORDINATOR', 'PARENT']) {
   if (user.role === 'ADMIN') return;
   if (!allowed.includes(user.role)) throw new AppError(403, 'FORBIDDEN_SCHOOL', 'No tenés acceso a este colegio');

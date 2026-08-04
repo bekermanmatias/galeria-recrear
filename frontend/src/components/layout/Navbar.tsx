@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { LogOut, Settings, User, ChevronDown, Menu } from 'lucide-react';
 import { api, type SessionUser } from '../../lib/api';
 
@@ -59,7 +59,7 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
         />
         <div className="hide-on-mobile" style={{ height: '40px', width: '2px', background: '#E2E8F0', borderRadius: '2px' }} />
         <span className="hide-on-mobile" style={{ fontSize: '22px', fontWeight: 800, color: '#1A4B77', letterSpacing: '-0.03em' }}>
-          Portal de Fotos
+          Portal
         </span>
       </div>
 

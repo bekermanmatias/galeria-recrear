@@ -1,11 +1,11 @@
-import crypto from 'node:crypto';
+﻿import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import multer from 'multer';
 import { Router } from 'express';
 import { z } from 'zod';
 import { fileTypeFromFile } from 'file-type';
-import { assertDepartureAccess, requireRoles } from '../auth.js';
+import { assertDepartureAccess, requireRoles, requirePermission } from '../auth.js';
 import { config, paths } from '../config.js';
 import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
@@ -40,7 +40,7 @@ async function editableVersion(lotId: string) {
   const result = await query<{ id: string; version_number: number; status: string }>('SELECT id,version_number,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1', [lotId]);
   const version = result.rows[0]; if (!version || !['DRAFT','UPLOADING'].includes(version.status)) throw new AppError(409, 'LOT_NOT_EDITABLE', 'El lote debe reabrirse antes de cargar más archivos'); return version;
 }
-async function assertDepartureActive(id: string) { const result=await query('SELECT 1 FROM departures WHERE id=$1 AND active', [id]); if(!result.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe'); }
+async function assertDepartureActive(id: string) { const result=await query('SELECT 1 FROM departures WHERE id=$1 AND active', [id]); if(!result.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida est? archivada o no existe'); }
 
 export const lotsRouter = Router();
 lotsRouter.get('/my-schools', asyncHandler(async (req, res) => {
@@ -50,17 +50,17 @@ lotsRouter.get('/my-schools', asyncHandler(async (req, res) => {
 lotsRouter.get('/my-departures', asyncHandler(async (req,res) => {
   const where=req.user!.role==='ADMIN'?'':'WHERE dc.user_id=$1';
   const values=req.user!.role==='ADMIN'?[]:[req.user!.id];
-  const result=await query(`SELECT d.id,d.type,d.name,d.destination,d.event_date::text,d.active,
+  const result=await query(`SELECT d.id,d.type,d.name,d.destination,d.event_date::text,d.start_date::text,d.end_date::text,d.active,
     COALESCE(array_agg(s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names
     FROM departures d LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id LEFT JOIN departure_schools ds ON ds.departure_id=d.id LEFT JOIN schools s ON s.id=ds.school_id
-    ${where} GROUP BY d.id ORDER BY d.active DESC,d.event_date DESC,d.name`,values);
+    ${where} GROUP BY d.id ORDER BY d.active DESC,d.start_date DESC,d.name`,values);
   res.json({items:result.rows});
 }));
 lotsRouter.get('/catalogs', asyncHandler(async (_req,res) => {
   const activities=await query('SELECT id,name,bot_code FROM activities WHERE active ORDER BY name');
   res.json({activities:activities.rows,shifts:[]});
 }));
-lotsRouter.get('/', asyncHandler(async (req, res) => {
+lotsRouter.get('/', requirePermission('lots','view'), asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE l.deleted_at IS NULL';
   if(req.user!.role==='COORDINATOR'){values.push(req.user!.id);where+=` AND l.created_by=$${values.length}`;}
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
@@ -81,20 +81,20 @@ lotsRouter.get('/', asyncHandler(async (req, res) => {
     ${where} GROUP BY l.id,l.activity_id,d.id,a.id,v.id,u.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
   res.json({items:result.rows,page,pageSize});
 }));
-lotsRouter.get('/:id', asyncHandler(async(req,res)=>{
+lotsRouter.get('/:id', requirePermission('lots','view'), asyncHandler(async(req,res)=>{
   const lot=await loadLot(param(req.params.id)); await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR','PARENT']);
   const versionId=req.user!.role==='PARENT'?lot.current_published_version_id:lot.latest_version_id; if(!versionId) throw new AppError(404,'LOT_NOT_PUBLISHED','No hay una versión publicada');
   const [version,media]=await Promise.all([query('SELECT * FROM lot_versions WHERE id=$1',[versionId]),query(`SELECT id,kind,status,original_name,COALESCE(delivery_mime_type,mime_type) mime_type,COALESCE(delivery_size_bytes,size_bytes) size_bytes,width,height,duration_seconds,sort_order,created_at,purge_after,watermark_status,watermark_error FROM media_assets WHERE lot_version_id=$1 AND status <> 'UPLOADING' AND ($2 <> 'PARENT' OR status='APPROVED') ORDER BY sort_order,created_at`,[versionId,req.user!.role])]);
   res.json({lot,version:version.rows[0],media:media.rows});
 }));
-lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
+lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','create'),asyncHandler(async(req,res)=>{
   const input=createSchema.parse(req.body); await assertDepartureAccess(req.user!,input.departureId,['COORDINATOR']); await assertDepartureActive(input.departureId);
   const response=await transaction(async client=>{const existing=await client.query<{id:string}>('SELECT id FROM lots WHERE departure_id=$1 AND (activity_id=$2 OR ($2 IS NULL AND activity_id IS NULL)) AND event_date=$3 AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 1 FOR UPDATE',[input.departureId,input.activityId??null,input.eventDate]);
     if(existing.rowCount){const version=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[existing.rows[0].id]);if(version.rows[0]&&['DRAFT','UPLOADING'].includes(version.rows[0].status)){if(input.albumName)await client.query('UPDATE lots SET title=$1,updated_at=now() WHERE id=$2',[input.albumName,existing.rows[0].id]);return{lotId:existing.rows[0].id,versionId:version.rows[0].id,existing:true};}throw new AppError(409,'LOT_PUBLISHED','El lote ya fue publicado; un administrador debe reabrirlo');}
     const lot=await client.query<{id:string}>('INSERT INTO lots(departure_id,activity_id,shift_id,event_date,created_by,title) VALUES($1,$2,NULL,$3,$4,$5) RETURNING id',[input.departureId,input.activityId??null,input.eventDate,req.user!.id,input.albumName??null]);const version=await client.query<{id:string}>('INSERT INTO lot_versions(lot_id,version_number,created_by) VALUES($1,1,$2) RETURNING id',[lot.rows[0].id,req.user!.id]);return{lotId:lot.rows[0].id,versionId:version.rows[0].id,existing:false};});
   res.status(response.existing?200:201).json(response);
 }));
-lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
+lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{
   const input=updateSchema.parse(req.body);const lot=await loadLot(param(req.params.id));
   if(req.user!.role==='COORDINATOR'){
     await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
@@ -118,7 +118,7 @@ lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(r
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_UPDATED','lot',lot.id,JSON.stringify(input)]);
   res.json({success:true});
 }));
-lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{
+lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','delete'),asyncHandler(async(req,res)=>{
   const lot=await loadLot(param(req.params.id));
   await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
   if(req.user!.role==='COORDINATOR'){
@@ -131,9 +131,9 @@ lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(
   });
   res.status(204).end();
 }));
-lotsRouter.get('/:id/processing',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{res.json({items:[]});}));
-lotsRouter.post('/:id/media/:mediaId/watermark/retry',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{res.status(204).end();}));
-lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),upload.single('file'),asyncHandler(async(req,res)=>{
+lotsRouter.get('/:id/processing',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','view'),asyncHandler(async(req,res)=>{res.json({items:[]});}));
+lotsRouter.post('/:id/media/:mediaId/watermark/retry',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{res.status(204).end();}));
+lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','create'),upload.single('file'),asyncHandler(async(req,res)=>{
   const file=req.file;
   if(!file)throw new AppError(400,'FILE_REQUIRED','Selecciona un archivo');
   let renderedPath = '';
@@ -165,6 +165,6 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),upload.single('
     if(renderedPath) await fs.rm(renderedPath,{force:true}).catch(()=>undefined);
   }
 }));
-lotsRouter.post('/:id/submit',requireRoles('ADMIN','COORDINATOR'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);if(lot.latest_status==='PENDING')return res.status(204).end();const version=await editableVersion(lot.id);const pending=await query(`SELECT count(*)::int total,COUNT(*) FILTER(WHERE status='READY')::int ready,COUNT(*) FILTER(WHERE status='ERROR')::int failed,COUNT(*) FILTER(WHERE status='UPLOADING')::int processing FROM media_assets WHERE lot_version_id=$1`,[version.id]);const state=pending.rows[0] as {total:number;ready:number;failed:number;processing:number};if(!state.total)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos');if(state.processing){await query(`UPDATE lot_versions SET submitted_at=now() WHERE id=$1`,[version.id]);return res.status(204).end();}if(state.failed)throw new AppError(409,'WATERMARK_FAILED','Hay archivos con error de procesamiento. Reintentalos antes de enviar a moderacion');if(!state.ready)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos listos');await query(`UPDATE lot_versions SET status='PENDING',submitted_at=now() WHERE id=$1`,[version.id]);res.status(204).end();}));
-lotsRouter.post('/:id/approve',requireRoles('ADMIN'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));const version=await query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);if(!version.rows[0]||version.rows[0].status!=='PENDING')throw new AppError(409,'LOT_NOT_PENDING','El lote no está pendiente de moderación');const ready=await query(`SELECT 1 FROM media_assets WHERE lot_version_id=$1 AND status='READY' LIMIT 1`,[version.rows[0].id]);await transaction(async client=>{if(ready.rowCount){await client.query(`UPDATE media_assets SET status='APPROVED',moderated_by=$1,moderated_at=now() WHERE lot_version_id=$2 AND status='READY'`,[req.user!.id,version.rows[0].id]);await client.query(`UPDATE lot_versions SET status='PUBLISHED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);await client.query('UPDATE lots SET current_published_version_id=$1 WHERE id=$2',[version.rows[0].id,lot.id]);}else await client.query(`UPDATE lot_versions SET status='REJECTED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);});res.status(204).end();}));
-lotsRouter.patch('/media/:mediaId/moderation',requireRoles('ADMIN'),asyncHandler(async(req,res)=>{const input=moderationSchema.parse(req.body);const status=input.action==='reject'?'REJECTED':'READY';const result=await query(`UPDATE media_assets m SET status=CASE WHEN $1::media_status='REJECTED'::media_status THEN 'REJECTED'::media_status WHEN EXISTS(SELECT 1 FROM lot_versions v WHERE v.id=m.lot_version_id AND v.status='PUBLISHED') THEN 'APPROVED'::media_status ELSE 'READY'::media_status END,moderated_by=$2,moderated_at=now(),purge_after=CASE WHEN $1::media_status='REJECTED'::media_status THEN now()+interval '30 days' ELSE NULL END WHERE m.id=$3 RETURNING id,status`,[status,req.user!.id,param(req.params.mediaId)]);if(!result.rowCount)throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');res.status(204).end();}));
+lotsRouter.post('/:id/submit',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);if(lot.latest_status==='PENDING')return res.status(204).end();const version=await editableVersion(lot.id);const pending=await query(`SELECT count(*)::int total,COUNT(*) FILTER(WHERE status='READY')::int ready,COUNT(*) FILTER(WHERE status='ERROR')::int failed,COUNT(*) FILTER(WHERE status='UPLOADING')::int processing FROM media_assets WHERE lot_version_id=$1`,[version.id]);const state=pending.rows[0] as {total:number;ready:number;failed:number;processing:number};if(!state.total)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos');if(state.processing){await query(`UPDATE lot_versions SET submitted_at=now() WHERE id=$1`,[version.id]);return res.status(204).end();}if(state.failed)throw new AppError(409,'WATERMARK_FAILED','Hay archivos con error de procesamiento. Reintentalos antes de enviar a moderacion');if(!state.ready)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos listos');await query(`UPDATE lot_versions SET status='PENDING',submitted_at=now() WHERE id=$1`,[version.id]);res.status(204).end();}));
+lotsRouter.post('/:id/approve',requireRoles('ADMIN','COORDINATOR'),requirePermission('moderation','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));if(req.user!.role==='COORDINATOR') await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);const version=await query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);if(!version.rows[0]||version.rows[0].status!=='PENDING')throw new AppError(409,'LOT_NOT_PENDING','El lote no est? pendiente de moderación');const ready=await query(`SELECT 1 FROM media_assets WHERE lot_version_id=$1 AND status='READY' LIMIT 1`,[version.rows[0].id]);await transaction(async client=>{if(ready.rowCount){await client.query(`UPDATE media_assets SET status='APPROVED',moderated_by=$1,moderated_at=now() WHERE lot_version_id=$2 AND status='READY'`,[req.user!.id,version.rows[0].id]);await client.query(`UPDATE lot_versions SET status='PUBLISHED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);await client.query('UPDATE lots SET current_published_version_id=$1 WHERE id=$2',[version.rows[0].id,lot.id]);}else await client.query(`UPDATE lot_versions SET status='REJECTED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);});res.status(204).end();}));
+lotsRouter.patch('/media/:mediaId/moderation',requireRoles('ADMIN','COORDINATOR'),requirePermission('moderation','edit'),asyncHandler(async(req,res)=>{const input=moderationSchema.parse(req.body); if(req.user!.role==='COORDINATOR'){const access=await query('SELECT l.departure_id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[param(req.params.mediaId)]); if(!access.rowCount) throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado'); await assertDepartureAccess(req.user!,access.rows[0].departure_id,['COORDINATOR']);}const status=input.action==='reject'?'REJECTED':'READY';const result=await query(`UPDATE media_assets m SET status=CASE WHEN $1::media_status='REJECTED'::media_status THEN 'REJECTED'::media_status WHEN EXISTS(SELECT 1 FROM lot_versions v WHERE v.id=m.lot_version_id AND v.status='PUBLISHED') THEN 'APPROVED'::media_status ELSE 'READY'::media_status END,moderated_by=$2,moderated_at=now(),purge_after=CASE WHEN $1::media_status='REJECTED'::media_status THEN now()+interval '30 days' ELSE NULL END WHERE m.id=$3 RETURNING id,status`,[status,req.user!.id,param(req.params.mediaId)]);if(!result.rowCount)throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');res.status(204).end();}));

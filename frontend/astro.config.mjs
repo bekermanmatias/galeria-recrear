@@ -15,7 +15,7 @@ const publicRouteDevFallback = {
       }
 
       const publicCode = /^\/([A-Za-z0-9_-]+)(?:\?.*)?$/.exec(url)?.[1];
-      const reserved = new Set(['admin', 'login', 'coordinator', 'parent', 'colegio', 'api', 'viajes']);
+      const reserved = new Set(['admin', 'login', 'coordinator', 'parent', 'colegio', 'api', 'viajes', 'colegios-pasajeros']);
       if (publicCode && !publicCode.includes('.') && !reserved.has(publicCode.toLowerCase())) req.url = '/';
       next();
     });

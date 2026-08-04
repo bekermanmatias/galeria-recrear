@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -139,7 +139,7 @@ export default function AdminActividades() {
           </div>
         </div>
       )}
-      <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar actividad?" description="Se eliminará la actividad y dejará de estar disponible para nuevas cargas." confirmLabel="Eliminar" tone="danger" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
+      <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar actividad definitivamente?" description="Se eliminará permanentemente la actividad del catálogo. Los lotes históricos conservarán sus fotos y videos, pero quedarán sin actividad asociada. Esta acción no se puede deshacer." confirmLabel="Eliminar definitivamente" tone="danger" busy={deleteBusy} onCancel={()=>!deleteBusy&&setPendingDelete(null)} onConfirm={confirmDelete}/>
     </div>
   );
 }
