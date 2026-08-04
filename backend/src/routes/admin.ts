@@ -28,7 +28,14 @@ adminRouter.get('/users', asyncHandler(async (req, res) => {
     SELECT u.id, u.name, u.email, u.role, u.active, u.created_at,
            COALESCE((SELECT array_agg(us.school_id ORDER BY us.school_id) FROM user_schools us WHERE us.user_id=u.id AND us.active=true), ARRAY[]::uuid[]) AS school_ids,
            COALESCE((SELECT array_agg(dc.departure_id ORDER BY d.event_date DESC, d.name) FROM departure_coordinators dc JOIN departures d ON d.id=dc.departure_id WHERE dc.user_id=u.id), ARRAY[]::uuid[]) AS departure_ids,
-           COALESCE((SELECT array_agg((d.type::text || ' - ' || d.name) ORDER BY d.event_date DESC, d.name) FROM departure_coordinators dc JOIN departures d ON d.id=dc.departure_id WHERE dc.user_id=u.id), ARRAY[]::text[]) AS departure_names, (SELECT count(*)::int FROM user_permissions up WHERE up.user_id=u.id) AS custom_permission_count
+           COALESCE((SELECT array_agg((d.type::text || ' - ' || d.name) ORDER BY d.event_date DESC, d.name) FROM departure_coordinators dc JOIN departures d ON d.id=dc.departure_id WHERE dc.user_id=u.id), ARRAY[]::text[]) AS departure_names,
+           (SELECT count(*)::int FROM user_permissions up WHERE up.user_id=u.id) AS custom_permission_count,
+           (u.role = 'ADMIN') AS has_global_access,
+           CASE
+             WHEN u.role = 'ADMIN' THEN 'GLOBAL'
+             WHEN EXISTS (SELECT 1 FROM user_permissions up WHERE up.user_id = u.id) THEN 'CUSTOM'
+             ELSE 'DEFAULT'
+           END AS permission_mode
     FROM users u
     WHERE ($4::boolean OR u.active = true)
       AND (u.name ILIKE $1 OR u.email ILIKE $1)
