@@ -1,6 +1,6 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
-import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School } from '../../lib/api';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
+import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -12,6 +12,8 @@ const primary: React.CSSProperties = { display: 'inline-flex', alignItems: 'cent
 const formatBytes = (bytes:number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const daysUntilPurge = (date?: string | null) => date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)) : 0;
 const input: React.CSSProperties = { padding: '10px 12px', border: '1px solid #E4E4E7', borderRadius: 6, font: 'inherit', fontSize: 13 };
+const departureDateRange = (item: { event_date?: string; start_date?: string; end_date?: string }) => { const start=(item.start_date??item.event_date??'').slice(0,10); const end=(item.end_date??start).slice(0,10); const fmt=(value:string)=>value?value.split('-').reverse().join('/'):''; const a=fmt(start); const b=fmt(end); return a===b?a:a+' - '+b; };
+
 const departureLabel = (lot: LotSummary) => {
   const name = lot.departure_name ?? lot.school_name ?? 'Salida';
   const type = lot.departure_type === 'AEREO' ? 'Aéreo' : lot.departure_type === 'MICRO' ? 'Micro' : '';
@@ -59,8 +61,8 @@ export function CatalogView({ kind }: { kind: ResourceKind }) {
   const label=kind==='activities'?'Actividad':'Turno'; const load=()=>adminRequest<{items:CatalogItem[]}>('/'+kind+'?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudo cargar el catálogo.'));},[kind]);
   const edit=(item?:CatalogItem)=>{setEditing(item??null);setName(item?.name??'');setCode(item?.bot_code??'');setOpen(true);};
   const save=async()=>{try{await adminRequest('/'+kind+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({name,botCode:code})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
-  const updateStatus=async(item:CatalogItem,active:boolean)=>{if(!active&&!confirm('?Inactivar esta '+label.toLowerCase()+'? No aparecer? en nuevas cargas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/'+kind+'/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
-  return <div style={page}><PageHeader title={label+'s'} subtitle={'Gestión del catálogo global de '+label.toLowerCase()+'s.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><Actions onEdit={()=>edit(item)}/></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
+  const updateStatus=async(item:CatalogItem,active:boolean)=>{if(!active&&!confirm('¿Inactivar esta '+label.toLowerCase()+'? No aparecerá en nuevas cargas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/'+kind+'/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
+  return <div style={page}><PageHeader title={label+'s'} subtitle={'Gestión del catálogo global de '+label.toLowerCase()+'s.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><td style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>{kind=== 'schools'&&<button type="button" title="Ver pasajeros" onClick={()=>{window.location.href='/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',gap:5,height:32,padding:'0 10px',border:'1px solid #DCE3EB',borderRadius:7,background:'#fff',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'}}><ContactRound size={15}/>Pasajeros</button>}<button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button></div></td></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
 }
 export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void }) {
   const [open, setOpen] = useState(false);
@@ -85,8 +87,8 @@ export function SchoolsView() {
   const load=()=>adminRequest<{items:School[]}>('/schools?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los colegios.'));},[]);
   const edit=(item?:School)=>{setEditing(item??null);setForm({name:item?.name??'',code:item?.code??'',botCode:item?.bot_code??'',startDate:item?.start_date??'',endDate:item?.end_date??''});setOpen(true);};
   const save=async()=>{try{await adminRequest('/schools'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({...form,startDate:form.startDate||null,endDate:form.endDate||null})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
-  const updateStatus=async(item:School,active:boolean)=>{if(!active&&!confirm('?Inactivar este colegio? No aparecer? al configurar nuevas salidas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/schools/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
-  return <div style={page}><PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Código bot','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.code}</Td><Td>{item.name}</Td><Td>{item.bot_code}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/></Td><Actions onEdit={()=>edit(item)}/></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}</div>;
+  const updateStatus=async(item:School,active:boolean)=>{if(!active&&!confirm('¿Inactivar este colegio? No aparecer? al configurar nuevas salidas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/schools/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
+  return <div style={page}><PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Código bot','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.code}</Td><Td>{item.name}</Td><Td>{item.bot_code}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/></Td><td style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}><button type="button" title="Ver pasajeros" onClick={()=>{window.location.href='/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',gap:5,height:32,padding:'0 10px',border:'1px solid #DCE3EB',borderRadius:7,background:'#fff',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'}}><ContactRound size={15}/>Pasajeros</button><button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button></div></td></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}</div>;
 }
 export function UsersView() {
   const [items,setItems]=useState<AdminUser[]>([]);
@@ -97,6 +99,14 @@ export function UsersView() {
   const [open,setOpen]=useState(false);
   const [form,setForm]=useState({name:'',email:'',password:'',role:'COORDINATOR',departureIds:[] as string[]});
   const [error,setError]=useState('');
+  const [deletingUser,setDeletingUser]=useState<AdminUser|null>(null);
+  const [permissionOpen,setPermissionOpen]=useState(false);
+  const [permissionData,setPermissionData]=useState<UserPermissions|null>(null);
+  const [permissionDraft,setPermissionDraft]=useState<Partial<Record<PermissionModule,Record<PermissionAction,boolean>>>>({});
+  const [permissionTouched,setPermissionTouched]=useState(false);
+  const [permissionReset,setPermissionReset]=useState(false);
+  const permissionLabels: Record<PermissionModule,string> = { departures:'Salidas', lots:'Lotes y carga', moderation:'Moderación', gallery:'Galería', activities:'Actividades', schools:'Colegios', passengers:'Pasajeros', users:'Usuarios', imports:'Importaciones' };
+  const permissionModules: PermissionModule[] = Object.keys(permissionLabels) as PermissionModule[];
 
   const load=async()=>{
     const [users,departureData]=await Promise.all([
@@ -108,9 +118,11 @@ export function UsersView() {
   };
   useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los usuarios.'));},[]);
   const edit=(item?:AdminUser)=>{
+    setPermissionData(null); setPermissionDraft({}); setPermissionTouched(false); setPermissionReset(false);
     setEditing(item??null);
     setDepartureSearch('');
     setForm({name:item?.name??'',email:item?.email??'',password:'',role:item?.role??'COORDINATOR',departureIds:item?.departure_ids??[]});
+    if (item?.id && item.role === 'COORDINATOR') { adminRequest<UserPermissions>('/users/'+item.id+'/permissions').then(data=>{setPermissionData(data);setPermissionDraft(data.permissions);}).catch(()=>{}); }
     setOpen(true);
   };
   const toggleDeparture=(id:string)=>{
@@ -125,13 +137,18 @@ export function UsersView() {
   const save=async()=>{
     try{
       const body:any={name:form.name,email:form.email,role:form.role,departureIds:form.role==='COORDINATOR'?form.departureIds:[]};
+      if(form.role==='COORDINATOR' && permissionTouched) body.permissions = permissionReset ? [] : permissionModules.map(module => ({module,...(permissionDraft[module] ?? {view:false,create:false,edit:false,delete:false})}));
       if(form.password)body.password=form.password;
       if(!editing&&!form.password)throw new Error('La contraseña inicial es obligatoria.');
-      await adminRequest('/users' + (editing ? '/' + editing.id : ''),{method:editing?'PATCH':'POST',body:JSON.stringify(body)});
+      const saved = await adminRequest<AdminUser>('/users' + (editing ? '/' + editing.id : ''),{method:editing?'PATCH':'POST',body:JSON.stringify(body)});
       setOpen(false); await load();
     }catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}
   };
-  const remove=async(id:string)=>{if(!confirm('¿Desactivar este usuario?'))return;await adminRequest('/users/' + id,{method:'DELETE'});await load();};
+  const openPermissions=()=>{ if(form.role!=='COORDINATOR') return; setPermissionTouched(true); setPermissionReset(false); if(!Object.keys(permissionDraft).length){ const defaults:any={}; permissionModules.forEach(module=>defaults[module]={view:module==='departures'||module==='lots'||module==='gallery',create:module==='lots',edit:module==='lots',delete:false}); setPermissionDraft(defaults); } setPermissionOpen(true); };
+  const togglePermission=(module:PermissionModule,action:PermissionAction)=>setPermissionDraft(current=>({...current,[module]:{view:false,create:false,edit:false,delete:false,...current[module],[action]:!current[module]?.[action]}}));
+  const resetPermissions=()=>{ setPermissionTouched(true); setPermissionReset(true); const defaults:any={}; permissionModules.forEach(module=>defaults[module]={view:module==='departures'||module==='lots'||module==='gallery',create:module==='lots',edit:module==='lots',delete:false}); setPermissionDraft(defaults); setPermissionData(data=>data?{...data,customized:false,permissions:defaults}:data); };
+  const remove=(id:string)=>{const target=items.find(item=>item.id===id);if(target)setDeletingUser(target);};
+  const deleteUser=async()=>{if(!deletingUser)return;try{await adminRequest('/users/' + deletingUser.id,{method:'DELETE'});setDeletingUser(null);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo eliminar definitivamente el usuario.');}};
   const updateStatus=async(item:AdminUser,nextActive:boolean)=>{
     if(!nextActive&&!confirm('¿Desactivar este usuario? Se revocarán sus sesiones y dejará de acceder a sus salidas.'))return;
     const previous=item.active;
@@ -143,11 +160,11 @@ export function UsersView() {
   return <div style={page}>
     <PageHeader title="Usuarios" subtitle="Gestión de accesos, roles y salidas asignadas." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Usuario</button>} search={search} onSearch={setSearch}/>
     <ErrorMessage value={error}/>
-    <DataTable headers={['Nombre','Email','Rol','Salidas','Estado','Acciones']}>
+    <DataTable headers={['Nombre','Email','Rol','Permisos','Salidas','Estado','Acciones']}>
       {filteredItems.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}>
         <Td strong>{item.name}</Td><Td>{item.email}</Td>
         <Td>{item.role==='ADMIN'?'Administrador':item.role==='COORDINATOR'?'Coordinador':'Familia'}</Td>
-        <Td>{item.role==='COORDINATOR'?(item.departure_names?.length?item.departure_names.join(', '):'Sin salidas'):'—'}</Td>
+        <Td>{item.role==='COORDINATOR'?(item.custom_permission_count?'Personalizados':'Predeterminados'):'â€”'}</Td><Td>{item.role==='COORDINATOR'?(item.departure_names?.length?item.departure_names.join(', '):'Sin salidas'):'?'}</Td>
         <Td><AdminStatusSelect active={item.active} onChange={next=>void updateStatus(item,next)}/></Td><Actions onEdit={()=>edit(item)} onDelete={()=>remove(item.id)}/>
       </tr>)}
     </DataTable>
@@ -166,13 +183,22 @@ export function UsersView() {
         <div style={{maxHeight:180,overflowY:'auto',border:'1px solid #E4E4E7',borderRadius:6,padding:6,display:'grid',gap:2}}>
           {visibleDepartures.map(item=><label key={item.id} style={{display:'flex',alignItems:'flex-start',gap:8,padding:'8px 7px',borderRadius:5,cursor:'pointer',fontSize:13,fontWeight:400}}>
             <input type="checkbox" checked={form.departureIds.includes(item.id)} onChange={()=>toggleDeparture(item.id)}/>
-            <span><strong style={{color:'#1A4B77'}}>{item.type==='MICRO'?'Micro':'Aéreo'} · {item.name}</strong><small style={{display:'block',color:'#64748B',marginTop:2}}>{item.destination} · {item.event_date}</small></span>
+            <span><strong style={{color:'#1A4B77'}}>{item.type==='MICRO'?'Micro':'Aéreo'} · {item.name}</strong><small style={{display:'block',color:'#64748B',marginTop:2}}>{item.destination} · {departureDateRange(item)}</small></span>
           </label>)}
           {!visibleDepartures.length&&<span style={{padding:10,color:'#94A3B8',fontSize:12}}>No hay salidas activas.</span>}
         </div>
         <span style={{fontSize:12,color:'#64748B'}}>{form.departureIds.length} salida(s) seleccionada(s)</span>
       </div>}
+      {form.role==='COORDINATOR'&&<button type="button" onClick={openPermissions} style={{...secondary,width:'100%',marginTop:8}}>Configurar permisos{permissionData?.customized?' · Personalizados':' · Predeterminados'}</button>}
     </Modal>}
+    {permissionOpen&&<Modal title="Configurar permisos" onClose={()=>setPermissionOpen(false)} onSave={async()=>{if(!editing?.id){setPermissionOpen(false);return;}try{const permissions=permissionReset?[]:permissionModules.map(module=>({module,...(permissionDraft[module]??{view:false,create:false,edit:false,delete:false})}));await adminRequest('/users/'+editing.id+'/permissions',{method:'PUT',body:JSON.stringify({permissions})});setPermissionData(data=>data?{...data,customized:!permissionReset,permissions:permissionDraft as any}:data);setPermissionReset(false);setPermissionTouched(false);setPermissionOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudieron guardar los permisos.');}}}>
+      <p style={{...muted,marginTop:0}}>Definí qué puede hacer este coordinador en cada módulo.</p>
+      <div style={{overflowX:'auto',border:'1px solid #E2E8F0',borderRadius:8}}>
+        <table style={{width:'100%',borderCollapse:'collapse',minWidth:560}}><thead><tr style={{borderBottom:'1px solid #E2E8F0'}}><th style={{padding:10,textAlign:'left',fontSize:12,color:'#64748B'}}>Módulo</th>{(['view','create','edit','delete'] as PermissionAction[]).map(action=><th key={action} style={{padding:10,textAlign:'center',fontSize:12,color:'#64748B'}}>{action==='view'?'Ver':action==='create'?'Crear':action==='edit'?'Editar':'Eliminar'}</th>)}</tr></thead><tbody>{permissionModules.map(module=><tr key={module} style={{borderBottom:'1px solid #F1F5F9'}}><td style={{padding:10,fontSize:13,fontWeight:600,color:'#334155'}}>{permissionLabels[module]}</td>{(['view','create','edit','delete'] as PermissionAction[]).map(action=><td key={action} style={{padding:10,textAlign:'center'}}><input type="checkbox" checked={Boolean(permissionDraft[module]?.[action])} onChange={()=>togglePermission(module,action)}/></td>)}</tr>)}</tbody></table>
+      </div>
+      <button type="button" onClick={resetPermissions} style={{...secondary,marginTop:12}}>Restaurar permisos predeterminados</button>
+    </Modal>}
+    <ConfirmDialog open={deletingUser!==null} title="¿Eliminar usuario definitivamente?" description={`Se eliminará de forma permanente la cuenta de ${deletingUser?.name??''}. Esta acción no se puede deshacer y revocar? su acceso.`} confirmLabel="Eliminar definitivamente" tone="danger" busy={false} onCancel={()=>setDeletingUser(null)} onConfirm={deleteUser}/>
   </div>;
 }
 const formatDate = (dateStr?: string) => {
@@ -213,7 +239,16 @@ export function GalleryView() {
   const [deleteBusyId,setDeleteBusyId]=useState<string|null>(null);
   const [pendingDiscard,setPendingDiscard]=useState<(Media&{lot:LotSummary})|null>(null);
   const [error,setError]=useState('');
+  const [deletingUser,setDeletingUser]=useState<AdminUser|null>(null);
+  const [permissionOpen,setPermissionOpen]=useState(false);
+  const [permissionData,setPermissionData]=useState<UserPermissions|null>(null);
+  const [permissionDraft,setPermissionDraft]=useState<Partial<Record<PermissionModule,Record<PermissionAction,boolean>>>>({});
+  const [permissionTouched,setPermissionTouched]=useState(false);
+  const [permissionReset,setPermissionReset]=useState(false);
+  const permissionLabels: Record<PermissionModule,string> = { departures:'Salidas', lots:'Lotes y carga', moderation:'Moderación', gallery:'Galería', activities:'Actividades', schools:'Colegios', passengers:'Pasajeros', users:'Usuarios', imports:'Importaciones' };
+  const permissionModules: PermissionModule[] = Object.keys(permissionLabels) as PermissionModule[];
   const [copiedCode,setCopiedCode]=useState<string|null>(null);
+  const [copiedOnlyCode,setCopiedOnlyCode]=useState<string|null>(null);
   const [editingLot,setEditingLot]=useState<LotSummary|null>(null);
   const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:'',status:''});
   const [editBusy,setEditBusy]=useState(false);
@@ -226,6 +261,13 @@ export function GalleryView() {
     await navigator.clipboard.writeText(url);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
+  };
+
+  const copyPublicCode = async (code?: string | null) => {
+    if (!code) return;
+    await navigator.clipboard.writeText(code);
+    setCopiedOnlyCode(code);
+    setTimeout(() => setCopiedOnlyCode(null), 2000);
   };
 
   useEffect(()=>{let mounted=true;api.lots().then(async data=>{const details=await Promise.all(data.items.map(async lot=>({lot,media:(await api.lot(lot.id)).media})));if(!mounted)return;setLots(data.items);setMedia(details.flatMap(item=>item.media.map(file=>({...file,lot:item.lot}))));}).catch(reason=>mounted&&setError(reason.message));adminRequest<{items:any[]}>('/departures').then(res=>mounted&&setDeparturesList(res.items)).catch(()=>{});adminRequest<{items:any[]}>('/activities').then(res=>mounted&&setActivitiesList(res.items)).catch(()=>{});return()=>{mounted=false;};},[]);
@@ -324,7 +366,7 @@ export function GalleryView() {
                 </div>
                 {publicCode&&(
                   <div style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:4}}>
-                    <span style={{fontSize:11,color:'#475569',fontWeight:600,background:'#F1F5F9',border:'1px solid #CBD5E1',padding:'1px 6px',borderRadius:4}}>Cód: {publicCode}</span>
+                    <button onClick={(e)=>{e.stopPropagation();void copyPublicCode(publicCode);}} title="Copiar código" style={{fontSize:11,color:'#475569',fontWeight:600,background:'#F1F5F9',border:'1px solid #CBD5E1',padding:'1px 6px',borderRadius:4,cursor:'pointer'}}>Cód: {copiedOnlyCode===publicCode?'¡Copiado!':publicCode}</button>
                     <button onClick={(e)=>{e.stopPropagation();void copyPublicLink(publicCode);}} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'1px 4px',color:copiedCode===publicCode?'#166534':'#1A4B77',fontSize:11,fontWeight:600}}>
                       {copiedCode===publicCode?'¡Copiado!':'Copiar link'}
                     </button>
@@ -383,7 +425,7 @@ export function GalleryView() {
       </div>
     )}
 
-    {openedLot&&currentLot&&<section style={{margin:'2px 0 28px',padding:'0 0 22px',borderBottom:'1px solid #E4E4E7'}}><div style={{display:'flex',alignItems:'end',justifyContent:'space-between',gap:16}}><div style={{display:'flex',alignItems:'start',gap:14}}><button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} style={{marginTop:2,padding:'8px 12px',border:'1px solid #DCE3EB',background:'#fff',borderRadius:6,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>← Volver a la lista</button><div><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}><StatusBadge status={currentLot.lot.status}/></div><div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}><h2 style={{margin:0,fontSize:24,color:'#1A4B77'}}>{departureLabel(currentLot.lot)} · {currentLot.lot.album_name||currentLot.lot.activity_name}</h2>{currentLot.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'4px 10px',fontSize:13}}><span style={{color:'#475569',fontWeight:600}}>Cód: {currentLot.lot.departure_public_code}</span><button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'2px',display:'flex',alignItems:'center',color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77'}}>{copiedCode===currentLot.lot.departure_public_code?<Check size={14}/>:<Copy size={14}/>}<span style={{fontSize:12,fontWeight:600,marginLeft:4}}>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button></div>}</div><p style={{margin:'6px 0 0',fontSize:14,color:'#64748B'}}>{formatDate(currentLot.lot.event_date)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}{currentLot.lot.created_by_name?<> · por {currentLot.lot.created_by_name}</>:null}</p></div></div><button onClick={()=>downloadLot(currentLot)} style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:13,fontWeight:600,cursor:'pointer'}}><Download size={16}/> Descargar lote</button></div></section>}
+    {openedLot&&currentLot&&<section style={{margin:'2px 0 28px',padding:'0 0 22px',borderBottom:'1px solid #E4E4E7'}}><div style={{display:'flex',alignItems:'end',justifyContent:'space-between',gap:16}}><div style={{display:'flex',alignItems:'start',gap:14}}><button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} style={{marginTop:2,padding:'8px 12px',border:'1px solid #DCE3EB',background:'#fff',borderRadius:6,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'flex',alignItems:'center',gap:6}}>← Volver a la lista</button><div><div style={{display:'flex',alignItems:'center',gap:10,marginBottom:4}}><StatusBadge status={currentLot.lot.status}/></div><div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}><h2 style={{margin:0,fontSize:24,color:'#1A4B77'}}>{departureLabel(currentLot.lot)} · {currentLot.lot.album_name||currentLot.lot.activity_name}</h2>{currentLot.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:6,background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'4px 10px',fontSize:13}}><button onClick={()=>void copyPublicCode(currentLot.lot.departure_public_code)} title="Copiar código" style={{border:0,background:'transparent',cursor:'pointer',padding:0,color:'#475569',fontWeight:600,fontSize:13}}>Cod: {copiedOnlyCode===currentLot.lot.departure_public_code?'Copiado!':currentLot.lot.departure_public_code}</button><button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'none',cursor:'pointer',padding:'2px',display:'flex',alignItems:'center',color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77'}}>{copiedCode===currentLot.lot.departure_public_code?<Check size={14}/>:<Copy size={14}/>}<span style={{fontSize:12,fontWeight:600,marginLeft:4}}>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button></div>}</div><p style={{margin:'6px 0 0',fontSize:14,color:'#64748B'}}>{formatDate(currentLot.lot.event_date)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}{currentLot.lot.created_by_name?<> · por {currentLot.lot.created_by_name}</>:null}</p></div></div><button onClick={()=>downloadLot(currentLot)} style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:13,fontWeight:600,cursor:'pointer'}}><Download size={16}/> Descargar lote</button></div></section>}
     {openedLot&&currentLot&&currentRejected.length>0&&<div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:20,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
       <div style={{display:'flex',alignItems:'center',gap:12}}>
         <div style={{width:36,height:36,borderRadius:'50%',display:'grid',placeItems:'center',background:'#FEE2E2',color:'#DC2626',fontWeight:800}}>!</div>
@@ -401,13 +443,13 @@ export function GalleryView() {
           {isRejected&&<><span style={{position:'absolute',left:8,top:8,padding:'4px 8px',borderRadius:6,background:'#DC2626',color:'#fff',fontSize:10,fontWeight:800,letterSpacing:'.03em',zIndex:3}}>DESCARTADA</span><div style={{position:'absolute',left:0,right:0,bottom:0,height:58,boxSizing:'border-box',padding:'9px 10px',background:'#fff',borderTop:'1px solid #FECACA',zIndex:2}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:11}}><span style={{color:'#475569',fontWeight:600}}>{formatBytes(item.size_bytes)}</span><span style={{color:'#B91C1C',fontWeight:700}}>{daysLeft===0?'Se elimina hoy':`${daysLeft} ${daysLeft===1?'día':'días'} restantes`}</span></div><div title={item.original_name} style={{marginTop:5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10,color:'#64748B'}}>{item.original_name}</div></div></>}
           {!isRejected&&<div className="gallery-overlay" style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',opacity:0,transition:'opacity .2s',display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:12,pointerEvents:'none'}}><span style={{color:'#fff',fontSize:11,fontWeight:600}}>{departureLabel(group.lot)}</span><span style={{color:'#E4E4E7',fontSize:11}}>{group.lot.activity_name}</span></div>}
           <button aria-label="Acciones de imagen" aria-expanded={menuOpen} onClick={event=>{event.stopPropagation();setOpenMediaMenu(menuOpen?null:item.id);}} style={{position:'absolute',right:8,top:8,zIndex:7,width:32,height:32,display:'grid',placeItems:'center',border:'1px solid rgba(148,163,184,.35)',borderRadius:'50%',background:'rgba(255,255,255,.94)',color:'#334155',cursor:'pointer',boxShadow:'0 2px 6px rgba(15,23,42,.16)'}}><MoreVertical size={18}/></button>
-          {menuOpen&&<div role="menu" onClick={event=>event.stopPropagation()} style={{position:'absolute',right:8,top:46,zIndex:8,minWidth:168,padding:5,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.2)'}}><button disabled={recovering===item.id} onClick={()=>moderateGalleryMedia(item)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'9px 10px',border:0,borderRadius:6,background:'transparent',color:isRejected?'#15803D':'#B91C1C',fontSize:12,fontWeight:650,cursor:recovering===item.id?'wait':'pointer',textAlign:'left'}}>{isRejected?<RotateCcw size={16}/>:<Trash2 size={16}/>} {recovering===item.id?'Procesando…':isRejected?'Recuperar y publicar':'Descartar imagen'}</button></div>}
+          {menuOpen&&<div role="menu" onClick={event=>event.stopPropagation()} style={{position:'absolute',right:8,top:46,zIndex:8,minWidth:168,padding:5,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.2)'}}><button disabled={recovering===item.id} onClick={()=>moderateGalleryMedia(item)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'9px 10px',border:0,borderRadius:6,background:'transparent',color:isRejected?'#15803D':'#B91C1C',fontSize:12,fontWeight:650,cursor:recovering===item.id?'wait':'pointer',textAlign:'left'}}>{isRejected?<RotateCcw size={16}/>:<Trash2 size={16}/>} {recovering===item.id?'Procesando?':isRejected?'Recuperar y publicar':'Descartar imagen'}</button></div>}
         </article>;})}
       </div>
     </section>)}
     {openedLot&&!displayedGroups.length&&<Empty>No hay fotos publicadas en este lote.</Empty>}
     {selectedItem&&<Lightbox src={api.contentUrl(selectedItem.id)} mediaType={selectedItem.kind} downloadUrl={api.downloadUrl(selectedItem.id)} downloadName={selectedItem.original_name} info={formatBytes(selectedItem.size_bytes)} onClose={()=>setSelected(null)} onNext={selected!==null&&selected<visible.length-1?()=>setSelected(selected+1):undefined} onPrev={selected!==null&&selected>0?()=>setSelected(selected-1):undefined}/>}
-    <ConfirmDialog open={pendingDiscard!==null} title="¿Descartar imagen?" description="La imagen dejará de mostrarse a las familias, pero podrás recuperarla durante los próximos 30 días." confirmLabel="Descartar imagen" busy={pendingDiscard!==null&&recovering===pendingDiscard.id} onCancel={()=>!recovering&&setPendingDiscard(null)} onConfirm={()=>{if(pendingDiscard)return moderateGalleryMedia(pendingDiscard,true);}}/>
+    <ConfirmDialog open={pendingDiscard!==null} title="?Descartar imagen?" description="La imagen dejará de mostrarse a las familias, pero podrás recuperarla durante los próximos 30 días." confirmLabel="Descartar imagen" busy={pendingDiscard!==null&&recovering===pendingDiscard.id} onCancel={()=>!recovering&&setPendingDiscard(null)} onConfirm={()=>{if(pendingDiscard)return moderateGalleryMedia(pendingDiscard,true);}}/>
     <ConfirmDialog open={deletingLot!==null} title="¿Eliminar lote permanentemente?" description={`Se eliminará por completo el lote "${deletingLot?.album_name||deletingLot?.activity_name}" de la salida "${deletingLot?departureLabel(deletingLot):''}". Se borrarán todas sus fotos, videos e historial del sistema. Esta acción no se puede deshacer.`} confirmLabel="Eliminar lote por completo" tone="danger" busy={deleteBusyId!==null} onCancel={()=>!deleteBusyId&&setDeletingLot(null)} onConfirm={async()=>{if(!deletingLot)return;setDeleteBusyId(deletingLot.id);try{await api.deleteLot(deletingLot.id);setLots(current=>current.filter(item=>item.id!==deletingLot.id));setDeletingLot(null);}catch(err:any){setError(err.message||'No se pudo eliminar el lote');}finally{setDeleteBusyId(null);}}}/>
 
     {editingLot&&(
@@ -451,7 +493,7 @@ export function ManualUploadView() {
   const upload=async()=>{const schoolItem=schools.find(item=>item.name===school),activityItem=activities.find(item=>item.name===activity),shiftItem=shifts.find(item=>item.name===shift);if(!schoolItem||!activityItem||!shiftItem||!files.length)return;setBusy(true);setMessage('');setProgress(0);try{const lot=await api.createLot({schoolId:schoolItem.id,activityId:activityItem.id,eventDate:date});for(let i=0;i<files.length;i++){await api.uploadMedia(lot.lotId,files[i]);setProgress(Math.round((i+1)/files.length*100));}await api.submitLot(lot.lotId);setFiles([]);setMessage('Carga completada y enviada a moderación.');}catch(reason){setMessage(reason instanceof Error?reason.message:'No se pudo cargar el lote.');}finally{setBusy(false);}};
   return <div style={page}><div style={{maxWidth:760,margin:'0 auto'}}><h2 style={title}>Carga manual</h2><p style={{...muted,marginBottom:28}}>Revisá los archivos seleccionados antes de enviarlos a moderación.</p><div className="responsive-grid"><SearchableSelect label="Colegio" value={school} onChange={setSchool} options={schools.map(item=>item.name)} placeholder="Seleccionar colegio..."/><label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={input}/></label><SearchableSelect label="Turno" value={shift} onChange={setShift} options={shifts.map(item=>item.name)} placeholder="Seleccionar turno..."/><SearchableSelect label="Actividad" value={activity} onChange={setActivity} options={activities.map(item=>item.name)} placeholder="Seleccionar actividad..."/></div><button onClick={()=>picker.current?.click()} style={{width:'100%',margin:'24px 0',padding:56,border:'1px dashed #94A3B8',borderRadius:8,background:'#F8FAFC',color:'#1A4B77',cursor:'pointer'}}><Upload size={30}/><div style={{marginTop:10}}>Seleccionar JPEG, PNG, HEIC, MP4 o MOV</div></button><input ref={picker} hidden multiple type="file" accept=".jpg,.jpeg,.jpe,.jfif,.png,.heic,.heif,.mp4,.mov,image/jpeg,image/png,image/heic,image/heif,video/mp4,video/quicktime" onChange={event=>{addFiles(event.target.files);event.currentTarget.value='';}}/>{previews.length>0&&<><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',margin:'0 0 12px'}}><p style={muted}>{previews.length} {previews.length===1?'archivo seleccionado':'archivos seleccionados'}</p><button onClick={()=>setFiles([])} disabled={busy} style={{border:0,background:'none',color:'#B91C1C',fontWeight:600,cursor:'pointer'}}>Quitar todos</button></div><div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))',gap:12,marginBottom:20}}>{previews.map((item,index)=><article key={item.url} style={{position:'relative',minWidth:0,border:'1px solid #E2E8F0',borderRadius:8,overflow:'hidden',background:'#fff'}}><div style={{height:112,display:'grid',placeItems:'center',background:'#F1F5F9'}}>{item.isHeic?<span style={{fontWeight:700,color:'#475569'}}>HEIC</span>:item.isVideo?<video src={item.url} muted preload="metadata" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<img src={item.url} alt={item.file.name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>}</div><button type="button" onClick={()=>removeFile(index)} disabled={busy} aria-label={'Quitar '+item.file.name} style={{position:'absolute',top:6,right:6,width:26,height:26,display:'grid',placeItems:'center',border:0,borderRadius:'50%',background:'rgba(15,23,42,.72)',color:'#fff',cursor:'pointer'}}><X size={15}/></button><div style={{padding:'9px 10px'}}><div title={item.file.name} style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:12,fontWeight:600,color:'#334155'}}>{item.file.name}</div><div style={{marginTop:3,fontSize:11,color:'#64748B'}}>{(item.file.size/1024/1024).toFixed(1)} MB{item.isHeic?' · Se convertirá al publicar':''}</div></div></article>)}</div></>}{busy&&<div style={{height:5,background:'#E2E8F0',margin:'16px 0'}}><div style={{height:'100%',width:`${progress}%`,background:'#1A4B77'}}/></div>}{message&&<div role="alert" style={{margin:'16px 0',color:message.startsWith('Carga')?'#15803D':'#B91C1C'}}>{message}</div>}<button onClick={upload} disabled={busy||!school||!activity||!shift||!files.length} style={{...primary,width:'100%',padding:15,opacity:busy ? .6 : 1}}>{busy?'Subiendo…':'Subir material'}</button></div></div>;
 }
-export function ImportView(){const [kind,setKind]=useState('schools');const [file,setFile]=useState<File|null>(null);const [preview,setPreview]=useState<any>(null);const [message,setMessage]=useState('');const send=async(commit=false)=>{if(!file)return;const body=new FormData();body.append('file',file);const data=await adminRequest<any>(`/imports/${kind}/${commit?'commit':'preview'}`,{method:'POST',body});if(commit){setMessage(`${data.imported} registros importados.`);setPreview(null);}else setPreview(data);};return <div style={page}><h2 style={title}>Importar CSV</h2><p style={{...muted,marginBottom:24}}>Validá el archivo antes de confirmar; un CSV inválido no crea registros parciales.</p><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><select value={kind} onChange={event=>setKind(event.target.value)} style={input}><option value="schools">Colegios</option><option value="users">Usuarios</option><option value="memberships">Asignaciones</option></select><input type="file" accept=".csv,text/csv" onChange={event=>setFile(event.target.files?.[0]??null)} style={input}/><button onClick={()=>send(false)} style={primary}>Validar</button></div>{preview&&<div style={{marginTop:24,padding:18,border:'1px solid #E2E8F0',borderRadius:8}}><strong>{preview.valid?'Archivo válido':'Archivo inválido'}</strong><p>{preview.rows?.length??0} filas · {preview.errors?.length??0} errores</p>{preview.errors?.map((item:any,index:number)=><div key={index} style={{color:'#B91C1C',fontSize:13}}>Fila {item.row}: {item.field} — {item.message}</div>)}{preview.valid&&<button onClick={()=>send(true)} style={{...primary,marginTop:12}}><Check size={16}/> Confirmar importación</button>}</div>}{message&&<p style={{color:'#15803D'}}>{message}</p>}</div>}
+export function ImportView(){const [kind,setKind]=useState('schools');const [file,setFile]=useState<File|null>(null);const [preview,setPreview]=useState<any>(null);const [message,setMessage]=useState('');const send=async(commit=false)=>{if(!file)return;const body=new FormData();body.append('file',file);const data=await adminRequest<any>(`/imports/${kind}/${commit?'commit':'preview'}`,{method:'POST',body});if(commit){setMessage(`${data.imported} registros importados.`);setPreview(null);}else setPreview(data);};return <div style={page}><h2 style={title}>Importar CSV</h2><p style={{...muted,marginBottom:24}}>Validá el archivo antes de confirmar; un CSV inválido no crea registros parciales.</p><div style={{display:'flex',gap:12,flexWrap:'wrap'}}><select value={kind} onChange={event=>setKind(event.target.value)} style={input}><option value="schools">Colegios</option><option value="users">Usuarios</option><option value="memberships">Asignaciones</option></select><input type="file" accept=".csv,text/csv" onChange={event=>setFile(event.target.files?.[0]??null)} style={input}/><button onClick={()=>send(false)} style={primary}>Validar</button></div>{preview&&<div style={{marginTop:24,padding:18,border:'1px solid #E2E8F0',borderRadius:8}}><strong>{preview.valid?'Archivo válido':'Archivo inválido'}</strong><p>{preview.rows?.length??0} filas · {preview.errors?.length??0} errores</p>{preview.errors?.map((item:any,index:number)=><div key={index} style={{color:'#B91C1C',fontSize:13}}>Fila {item.row}: {item.field} · {item.message}</div>)}{preview.valid&&<button onClick={()=>send(true)} style={{...primary,marginTop:12}}><Check size={16}/> Confirmar importación</button>}</div>}{message&&<p style={{color:'#15803D'}}>{message}</p>}</div>}
 
 function PageHeader({title:heading,subtitle,action,search,onSearch}:{title:string;subtitle:string;action?:React.ReactNode;search?:string;onSearch?:(value:string)=>void}){return <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:18,marginBottom:24}}><div><h2 style={title}>{heading}</h2><p style={muted}>{subtitle}</p></div><div style={{display:'flex',alignItems:'center',gap:12}}>{onSearch&&<div style={{position:'relative'}}><Search size={15} style={{position:'absolute',left:11,top:11,color:'#94A3B8'}}/><input value={search} onChange={event=>onSearch(event.target.value)} placeholder="Buscar..." style={{...input,paddingLeft:34,width:220}}/></div>}{action}</div></div>}
 function DataTable({headers,children}:{headers:string[];children:React.ReactNode}){return <table style={{width:'100%',borderCollapse:'collapse',textAlign:'left',fontFamily:'inherit'}}><thead><tr style={{borderBottom:'1px solid #E4E4E7'}}>{headers.map((header,index)=><th key={header} style={{padding:'12px 20px',fontSize:12,fontWeight:600,letterSpacing:'.02em',color:'#64748B',textTransform:'uppercase',textAlign:index===headers.length-1?'right':'left',width:index===headers.length-1?128:undefined}}>{header}</th>)}</tr></thead><tbody>{children}</tbody></table>}
@@ -459,45 +501,4 @@ function Td({children,strong=false}:{children:React.ReactNode;strong?:boolean}){
 function Actions({onEdit,onDelete}:{onEdit:()=>void;onDelete?:()=>void}){return <td style={{padding:'12px 20px',textAlign:'right',width:128,boxSizing:'border-box'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:10}}><button onClick={onEdit} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>{onDelete&&<button onClick={onDelete} aria-label="Eliminar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#EF4444'}}><Trash2 size={16}/></button>}</div></td>}
 function Field({label,value,onChange,type='text'}:{label:string;value:string;onChange:(value:string)=>void;type?:string}){return <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>{label}<input type={type} value={value} onChange={event=>onChange(event.target.value)} style={input}/></label>}
 function Modal({title:heading,onClose,onSave,children}:{title:string;onClose:()=>void;onSave:()=>void;children:React.ReactNode}){return <div style={{position:'fixed',inset:0,zIndex:100,background:'rgba(15,23,42,.45)',display:'grid',placeItems:'center',padding:16}}><div style={{width:'min(100%,480px)',background:'#fff',borderRadius:12,padding:28,boxShadow:'0 20px 50px rgba(15,23,42,.2)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:22}}><h3 style={{margin:0,color:'#1A4B77'}}>{heading}</h3><button onClick={onClose} style={{border:0,background:'none',cursor:'pointer'}}><X size={20}/></button></div><div style={{display:'grid',gap:16}}>{children}</div><div style={{display:'flex',justifyContent:'flex-end',gap:10,marginTop:24}}><button onClick={onClose} style={{...primary,background:'#F1F5F9',color:'#475569'}}>Cancelar</button><button onClick={onSave} style={primary}>Guardar</button></div></div></div>}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

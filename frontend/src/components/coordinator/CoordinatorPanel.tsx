@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Upload, X, Check, Trash2, Edit2, PenLine, Upload as UploadIcon, Image } from 'lucide-react';
 import DashboardLayout from '../layout/DashboardLayout';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -35,6 +35,9 @@ const getDepartureName = (lot: LotSummary) => {
   if (type && !name.toLowerCase().startsWith(type.toLowerCase())) return `${type} - ${name}`;
   return name;
 };
+
+const formatDepartureRange = (item: Departure) => { const start=(item.start_date??item.event_date).slice(0,10); const end=(item.end_date??start).slice(0,10); return start===end?start:end; };
+const departureOption = (item: Departure) => (item.type === 'MICRO' ? 'Micro' : 'Aereo') + ' · ' + item.name + ' · ' + item.destination + ' · ' + formatDepartureRange(item);
 
 export default function CoordinatorPanel() {
   const [activeTab, setActiveTab] = useState('carga');
@@ -121,7 +124,7 @@ export default function CoordinatorPanel() {
   };
 
   const uploadFiles = async () => {
-    const selectedDeparture = departures.find(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}` === salida);
+    const selectedDeparture = departures.find(item => departureOption(item) === salida);
     const activity = isCustomActivity ? null : activities.find(item => item.name === actividad);
     const pending = files.filter(item => item.status === 'pending' || (item.status === 'error' && !item.mediaId));
     const retrying = files.filter(item => item.status === 'error' && item.mediaId);
@@ -230,7 +233,7 @@ export default function CoordinatorPanel() {
             label="Salida *"
             value={salida}
             onChange={setSalida}
-            options={departures.map(item => `${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)}
+            options={departures.map(departureOption)}
             placeholder="Seleccionar salida..."
           />
           <DateField label="Fecha *" value={fecha} onChange={setFecha} />

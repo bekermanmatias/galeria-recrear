@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertCircle, Check, LoaderCircle, Trash2, Upload, X } from 'lucide-react';
 import { api, type CatalogItem, type Departure } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
@@ -12,6 +12,8 @@ const MAX_PARALLEL_UPLOADS=3;
 const dateInput:React.CSSProperties={width:'100%',height:44,padding:'12px 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:14,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6};
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
 const CUSTOM_ACTIVITY = '__personalizada__';
+const formatDepartureRange = (item: Departure) => { const start=(item.start_date??item.event_date).slice(0,10); const end=(item.end_date??start).slice(0,10); return start===end?start:end; };
+const departureOption = (item: Departure) => (item.type === 'MICRO' ? 'Micro' : 'Aereo') + ' · ' + item.name + ' · ' + item.destination + ' · ' + formatDepartureRange(item);
 
 export default function AdminCargaManual() {
   const [departures,setDepartures]=useState<Departure[]>([]); const [activities,setActivities]=useState<CatalogItem[]>([]);
@@ -34,7 +36,7 @@ export default function AdminCargaManual() {
   const updateFile=(id:string,patch:Partial<UploadFile>)=>setFiles(current=>current.map(item=>item.id===id?{...item,...patch}:item));
 
   const upload=async()=>{
-    const departureItem=departures.find(item=>`${item.type === 'MICRO' ? 'Micro' : 'A\u00e9reo'} \u00b7 ${item.name} \u00b7 ${item.destination}`===departure),activityItem=activities.find(item=>item.name===activity);
+    const departureItem=departures.find(item=>departureOption(item)===departure),activityItem=activities.find(item=>item.name===activity);
     const failedFiles=files.filter(item=>item.status==='failed'&&item.mediaId);const pending=files.filter(item=>item.status==='queued'||(item.status==='failed'&&!item.mediaId));
     if(!departureItem||(!pending.length&&!failedFiles.length))return;
     setUploading(true);setProgress({completed:0,total:pending.length||failedFiles.length});setMessage('');
@@ -48,7 +50,7 @@ export default function AdminCargaManual() {
   return <div style={{flex:1,overflowY:'auto',padding:32}}><div style={{maxWidth:720,margin:'0 auto'}}>
     <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná la actividad y todas las fotos o videos del lote. Se procesan de a {MAX_PARALLEL_UPLOADS} para una carga estable.</p></div>
     <div className="upload-fields-grid">
-      <SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(item=>`${item.type === 'MICRO' ? 'Micro' : 'Aéreo'} · ${item.name} · ${item.destination}`)} placeholder="Seleccionar salida..."/>
+      <SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(departureOption)} placeholder="Seleccionar salida..."/>
       <label style={{display:'grid',gap:8,fontSize:13,fontWeight:500}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={dateInput}/></label>
       <SearchableSelect label="Actividad" value={activity} onChange={handleActivityChange} options={[...activities.map(item=>item.name),CUSTOM_ACTIVITY]} renderOption={(option: string)=>option===CUSTOM_ACTIVITY?'Personalizada...':option} placeholder="Opcional..."/>
       <div>

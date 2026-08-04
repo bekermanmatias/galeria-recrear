@@ -1,0 +1,7 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import AdminSchoolPassengers from '../components/admin/AdminSchoolPassengers';
+---
+<BaseLayout title="Pasajeros por colegio">
+  <AdminSchoolPassengers client:only="react" />
+</BaseLayout>

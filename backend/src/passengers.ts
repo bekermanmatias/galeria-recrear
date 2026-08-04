@@ -66,7 +66,7 @@ export function parsePassengerWorkbook(buffer: Buffer) {
     if (!parsed.success) for (const issue of parsed.error.issues) errors.push({ row, field: String(issue.path[0] ?? 'fila'), message: issue.message });
     else {
       const key = `${parsed.data.documentType}\u001F${parsed.data.documentNumber}`;
-      if (documentKeys.has(key)) errors.push({ row, field: 'N?mero', message: 'Documento repetido dentro del archivo' });
+      if (documentKeys.has(key)) errors.push({ row, field: 'Número', message: 'Documento repetido dentro del archivo' });
       else { documentKeys.add(key); rows.push(parsed.data); }
     }
   });

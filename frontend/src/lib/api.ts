@@ -3,27 +3,72 @@ const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001/api/v1'
 export type Role = 'ADMIN' | 'COORDINATOR' | 'PARENT';
 export interface SessionUser { id: string; name: string; email: string; role: Role; }
 export interface School { id: string; name: string; code: string; bot_code: string; start_date?: string | null; end_date?: string | null; active?: boolean; coordinator_ids?: string[]; coordinators?: string[]; public_link_active?: boolean | null; public_link_generated_at?: string | null; public_link_revoked_at?: string | null; public_link_token?: string | null; }
-export interface Departure { id: string; type: 'MICRO' | 'AEREO'; name: string; destination: string; event_date: string; active: boolean; archived_at?: string | null; public_code?: string; public_access_active?: boolean; school_ids?: string[]; school_names?: string[]; coordinator_ids?: string[]; coordinator_names?: string[]; lot_count?: number; }
+export interface Departure { id: string; type: 'MICRO' | 'AEREO'; name: string; destination: string; event_date: string; start_date: string; end_date: string; active: boolean; archived_at?: string | null; public_code?: string; public_access_active?: boolean; school_ids?: string[]; school_names?: string[]; school_codes?: string[]; coordinator_ids?: string[]; coordinator_names?: string[]; lot_count?: number; }
 export interface CatalogItem { id: string; name: string; bot_code: string; active?: boolean; sort_order?: number; }
-export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; departure_ids?: string[]; departure_names?: string[]; }
+export interface AdminUser { id: string; name: string; email: string; role: Role; active: boolean; school_ids?: string[]; departure_ids?: string[]; departure_names?: string[]; custom_permission_count?: number; }
+export type PermissionAction = 'view' | 'create' | 'edit' | 'delete';
+export type PermissionModule = 'departures' | 'lots' | 'moderation' | 'gallery' | 'activities' | 'schools' | 'passengers' | 'users' | 'imports';
+export type PermissionMatrix = Record<PermissionModule, Record<PermissionAction, boolean>>;
+export interface UserPermissions { role: Role; customized: boolean; permissions: PermissionMatrix; }
 export interface LotSummary { id: string; event_date: string; school_id: string | null; school_name: string; departure_id?: string; departure_name?: string; departure_destination?: string; departure_type?: 'MICRO' | 'AEREO'; departure_public_code?: string | null; school_names?: string[]; activity_id?: string | null; activity_name: string; album_name?: string; shift_name: string; version_id: string; version_number: number; status: string; approved_count: number; submitted_at?: string | null; version_created_at?: string | null; created_by_name?: string | null; created_by_id?: string | null; }
 export interface Media { id: string; kind: 'IMAGE' | 'VIDEO'; status: string; original_name: string; mime_type: string; size_bytes: number; purge_after?: string | null; watermark_status?: string | null; watermark_error?: string | null; }
 export interface MediaProcessing { id: string; status: string; watermark_status: string | null; watermark_error: string | null; watermark_attempts: number; }
 export interface Passenger { id:string; external_number?:string|null; full_name:string; document_type:string; document_number:string; birth_date?:string|null; document_expires_at?:string|null; country?:string|null; passenger_status?:string|null; bonus?:string|null; phone?:string|null; mobile?:string|null; email?:string|null; active:boolean; created_at?:string; updated_at:string; deactivated_at?:string|null; }
 
-export interface PassengerImport { id:string; file_name:string; total_rows:number; created_rows:number; updated_rows:number; rejected_rows:number; created_at:string; imported_by_name:string; }
-async function parseResponse<T>(response: Response): Promise<T> {
-  if (response.status === 204) return undefined as T;
-  const contentType = response.headers.get('content-type') ?? '';
-  if (!contentType.includes('application/json')) {
-    if (!response.ok) throw new Error('No se pudo completar la solicitud');
-    return await response.blob() as T;
+export interface PassengerImport { id:string; file_name:string; total_rows:number; created_rows:number; updated_rows:number; rejected_rows:number; created_at:string; imported_by_name:string; school_id?:string|null; school_code?:string|null; school_name?:string|null; }
+export class ApiError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly code: string | undefined,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ApiError';
   }
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error?.message || 'No se pudo completar la solicitud');
-  return data as T;
 }
 
+function readApiError(data: unknown): { code?: string; message: string } {
+  const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+  const nested = payload.error && typeof payload.error === 'object'
+    ? (payload.error as Record<string, unknown>)
+    : undefined;
+
+  const message = typeof nested?.message === 'string'
+    ? nested.message
+    : typeof payload.error === 'string'
+      ? payload.error
+      : typeof payload.message === 'string'
+        ? payload.message
+        : 'No se pudo completar la solicitud. Intentá nuevamente.';
+
+  const code = typeof nested?.code === 'string'
+    ? nested.code
+    : typeof payload.code === 'string'
+      ? payload.code
+      : undefined;
+
+  return { code, message };
+}
+
+async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
+
+  const contentType = response.headers.get('content-type') ?? '';
+  if (!contentType.includes('application/json')) {
+    if (!response.ok) {
+      throw new ApiError(response.status, undefined, 'No se pudo completar la solicitud. Intentá nuevamente.');
+    }
+    return await response.blob() as T;
+  }
+
+  const data: unknown = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = readApiError(data);
+    throw new ApiError(response.status, error.code, error.message);
+  }
+
+  return data as T;
+}
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, {
     credentials: 'include',
@@ -83,7 +128,7 @@ export const publicGalleryApi = {
   downloadUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/download`,
 };
 
-export interface PublicDeparture { id: string; public_code: string; name: string; destination: string; type: 'MICRO' | 'AEREO'; event_date: string; }
+export interface PublicDeparture { id: string; public_code: string; name: string; destination: string; type: 'MICRO' | 'AEREO'; event_date: string; start_date: string; end_date: string; }
 export const publicDepartureApi = {
   search: (text: string) => publicRequest<{ items: PublicDeparture[] }>(`/public/departures/search?q=${encodeURIComponent(text)}`),
   departure: (code: string) => publicRequest<{ departure: PublicDeparture; items: LotSummary[] }>(`/public/departures/${encodeURIComponent(code)}`),
