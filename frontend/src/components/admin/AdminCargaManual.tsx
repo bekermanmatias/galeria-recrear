@@ -9,7 +9,7 @@ type UploadFile = { id:string; file:File; preview:string; isVideo:boolean; isHei
 const validName=/\.(jpe?g|jpe|jfif|png|heic|heif|mp4|mov)$/i;
 const validTypes=new Set(['image/jpeg','image/pjpeg','image/png','image/heic','image/heif','video/mp4','video/quicktime']);
 const MAX_PARALLEL_UPLOADS=3;
-const dateInput:React.CSSProperties={width:'100%',height:44,padding:'12px 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:14,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6};
+const dateInput:React.CSSProperties={width:'100%',minWidth:0,height:44,padding:'12px 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:14,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6};
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
 const CUSTOM_ACTIVITY = '__personalizada__';
 const formatDepartureRange = (item: Departure) => { const start=(item.start_date??item.event_date).slice(0,10); const end=(item.end_date??start).slice(0,10); return start===end?start:end; };
