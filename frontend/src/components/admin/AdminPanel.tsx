@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Shield } from 'lucide-react';
+import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Shield, QrCode } from 'lucide-react';
 import { api, type SessionUser } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
@@ -8,8 +8,9 @@ import AdminCargaManual from './AdminCargaManual';
 import AdminSalidas from './AdminSalidas';
 import AdminPasajeros from './AdminPasajeros';
 import RolesView from './RolesView';
+import AdminQRScanner from './AdminQRScanner';
 
-type TabId = 'carga' | 'moderacion' | 'galeria' | 'salidas' | 'pasajeros' | 'colegios' | 'actividades' | 'usuarios' | 'roles';
+type TabId = 'carga' | 'moderacion' | 'galeria' | 'salidas' | 'pasajeros' | 'colegios' | 'actividades' | 'usuarios' | 'roles' | 'escaner';
 
 export default function AdminPanel() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -38,6 +39,7 @@ export default function AdminPanel() {
     { id: 'actividades', label: 'Actividades', icon: List, allowed: isSysAdmin || p.activities?.view },
     { id: 'usuarios', label: 'Usuarios', icon: Users, allowed: isSysAdmin || p.users?.view },
     { id: 'roles', label: 'Roles', icon: Shield, allowed: isSysAdmin },
+    { id: 'escaner', label: 'Escáner QR', icon: QrCode, allowed: isSysAdmin || p.passengers?.view },
   ];
 
   const allowedTabs = allTabs.filter(t => t.allowed);
@@ -79,6 +81,7 @@ export default function AdminPanel() {
     {currentTab === 'actividades' && <CatalogView kind="activities" />}
     {currentTab === 'usuarios' && <UsersView />}
     {currentTab === 'roles' && <RolesView />}
+    {currentTab === 'escaner' && <AdminQRScanner />}
   </DashboardLayout>;
 }
 
