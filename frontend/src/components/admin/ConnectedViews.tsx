@@ -93,24 +93,24 @@ export function CatalogView({ kind }: { kind: ResourceKind }) {
       </DataTable>
     </div>
     {/* Mobile list */}
-    <div className="catalog-mobile" style={{flexDirection:'column',gap:0,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+    <div className="catalog-mobile" style={{flexDirection:'column',gap:0}}>
       {!filtered.length && <div style={{padding:28,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron {pluralLabel.toLowerCase()}.</div>}
-      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'12px 14px',borderBottom:idx<filtered.length-1?'1px solid #F1F5F9':'none',opacity:item.active!==false?1:.6}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77'}}>{item.name}</div>
+      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 0',borderBottom:'1px solid #F1F5F9',opacity:item.active!==false?1:.6}}>
+        <div style={{flex:1,minWidth:0,paddingRight:4}}>
+          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77',lineHeight:1.3,overflowWrap:'break-word'}}>{item.name}</div>
           <div style={{fontSize:12,color:'#64748B',marginTop:2}}>Cód: {item.bot_code}</div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-          <AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/>
-          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
-          {kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}
+        <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+          <AdminStatusSelect compact active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/>
+          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={15}/></button>
+          {kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={15}/></button>}
         </div>
       </div>)}
     </div>
     {open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}
   </div>;
 }
-export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean }) {
+export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false, compact = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -120,11 +120,11 @@ export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabe
   }, []);
   const choose = (next: boolean) => { setOpen(false); if (next !== active) onChange(next); };
   return <div ref={ref} style={{ position: 'relative', display: fullWidth ? 'block' : 'inline-block', width: fullWidth ? '100%' : undefined }}>
-    <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="listbox" aria-expanded={open} style={{ display: 'inline-flex', width: fullWidth ? '100%' : undefined, alignItems: 'center', justifyContent: 'space-between', gap: 18, minWidth: 105, padding: '6px 8px 6px 10px', border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', color: '#334155', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-      {active ? activeLabel : inactiveLabel}<ChevronDown size={14} color="#64748B" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s' }} />
+    <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="listbox" aria-expanded={open} style={{ display: 'inline-flex', width: fullWidth ? '100%' : undefined, alignItems: 'center', justifyContent: 'space-between', gap: compact ? 4 : 14, minWidth: compact ? 'auto' : 95, padding: compact ? '4px 6px 4px 8px' : '6px 8px 6px 10px', border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', color: '#334155', fontSize: compact ? 11 : 12, fontWeight: 600, cursor: 'pointer' }}>
+      {active ? activeLabel : inactiveLabel}<ChevronDown size={compact ? 12 : 14} color="#64748B" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s', flexShrink: 0 }} />
     </button>
-    {open && <div role="listbox" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, minWidth: '100%', zIndex: 30, padding: 4, border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.12)' }}>
-      {[true, false].map(value => <button key={String(value)} type="button" role="option" aria-selected={active === value} onClick={() => choose(value)} style={{ display: 'block', width: '100%', padding: '7px 9px', border: 0, borderRadius: 4, background: active === value ? '#F8FAFC' : '#fff', color: '#334155', textAlign: 'left', font: 'inherit', fontSize: 12, cursor: 'pointer' }}>{value ? activeLabel : inactiveLabel}</button>)}
+    {open && <div role="listbox" style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: 95, zIndex: 30, padding: 4, border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', boxShadow: '0 8px 20px rgba(15,23,42,.12)' }}>
+      {[true, false].map(value => <button key={String(value)} type="button" role="option" aria-selected={active === value} onClick={() => choose(value)} style={{ display: 'block', width: '100%', padding: '6px 8px', border: 0, borderRadius: 4, background: active === value ? '#F8FAFC' : '#fff', color: '#334155', textAlign: 'left', font: 'inherit', fontSize: 12, cursor: 'pointer', whiteSpace: 'nowrap' }}>{value ? activeLabel : inactiveLabel}</button>)}
     </div>}
   </div>;
 }
@@ -165,17 +165,17 @@ export function SchoolsView() {
       </DataTable>
     </div>
     {/* Mobile list */}
-    <div className="schools-mobile" style={{flexDirection:'column',gap:0,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+    <div className="schools-mobile" style={{flexDirection:'column',gap:0}}>
       {!filtered.length && <div style={{padding:28,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron colegios.</div>}
-      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'12px 14px',borderBottom:idx<filtered.length-1?'1px solid #F1F5F9':'none',opacity:item.active!==false?1:.6}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77'}}>{item.name}</div>
+      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 0',borderBottom:'1px solid #F1F5F9',opacity:item.active!==false?1:.6}}>
+        <div style={{flex:1,minWidth:0,paddingRight:4}}>
+          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77',lineHeight:1.3,overflowWrap:'break-word'}}>{item.name}</div>
           <div style={{fontSize:12,color:'#64748B',marginTop:2}}>Cód: {item.code}{item.bot_code ? ` · Bot: ${item.bot_code}` : ''}</div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
-          <AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/>
-          <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>
-          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+        <div style={{display:'flex',alignItems:'center',gap:4,flexShrink:0}}>
+          <AdminStatusSelect compact active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/>
+          <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={15}/></button>
+          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={15}/></button>
         </div>
       </div>)}
     </div>
