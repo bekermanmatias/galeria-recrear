@@ -155,21 +155,41 @@ export default function AdminPasajeros() {
         .page-header-search { width: 100% !important; }
         .page-header-search input { width: 100% !important; }
         .page-header-btn { flex: 1 1 auto; min-width: 0; justify-content: center !important; }
-        
-        .passengers-table thead { display: none; }
-        .passengers-table, .passengers-table tbody, .passengers-table tr, .passengers-table td { display: block; width: 100%; box-sizing: border-box; }
-        .passengers-table { min-width: 0 !important; }
-        .passengers-table tr { margin-bottom: 16px; border: 1px solid #E2E8F0 !important; border-radius: 8px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
-        .passengers-table td { display: flex; flex-direction: column; align-items: flex-start; padding: 0 !important; border: none !important; text-align: left; width: 100%; box-sizing: border-box; gap: 4px; word-break: break-word; }
-        .passengers-table td::before { content: attr(data-label); font-weight: 600; font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 2px; }
-        .passengers-table td:last-child { flex-direction: row; justify-content: flex-end; gap: 8px; margin-top: 8px; padding-top: 12px !important; border-top: 1px solid #F1F5F9 !important; }
-        .passengers-table td:last-child::before { display: none; }
+        .passengers-table-wrap { display: none; }
+        .passengers-mobile { display: flex !important; }
+      }
+      @media (min-width: 769px) {
+        .passengers-mobile { display: none !important; }
       }
     `}} />
-    <div style={{overflowX:'auto'}}><table className="passengers-table" style={{width:'100%',minWidth:1420,borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid #E2E8F0'}}>{['Pasajero','Documento','Contacto','Colegio','Salida','Pulsera','Estado','Actualización','Acciones'].map(value=><th key={value} style={{padding:'12px 14px',textAlign:'left',fontSize:12,color:'#64748B',textTransform:'uppercase'}}>{value}</th>)}</tr></thead><tbody>
+    {/* Desktop table */}
+    <div className="passengers-table-wrap" style={{overflowX:'auto'}}><table className="passengers-table" style={{width:'100%',minWidth:1420,borderCollapse:'collapse'}}><thead><tr style={{borderBottom:'1px solid #E2E8F0'}}>{['Pasajero','Documento','Contacto','Colegio','Salida','Pulsera','Estado','Actualización','Acciones'].map(value=><th key={value} style={{padding:'12px 14px',textAlign:'left',fontSize:12,color:'#64748B',textTransform:'uppercase'}}>{value}</th>)}</tr></thead><tbody>
       {items.map(item=><tr key={item.id} style={{borderBottom:'1px solid #EAF0F5',opacity:item.active?1:.58}}><td data-label="Pasajero" style={td}><strong style={{color:'#1A4B77'}}>{item.full_name}</strong>{item.external_number&&<div style={{fontSize:12,color:'#64748B'}}>Nro. {item.external_number}</div>}</td><td data-label="Documento" style={td}>{item.document_type} {item.document_number}</td><td data-label="Contacto" style={td}><div>{item.email||'-'}</div><small style={{color:'#64748B'}}>{item.mobile||item.phone||''}</small></td><td data-label="Colegio" style={td}><AssociationChips items={item.schools} empty="Sin colegio"/></td><td data-label="Salida" style={td}><AssociationChips items={item.departures} empty="Sin salida"/></td><td data-label="Pulsera" style={td}>{item.wristband_code ? <span style={{padding:'3px 6px',borderRadius:4,background:'#DCFCE7',color:'#166534',fontSize:12,fontWeight:600,fontFamily:'monospace'}}>{item.wristband_code}</span> : <span style={{color:'#94A3B8'}}>-</span>}</td><td data-label="Estado" style={td}><AdminStatusSelect active={item.active} onChange={next=>{if(!next)setStatusChange({item,next});else void updateStatus(item,next);}}/></td><td data-label="Actualización" style={td}>{date(item.updated_at)}</td><td data-label="Acciones" style={td}><button onClick={()=>{setEditing(item);setForm(toForm(item));setError('');}} title="Editar pasajero" aria-label="Editar pasajero" style={iconButton}><Edit2 size={16}/></button><button onClick={()=>setWristbandTarget(item)} title={item.wristband_code?'Ver o cambiar pulsera':'Vincular pulsera'} aria-label="Vincular pulsera" style={{...iconButton,color:item.wristband_code?'#15803D':'#1A4B77'}}><QrCode size={16}/></button><button onClick={()=>setDeleteTarget(item)} title="Eliminar pasajero definitivamente" aria-label="Eliminar pasajero definitivamente" style={{...iconButton,color:'#DC2626'}}><Trash2 size={16}/></button></td></tr>)}
       {!items.length && <tr><td colSpan={9} style={{padding:36,textAlign:'center',color:'#94A3B8'}}>No se encontraron pasajeros.</td></tr>}
     </tbody></table></div>
+    {/* Mobile compact list */}
+    <div className="passengers-mobile" style={{flexDirection:'column',gap:0,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+      {!items.length && <div style={{padding:36,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron pasajeros.</div>}
+      {items.map((item,idx)=><div key={item.id} onClick={()=>{setEditing(item);setForm(toForm(item));setError('');}} role="button" tabIndex={0} style={{display:'flex',alignItems:'center',gap:12,padding:'13px 16px',borderBottom:idx<items.length-1?'1px solid #F1F5F9':'none',cursor:'pointer',opacity:item.active?1:.6,transition:'background .15s'}} onMouseEnter={e=>(e.currentTarget.style.background='#F8FAFC')} onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
+        {/* Avatar inicial */}
+        <div style={{flexShrink:0,width:38,height:38,borderRadius:'50%',background:'#EEF4F8',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:15,color:'#1A4B77'}}>{item.full_name.charAt(0)}</div>
+        {/* Info principal */}
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{item.full_name}</div>
+          <div style={{fontSize:12,color:'#64748B',marginTop:2}}>{item.document_type} {item.document_number}{item.schools[0]?' · '+item.schools[0].label:''}</div>
+        </div>
+        {/* Pulsera badge */}
+        <div style={{flexShrink:0,textAlign:'right'}}>
+          {item.wristband_code
+            ? <span style={{display:'inline-flex',alignItems:'center',gap:3,padding:'3px 8px',borderRadius:12,background:'#DCFCE7',color:'#15803D',fontSize:11,fontWeight:700}}><QrCode size={11}/>{item.wristband_code}</span>
+            : <span style={{fontSize:11,color:'#CBD5E1'}}>Sin pulsera</span>}
+        </div>
+        {/* Quick actions */}
+        <div style={{flexShrink:0,display:'flex',gap:4}} onClick={e=>e.stopPropagation()}>
+          <button onClick={()=>setWristbandTarget(item)} title="Vincular pulsera" style={{...iconButton,color:item.wristband_code?'#15803D':'#94A3B8',width:32,height:32}}><QrCode size={15}/></button>
+        </div>
+      </div>)}
+    </div>
     {!!history.length && <section style={{marginTop:32}}><h3 style={{fontSize:16,color:'#1A4B77',margin:'0 0 12px'}}>Últimas importaciones</h3><div style={{display:'grid',gap:8}}>{history.slice(0,5).map(item=><div key={item.id} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'10px 12px',border:'1px solid #E2E8F0',borderRadius:8,fontSize:13}}><span><FileSpreadsheet size={15} style={{verticalAlign:'-3px',marginRight:7,color:'#1A4B77'}}/>{item.file_name}</span><span style={{color:'#64748B'}}>{item.created_rows} nuevos · {item.updated_rows} actualizados · {date(item.created_at)} · {item.imported_by_name}</span></div>)}</div></section>}
     {editing && <Modal title="Editar pasajero" onClose={()=>setEditing(null)}><PassengerFields form={form} setForm={setForm} passenger={editing} schools={filterOptions.schools} onAssignSchool={school=>void assignSchool(editing,school)} associationBusy={associationBusy}/>{error&&<p style={{color:'#B91C1C',fontSize:13}}>{error}</p>}<Actions onCancel={()=>setEditing(null)} onSave={save} busy={busy}/></Modal>}
     {importOpen && <Modal title="Importar pasajeros desde Excel" onClose={()=>setImportOpen(false)}><p style={{margin:'0 0 18px',fontSize:13,color:'#64748B',lineHeight:1.55}}>Subí un archivo XLSX o XLS con el formato AV26000. Antes de importar validaremos filas, documentos y datos obligatorios; importes, pagos y deudas no se incorporan.</p><label style={{minHeight:150,border:`1.5px dashed ${file?'#1A4B77':'#CBD5E1'}`,borderRadius:10,background:file?'#F8FBFD':'#F8FAFC',display:'grid',placeItems:'center',padding:18,cursor:'pointer',textAlign:'center'}}><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={event=>{setFile(event.target.files?.[0]??null);setPreview(null);setError('');}} style={{display:'none'}}/>{file?<div><FileSpreadsheet size={30} color="#1A4B77"/><strong style={{display:'block',marginTop:8,fontSize:14,color:'#1A4B77'}}>{file.name}</strong><span style={{fontSize:12,color:'#64748B'}}>{Math.max(1,Math.round(file.size/1024))} KB · Hacé clic para reemplazarlo</span></div>:<div><Upload size={30} color="#1A4B77"/><strong style={{display:'block',marginTop:8,fontSize:14,color:'#1A4B77'}}>Seleccioná el archivo de pasajeros</strong><span style={{fontSize:12,color:'#64748B'}}>XLSX o XLS · hasta 12 MB</span></div>}</label>{file&&<button type="button" onClick={()=>{setFile(null);setPreview(null);setError('')}} style={{marginTop:8,border:0,background:'none',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'}}>Quitar archivo</button>}{error&&<p style={{color:'#B91C1C',fontSize:13}}>{error}</p>}{preview&&<ImportPreview preview={preview}/>}<Actions onCancel={()=>setImportOpen(false)} onSave={preview?.valid?commitImport:previewImport} busy={busy} disabled={!file}/></Modal>}
