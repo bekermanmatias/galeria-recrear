@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Edit2, FileSpreadsheet, Globe, Mail, Phone, QrCode, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
+import { Edit2, FileSpreadsheet, QrCode, Search, SlidersHorizontal, Trash2, Upload, X } from 'lucide-react';
 import { adminRequest, type Passenger, type PassengerImport } from '../../lib/api';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { AdminStatusSelect } from './ConnectedViews';
@@ -136,8 +136,13 @@ export default function AdminPasajeros() {
       <div><h2 style={{margin:'0 0 5px',fontSize:24,color:'#1A4B77'}}>Pasajeros</h2><p style={{margin:0,color:'#64748B',fontSize:14}}>Padrón interno de pasajeros para futuras asignaciones a colegios y salidas.</p></div>
       <div className="page-header-actions" style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
         <div className="page-header-search" style={{position:'relative'}}><Search size={16} style={{position:'absolute',left:11,top:11,color:'#94A3B8'}}/><input value={search} onChange={event=>setSearch(event.target.value)} placeholder="Buscar nombre, documento, colegio o salida..." style={{...input,width:300,paddingLeft:34}}/></div>
-        <button className="page-header-btn" onClick={()=>setFilterOpen(value=>!value)} style={{...button,background:filterOpen?'#EEF4F8':'#fff'}}><SlidersHorizontal size={16}/>Filtros{activeFilters.length ? ` (${activeFilters.length})` : ''}</button>
-        <button className="page-header-btn" onClick={()=>{setImportOpen(true);setPreview(null);setFile(null);setError('');setMessage('');}} style={button}><Upload size={16}/>Importar Excel</button>
+        <div className="passengers-action-bar">
+          <button className="page-header-btn passengers-action-btn" onClick={()=>setFilterOpen(value=>!value)} style={{...button,background:filterOpen?'#EEF4F8':'#fff',position:'relative'}}>
+            <SlidersHorizontal size={16}/>Filtros
+            {activeFilters.length > 0 && <span style={{position:'absolute',top:-5,right:-5,width:18,height:18,borderRadius:'50%',background:'#1A4B77',color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>{activeFilters.length}</span>}
+          </button>
+          <button className="page-header-btn passengers-action-btn" onClick={()=>{setImportOpen(true);setPreview(null);setFile(null);setError('');setMessage('');}} style={button}><Upload size={16}/>Importar Excel</button>
+        </div>
       </div>
     </header>
     {filterOpen && <section style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(190px,1fr))',gap:10,padding:14,marginBottom:12,border:'1px solid #E2E8F0',borderRadius:8,background:'#F8FAFC'}}>
@@ -154,14 +159,16 @@ export default function AdminPasajeros() {
       @media (max-width: 768px) {
         .page-header { flex-direction: column !important; align-items: flex-start !important; }
         .page-header-actions { width: 100% !important; flex-wrap: wrap !important; }
-        .page-header-search { width: 100% !important; }
+        .page-header-search { width: 100% !important; order: 2; }
         .page-header-search input { width: 100% !important; }
-        .page-header-btn { flex: 1 1 auto; min-width: 0; justify-content: center !important; }
+        .passengers-action-bar { order: 1; width: 100%; display: flex; gap: 8px; }
+        .passengers-action-btn { flex: 1; justify-content: center; height: 40px; border-radius: 10px !important; font-size: 13px !important; }
         .passengers-table-wrap { display: none; }
         .passengers-mobile { display: block !important; }
       }
       @media (min-width: 769px) {
         .passengers-mobile { display: none !important; }
+        .passengers-action-bar { display: contents; }
       }
     `}} />
     {/* Desktop table */}
@@ -215,94 +222,46 @@ function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:
 const iconButton: React.CSSProperties = {display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#1A4B77'};
 
 function PassengerViewModal({passenger,onClose,onEdit,onWristband}:{passenger:Passenger;onClose:()=>void;onEdit:()=>void;onWristband:()=>void}) {
-  const fmt = (val?:string|null) => val ? val.slice(0,10).split('-').reverse().join('/') : null;
-  const initials = passenger.full_name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
-  const hasContact = passenger.email || passenger.phone || passenger.mobile;
-
-  const Field2 = ({label,value,icon}:{label:string;value?:string|null;icon?:React.ReactNode}) => value ? (
-    <div style={{display:'flex',flexDirection:'column',gap:2}}>
-      <span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.05em'}}>{label}</span>
-      <span style={{fontSize:13,color:'#1E293B',display:'flex',alignItems:'center',gap:5}}>{icon}{value}</span>
-    </div>
-  ) : null;
-
+  const row = (label:string,value:string|null|undefined) => value ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>{label}</span><span style={{fontSize:14,color:'#1E293B'}}>{value}</span></div> : null;
   return (
-    <div style={{position:'fixed',inset:0,zIndex:100,display:'flex',alignItems:'flex-end',background:'rgba(15,23,42,.55)'}} onClick={onClose}>
-      <div style={{width:'100%',maxHeight:'88vh',overflowY:'auto',borderRadius:'20px 20px 0 0',background:'#fff'}} onClick={e=>e.stopPropagation()}>
-
-        {/* Drag handle */}
-        <div style={{display:'flex',justifyContent:'center',paddingTop:10,paddingBottom:4}}>
-          <div style={{width:36,height:4,borderRadius:2,background:'#E2E8F0'}}/>
-        </div>
-
-        {/* Hero header */}
-        <div style={{background:'linear-gradient(135deg,#1A4B77 0%,#2563EB 100%)',padding:'16px 20px 24px',position:'relative'}}>
-          <button onClick={onClose} style={{position:'absolute',top:12,right:14,border:0,background:'rgba(255,255,255,.18)',borderRadius:8,color:'#fff',cursor:'pointer',padding:'5px 7px',lineHeight:0}}><X size={17}/></button>
-          <div style={{display:'flex',alignItems:'center',gap:14,marginTop:4}}>
-            {/* Avatar */}
-            <div style={{width:52,height:52,borderRadius:'50%',background:'rgba(255,255,255,.22)',display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:19,color:'#fff',flexShrink:0,border:'2px solid rgba(255,255,255,.35)'}}>{initials}</div>
-            <div style={{minWidth:0}}>
-              <div style={{fontWeight:700,fontSize:15,color:'#fff',lineHeight:1.3}}>{passenger.full_name}</div>
-              {passenger.external_number && <div style={{fontSize:12,color:'rgba(255,255,255,.72)',marginTop:2}}>Nro. {passenger.external_number}</div>}
-              <div style={{marginTop:6,display:'flex',gap:6,flexWrap:'wrap'}}>
-                {/* Status badge */}
-                <span style={{display:'inline-flex',alignItems:'center',gap:4,padding:'2px 8px',borderRadius:10,background:passenger.active?'rgba(34,197,94,.22)':'rgba(239,68,68,.22)',color:passenger.active?'#86EFAC':'#FCA5A5',fontSize:11,fontWeight:700}}>
-                  <span style={{width:5,height:5,borderRadius:'50%',background:passenger.active?'#4ADE80':'#F87171',display:'inline-block'}}/>
-                  {passenger.active?'Activo':'Inactivo'}
-                </span>
-                {/* Pulsera badge */}
-                {passenger.wristband_code
-                  ? <span style={{display:'inline-flex',alignItems:'center',gap:4,padding:'2px 8px',borderRadius:10,background:'rgba(34,197,94,.22)',color:'#86EFAC',fontSize:11,fontWeight:700}}><QrCode size={11}/>{passenger.wristband_code}</span>
-                  : <span style={{display:'inline-flex',alignItems:'center',gap:4,padding:'2px 8px',borderRadius:10,background:'rgba(255,255,255,.14)',color:'rgba(255,255,255,.6)',fontSize:11}}>Sin pulsera</span>}
-              </div>
-            </div>
+    <div style={{position:'fixed',inset:0,zIndex:100,display:'flex',alignItems:'flex-end',background:'rgba(15,23,42,.5)'}} onClick={onClose}>
+      <div style={{width:'100%',maxHeight:'90vh',overflowY:'auto',borderRadius:'16px 16px 0 0',background:'#fff',padding:'0 0 24px'}} onClick={e=>e.stopPropagation()}>
+        {/* Handle bar */}
+        <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}><div style={{width:40,height:4,borderRadius:2,background:'#CBD5E1'}}/></div>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px 14px',borderBottom:'1px solid #F1F5F9'}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:16,color:'#1A4B77'}}>{passenger.full_name}</div>
+            {passenger.external_number && <div style={{fontSize:12,color:'#94A3B8',marginTop:2}}>Nro. {passenger.external_number}</div>}
           </div>
+          <button onClick={onClose} style={{border:0,background:'none',color:'#94A3B8',cursor:'pointer',padding:4}}><X size={20}/></button>
         </div>
-
-        {/* Content */}
-        <div style={{padding:'18px 20px 0'}}>
-
-          {/* Identificación */}
-          <div style={{marginBottom:18}}>
-            <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.08em'}}>Identificación</p>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,padding:'14px',background:'#F8FAFC',borderRadius:10,border:'1px solid #F1F5F9'}}>
-              <Field2 label="Tipo doc." value={passenger.document_type}/>
-              <Field2 label="Número" value={passenger.document_number}/>
-              <Field2 label="Fecha de nac." value={fmt(passenger.birth_date)} icon={<Calendar size={12} style={{color:'#94A3B8'}}/>}/>
-              <Field2 label="Venc. documento" value={fmt(passenger.document_expires_at)} icon={<Calendar size={12} style={{color:'#94A3B8'}}/>}/>
-              <Field2 label="País" value={passenger.country} icon={<Globe size={12} style={{color:'#94A3B8'}}/>}/>
-              <Field2 label="Estado" value={passenger.passenger_status}/>
-            </div>
+        {/* Data */}
+        <div style={{padding:'0 20px'}}>
+          {row('Documento',`${passenger.document_type} ${passenger.document_number}`)}
+          {row('Fecha de nacimiento', passenger.birth_date ? passenger.birth_date.slice(0,10).split('-').reverse().join('/') : null)}
+          {row('País', passenger.country)}
+          {row('Estado pasajero', passenger.passenger_status)}
+          {row('Teléfono', passenger.phone)}
+          {row('Celular', passenger.mobile)}
+          {row('Correo electrónico', passenger.email)}
+          {row('Vencimiento documento', passenger.document_expires_at ? passenger.document_expires_at.slice(0,10).split('-').reverse().join('/') : null)}
+          {/* Pulsera */}
+          <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}>
+            <span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Pulsera</span>
+            {passenger.wristband_code
+              ? <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:12,background:'#DCFCE7',color:'#15803D',fontSize:13,fontWeight:700,width:'fit-content'}}><QrCode size={14}/>{passenger.wristband_code}</span>
+              : <span style={{fontSize:13,color:'#94A3B8'}}>Sin pulsera asignada</span>}
           </div>
-
-          {/* Contacto */}
-          {hasContact && <div style={{marginBottom:18}}>
-            <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.08em'}}>Contacto</p>
-            <div style={{display:'grid',gridTemplateColumns:'1fr',gap:10,padding:'14px',background:'#F8FAFC',borderRadius:10,border:'1px solid #F1F5F9'}}>
-              <Field2 label="Correo" value={passenger.email} icon={<Mail size={12} style={{color:'#94A3B8'}}/>}/>
-              <Field2 label="Teléfono" value={passenger.phone} icon={<Phone size={12} style={{color:'#94A3B8'}}/>}/>
-              <Field2 label="Celular" value={passenger.mobile} icon={<Phone size={12} style={{color:'#94A3B8'}}/>}/>
-            </div>
-          </div>}
-
-          {/* Asignaciones */}
-          {(passenger.schools?.length || passenger.departures?.length) ? <div style={{marginBottom:18}}>
-            <p style={{margin:'0 0 10px',fontSize:11,fontWeight:700,color:'#94A3B8',textTransform:'uppercase',letterSpacing:'.08em'}}>Asignaciones</p>
-            <div style={{padding:'14px',background:'#F8FAFC',borderRadius:10,border:'1px solid #F1F5F9',display:'flex',flexDirection:'column',gap:12}}>
-              {passenger.schools?.length ? <div><span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase'}}>Colegios</span><div style={{marginTop:6}}><AssociationChips items={passenger.schools} empty="Sin colegio"/></div></div> : null}
-              {passenger.departures?.length ? <div><span style={{fontSize:10,fontWeight:700,color:'#94A3B8',textTransform:'uppercase'}}>Salidas</span><div style={{marginTop:6}}><AssociationChips items={passenger.departures} empty="Sin salida"/></div></div> : null}
-            </div>
-          </div> : null}
+          {/* Colegios */}
+          {passenger.schools?.length ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Colegios</span><AssociationChips items={passenger.schools} empty="Sin colegio"/></div> : null}
+          {/* Salidas */}
+          {passenger.departures?.length ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Salidas</span><AssociationChips items={passenger.departures} empty="Sin salida"/></div> : null}
         </div>
-
-        {/* Action buttons fixed at bottom */}
-        <div style={{display:'flex',gap:10,padding:'4px 20px 28px'}}>
-          <button onClick={onWristband} style={{flex:1,height:46,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'1.5px solid #DCE3EB',borderRadius:10,background:'#fff',color:'#1A4B77',fontSize:14,fontWeight:600,cursor:'pointer'}}>
-            <QrCode size={17}/>{passenger.wristband_code ? 'Gestionar pulsera' : 'Asignar pulsera'}
-          </button>
-          <button onClick={onEdit} style={{flex:1,height:46,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'none',borderRadius:10,background:'#1A4B77',color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer'}}>
-            <Edit2 size={17}/>Editar datos
-          </button>
+        {/* Action buttons */}
+        <div style={{display:'flex',gap:10,padding:'20px 20px 0'}}>
+          <button onClick={onWristband} style={{flex:1,height:42,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'1px solid #DCE3EB',borderRadius:8,background:'#fff',color:'#1A4B77',fontSize:14,fontWeight:600,cursor:'pointer'}}><QrCode size={16}/>{passenger.wristband_code ? 'Ver pulsera' : 'Asignar pulsera'}</button>
+          <button onClick={onEdit} style={{flex:1,height:42,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'none',borderRadius:8,background:'#1A4B77',color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer'}}><Edit2 size={16}/>Editar</button>
         </div>
       </div>
     </div>
