@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
-import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image, Bus, ContactRound, Shield, QrCode } from 'lucide-react';
+import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image as ImageIcon, Bus, ContactRound, Shield, QrCode } from 'lucide-react';
 import { api, type SessionUser } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
-import { UsersView, CatalogView, SchoolsView, GalleryView } from './ConnectedViews';
+import { UsersView, CatalogView, SchoolsView } from './ConnectedViews';
 import AdminCargaManual from './AdminCargaManual';
+import AdminGaleria from './AdminGaleria';
+import AdminEstadoCargas from './AdminEstadoCargas';
 import AdminSalidas from './AdminSalidas';
 import AdminPasajeros from './AdminPasajeros';
 import RolesView from './RolesView';
 import AdminQRScanner from './AdminQRScanner';
 
-type TabId = 'carga' | 'moderacion' | 'galeria' | 'salidas' | 'pasajeros' | 'colegios' | 'actividades' | 'usuarios' | 'roles' | 'escaner';
+type TabId = 'carga' | 'moderacion' | 'lotes' | 'salidas' | 'pasajeros' | 'colegios' | 'actividades' | 'usuarios' | 'roles' | 'escaner';
 
 export default function AdminPanel() {
   const [user, setUser] = useState<SessionUser | null>(null);
@@ -32,10 +34,10 @@ export default function AdminPanel() {
   const allTabs = [
     { id: 'carga', label: 'Subir material', icon: UploadIcon, allowed: isSysAdmin || p.lots?.create },
     { id: 'moderacion', label: 'Moderación', icon: LayoutGrid, allowed: isSysAdmin || p.moderation?.view },
-    { id: 'galeria', label: 'Galería', icon: Image, allowed: isSysAdmin || p.gallery?.view },
+    { id: 'lotes', label: 'Lotes', icon: ImageIcon, allowed: isSysAdmin || p.lots?.view },
     { id: 'salidas', label: 'Salidas', icon: Bus, allowed: isSysAdmin || p.departures?.view },
-    { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound, allowed: isSysAdmin || p.passengers?.view },
     { id: 'colegios', label: 'Colegios', icon: School, allowed: isSysAdmin || p.schools?.view },
+    { id: 'pasajeros', label: 'Pasajeros', icon: ContactRound, allowed: isSysAdmin || p.passengers?.view },
     { id: 'actividades', label: 'Actividades', icon: List, allowed: isSysAdmin || p.activities?.view },
     { id: 'usuarios', label: 'Usuarios', icon: Users, allowed: isSysAdmin || p.users?.view },
     { id: 'roles', label: 'Roles', icon: Shield, allowed: isSysAdmin },
@@ -71,23 +73,22 @@ export default function AdminPanel() {
 
   const uiRole = user.role === 'ADMIN' ? 'admin' : user.role === 'COORDINATOR' ? 'coordinator' : 'parent';
 
+  let tabContent = null;
+  switch (currentTab) {
+    case 'carga': tabContent = <AdminCargaManual />; break;
+    case 'moderacion': tabContent = <AdminModeration />; break;
+    case 'lotes': tabContent = <AdminEstadoCargas />; break;
+    case 'salidas': tabContent = <AdminSalidas />; break;
+    case 'pasajeros': tabContent = <AdminPasajeros />; break;
+    case 'colegios': tabContent = <SchoolsView />; break;
+    case 'actividades': tabContent = <CatalogView kind="activities" />; break;
+    case 'usuarios': tabContent = <UsersView />; break;
+    case 'roles': tabContent = <RolesView />; break;
+    case 'escaner': tabContent = <AdminQRScanner />; break;
+    default: tabContent = <div style={{ padding: 32 }}>Seleccione una opción del menú.</div>;
+  }
+
   return <DashboardLayout role={uiRole} tabs={allowedTabs as any} activeTab={currentTab || ''} onTabChange={id => { setActiveTab(id as TabId); window.history.pushState(null, '', '/admin/' + id); }}>
-    {currentTab === 'carga' && <AdminCargaManual />}
-    {currentTab === 'moderacion' && <AdminModeration />}
-    {currentTab === 'galeria' && <GalleryView />}
-    {currentTab === 'salidas' && <AdminSalidas />}
-    {currentTab === 'pasajeros' && <AdminPasajeros />}
-    {currentTab === 'colegios' && <SchoolsView />}
-    {currentTab === 'actividades' && <CatalogView kind="activities" />}
-    {currentTab === 'usuarios' && <UsersView />}
-    {currentTab === 'roles' && <RolesView />}
-    {currentTab === 'escaner' && <AdminQRScanner />}
+    {tabContent}
   </DashboardLayout>;
 }
-
-
-
-
-
-
-
