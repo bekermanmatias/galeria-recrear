@@ -39,6 +39,7 @@ export default function AdminPasajeros() {
   const [updatedTo,setUpdatedTo] = useState('');
   const [filterOptions,setFilterOptions] = useState<FilterOptions>({schools:[],departures:[]});
   const [editing,setEditing] = useState<Passenger|null>(null);
+  const [viewing,setViewing] = useState<Passenger|null>(null);
   const [form,setForm] = useState<Form>(emptyForm);
   const [importOpen,setImportOpen] = useState(false);
   const [file,setFile] = useState<File|null>(null);
@@ -51,6 +52,7 @@ export default function AdminPasajeros() {
   const [statusChange,setStatusChange] = useState<{item:Passenger;next:boolean}|null>(null);
   const [statusBusy,setStatusBusy] = useState(false);
   const [associationBusy,setAssociationBusy] = useState(false);
+  const openView = (item:Passenger) => { setViewing(item); };
 
   const loadHistory = async () => {
     const imports = await adminRequest<{items:PassengerImport[]}>('/passengers/imports');
@@ -176,7 +178,7 @@ export default function AdminPasajeros() {
           <th style={{padding:'10px 12px',width:36}}></th>
         </tr></thead>
         <tbody>
-          {items.map(item=><tr key={item.id} onClick={()=>{setEditing(item);setForm(toForm(item));setError('');}} style={{borderBottom:'1px solid #F1F5F9',cursor:'pointer',opacity:item.active?1:.6}}>
+          {items.map(item=><tr key={item.id} onClick={()=>openView(item)} style={{borderBottom:'1px solid #F1F5F9',cursor:'pointer',opacity:item.active?1:.6}}>
             <td style={{padding:'12px 12px',fontSize:13,color:'#1A4B77',fontWeight:600,lineHeight:1.4}}>{item.full_name}{item.external_number&&<div style={{fontSize:11,color:'#94A3B8',fontWeight:400}}>Nro. {item.external_number}</div>}</td>
             <td style={{padding:'12px 12px',fontSize:13,color:'#475569',whiteSpace:'nowrap'}}>{item.document_type} {item.document_number}</td>
             <td style={{padding:'8px 8px',textAlign:'right'}} onClick={e=>e.stopPropagation()}>
@@ -189,6 +191,7 @@ export default function AdminPasajeros() {
     </div>
     {!!history.length && <section style={{marginTop:32}}><h3 style={{fontSize:16,color:'#1A4B77',margin:'0 0 12px'}}>Últimas importaciones</h3><div style={{display:'grid',gap:8}}>{history.slice(0,5).map(item=><div key={item.id} style={{display:'flex',justifyContent:'space-between',gap:12,padding:'10px 12px',border:'1px solid #E2E8F0',borderRadius:8,fontSize:13}}><span><FileSpreadsheet size={15} style={{verticalAlign:'-3px',marginRight:7,color:'#1A4B77'}}/>{item.file_name}</span><span style={{color:'#64748B'}}>{item.created_rows} nuevos · {item.updated_rows} actualizados · {date(item.created_at)} · {item.imported_by_name}</span></div>)}</div></section>}
     {editing && <Modal title="Editar pasajero" onClose={()=>setEditing(null)}><PassengerFields form={form} setForm={setForm} passenger={editing} schools={filterOptions.schools} onAssignSchool={school=>void assignSchool(editing,school)} associationBusy={associationBusy}/>{error&&<p style={{color:'#B91C1C',fontSize:13}}>{error}</p>}<Actions onCancel={()=>setEditing(null)} onSave={save} busy={busy}/></Modal>}
+    {viewing && <PassengerViewModal passenger={viewing} onClose={()=>setViewing(null)} onEdit={()=>{setEditing(viewing);setForm(toForm(viewing));setError('');setViewing(null);}} onWristband={()=>{setWristbandTarget(viewing);setViewing(null);}}/>}
     {importOpen && <Modal title="Importar pasajeros desde Excel" onClose={()=>setImportOpen(false)}><p style={{margin:'0 0 18px',fontSize:13,color:'#64748B',lineHeight:1.55}}>Subí un archivo XLSX o XLS con el formato AV26000. Antes de importar validaremos filas, documentos y datos obligatorios; importes, pagos y deudas no se incorporan.</p><label style={{minHeight:150,border:`1.5px dashed ${file?'#1A4B77':'#CBD5E1'}`,borderRadius:10,background:file?'#F8FBFD':'#F8FAFC',display:'grid',placeItems:'center',padding:18,cursor:'pointer',textAlign:'center'}}><input type="file" accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" onChange={event=>{setFile(event.target.files?.[0]??null);setPreview(null);setError('');}} style={{display:'none'}}/>{file?<div><FileSpreadsheet size={30} color="#1A4B77"/><strong style={{display:'block',marginTop:8,fontSize:14,color:'#1A4B77'}}>{file.name}</strong><span style={{fontSize:12,color:'#64748B'}}>{Math.max(1,Math.round(file.size/1024))} KB · Hacé clic para reemplazarlo</span></div>:<div><Upload size={30} color="#1A4B77"/><strong style={{display:'block',marginTop:8,fontSize:14,color:'#1A4B77'}}>Seleccioná el archivo de pasajeros</strong><span style={{fontSize:12,color:'#64748B'}}>XLSX o XLS · hasta 12 MB</span></div>}</label>{file&&<button type="button" onClick={()=>{setFile(null);setPreview(null);setError('')}} style={{marginTop:8,border:0,background:'none',color:'#1A4B77',fontSize:12,fontWeight:600,cursor:'pointer'}}>Quitar archivo</button>}{error&&<p style={{color:'#B91C1C',fontSize:13}}>{error}</p>}{preview&&<ImportPreview preview={preview}/>}<Actions onCancel={()=>setImportOpen(false)} onSave={preview?.valid?commitImport:previewImport} busy={busy} disabled={!file}/></Modal>}
     <ConfirmDialog open={statusChange!==null} title="¿Pasar pasajero a Inactivo?" description="Se desactivará globalmente y conservará todos sus datos y asociaciones históricas. Podrás reactivarlo desde este mismo selector." confirmLabel="Continuar" tone="danger" busy={statusBusy} onCancel={()=>!statusBusy&&setStatusChange(null)} onConfirm={async()=>{if(!statusChange)return;const change=statusChange;setStatusChange(null);await updateStatus(change.item,change.next);}}/>
     <ConfirmDialog open={deleteTarget!==null} title="¿Eliminar pasajero definitivamente?" description={`Se eliminará de forma permanente a ${deleteTarget?.full_name??'este pasajero'}, junto con sus asociaciones. Esta acción no se puede deshacer y no afecta el historial de importaciones.`} confirmLabel="Eliminar definitivamente" tone="danger" busy={busy} onCancel={()=>!busy&&setDeleteTarget(null)} onConfirm={async()=>{if(!deleteTarget)return;setBusy(true);setError('');try{await adminRequest(`/passengers/${deleteTarget.id}`,{method:'DELETE'});setItems(current=>current.filter(item=>item.id!==deleteTarget.id));setDeleteTarget(null);setMessage('Pasajero eliminado definitivamente.');}catch(caught){setError(caught instanceof Error?caught.message:'No se pudo eliminar el pasajero.');}finally{setBusy(false);}}}/>
@@ -210,3 +213,50 @@ function Notice({tone,children}:{tone:'success'|'error';children:React.ReactNode
 function Actions({onCancel,onSave,busy,disabled}:{onCancel:()=>void;onSave:()=>void;busy:boolean;disabled?:boolean}) { return <div style={{display:'flex',justifyContent:'flex-end',gap:9,marginTop:24}}><button onClick={onCancel} style={button}>Cancelar</button><button disabled={busy||disabled} onClick={onSave} style={{...button,background:'#1A4B77',borderColor:'#1A4B77',color:'#fff',opacity:busy||disabled?.6:1}}>{busy?'Procesando...':'Continuar'}</button></div>; }
 function Modal({title,onClose,children}:{title:string;onClose:()=>void;children:React.ReactNode}) { return <div style={{position:'fixed',inset:0,zIndex:100,display:'grid',placeItems:'center',padding:18,background:'rgba(15,23,42,.48)'}}><div style={{width:'min(100%,700px)',maxHeight:'90vh',overflowY:'auto',borderRadius:12,background:'#fff',padding:26,boxShadow:'0 22px 60px rgba(0,0,0,.3)'}}><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:15,marginBottom:22}}><h3 style={{margin:0,color:'#1A4B77',fontSize:21}}>{title}</h3><button onClick={onClose} style={{border:0,background:'none',color:'#64748B',cursor:'pointer'}}><X size={20}/></button></div>{children}</div></div>; }
 const iconButton: React.CSSProperties = {display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#1A4B77'};
+
+function PassengerViewModal({passenger,onClose,onEdit,onWristband}:{passenger:Passenger;onClose:()=>void;onEdit:()=>void;onWristband:()=>void}) {
+  const row = (label:string,value:string|null|undefined) => value ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>{label}</span><span style={{fontSize:14,color:'#1E293B'}}>{value}</span></div> : null;
+  return (
+    <div style={{position:'fixed',inset:0,zIndex:100,display:'flex',alignItems:'flex-end',background:'rgba(15,23,42,.5)'}} onClick={onClose}>
+      <div style={{width:'100%',maxHeight:'90vh',overflowY:'auto',borderRadius:'16px 16px 0 0',background:'#fff',padding:'0 0 24px'}} onClick={e=>e.stopPropagation()}>
+        {/* Handle bar */}
+        <div style={{display:'flex',justifyContent:'center',padding:'12px 0 4px'}}><div style={{width:40,height:4,borderRadius:2,background:'#CBD5E1'}}/></div>
+        {/* Header */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 20px 14px',borderBottom:'1px solid #F1F5F9'}}>
+          <div>
+            <div style={{fontWeight:700,fontSize:16,color:'#1A4B77'}}>{passenger.full_name}</div>
+            {passenger.external_number && <div style={{fontSize:12,color:'#94A3B8',marginTop:2}}>Nro. {passenger.external_number}</div>}
+          </div>
+          <button onClick={onClose} style={{border:0,background:'none',color:'#94A3B8',cursor:'pointer',padding:4}}><X size={20}/></button>
+        </div>
+        {/* Data */}
+        <div style={{padding:'0 20px'}}>
+          {row('Documento',`${passenger.document_type} ${passenger.document_number}`)}
+          {row('Fecha de nacimiento', passenger.birth_date ? passenger.birth_date.slice(0,10).split('-').reverse().join('/') : null)}
+          {row('País', passenger.country)}
+          {row('Estado pasajero', passenger.passenger_status)}
+          {row('Teléfono', passenger.phone)}
+          {row('Celular', passenger.mobile)}
+          {row('Correo electrónico', passenger.email)}
+          {row('Vencimiento documento', passenger.document_expires_at ? passenger.document_expires_at.slice(0,10).split('-').reverse().join('/') : null)}
+          {/* Pulsera */}
+          <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}>
+            <span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Pulsera</span>
+            {passenger.wristband_code
+              ? <span style={{display:'inline-flex',alignItems:'center',gap:5,padding:'4px 10px',borderRadius:12,background:'#DCFCE7',color:'#15803D',fontSize:13,fontWeight:700,width:'fit-content'}}><QrCode size={14}/>{passenger.wristband_code}</span>
+              : <span style={{fontSize:13,color:'#94A3B8'}}>Sin pulsera asignada</span>}
+          </div>
+          {/* Colegios */}
+          {passenger.schools?.length ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Colegios</span><AssociationChips items={passenger.schools} empty="Sin colegio"/></div> : null}
+          {/* Salidas */}
+          {passenger.departures?.length ? <div style={{display:'flex',flexDirection:'column',gap:3,padding:'10px 0',borderBottom:'1px solid #F1F5F9'}}><span style={{fontSize:11,fontWeight:600,color:'#94A3B8',textTransform:'uppercase'}}>Salidas</span><AssociationChips items={passenger.departures} empty="Sin salida"/></div> : null}
+        </div>
+        {/* Action buttons */}
+        <div style={{display:'flex',gap:10,padding:'20px 20px 0'}}>
+          <button onClick={onWristband} style={{flex:1,height:42,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'1px solid #DCE3EB',borderRadius:8,background:'#fff',color:'#1A4B77',fontSize:14,fontWeight:600,cursor:'pointer'}}><QrCode size={16}/>{passenger.wristband_code ? 'Ver pulsera' : 'Asignar pulsera'}</button>
+          <button onClick={onEdit} style={{flex:1,height:42,display:'inline-flex',alignItems:'center',justifyContent:'center',gap:7,border:'none',borderRadius:8,background:'#1A4B77',color:'#fff',fontSize:14,fontWeight:600,cursor:'pointer'}}><Edit2 size={16}/>Editar</button>
+        </div>
+      </div>
+    </div>
+  );
+}
