@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, ChevronLeft, X, LogOut, Settings } from 'lucide-react';
 import Navbar from './Navbar';
 import { api } from '../../lib/api';
@@ -134,12 +134,11 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
                 </button>
               )
             })}
-          </div>
-
-          <div style={{ padding: '24px', borderTop: '1px solid #E5E7EB', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            <button onClick={async () => { try { await api.logout(); } finally { window.location.href = '/login'; } }} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '12px', background: 'none', border: 'none', color: '#EF4444', fontSize: '15px', fontWeight: 500, width: '100%', textAlign: 'left' }}>
-              <LogOut size={20} color="#EF4444" /> Cerrar sesión
+            
+            <hr style={{ border: 0, borderTop: '1px solid #E5E7EB', margin: '8px 0' }} />
+            
+            <button onClick={async () => { try { await api.logout(); } finally { window.location.href = '/login'; } }} style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: 'none', border: 'none', color: '#EF4444', fontSize: '16px', fontWeight: 600, width: '100%', textAlign: 'left', borderRadius: '12px' }}>
+              <LogOut size={24} color="#EF4444" /> Cerrar sesión
             </button>
           </div>
         </div>

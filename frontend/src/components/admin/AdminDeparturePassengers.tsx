@@ -5,7 +5,7 @@ import DashboardLayout from '../layout/DashboardLayout';
 import DeparturePassengers from '../passengers/DeparturePassengers';
 
 const tabs = [
-  { id:'moderacion', label:'Moderación', icon:LayoutGrid }, { id:'galeria', label:'Galería', icon:Image }, { id:'salidas', label:'Salidas', icon:Bus }, { id:'colegios', label:'Colegios', icon:School }, { id:'actividades', label:'Actividades', icon:List }, { id:'usuarios', label:'Usuarios', icon:Users }, { id:'carga', label:'Carga Manual', icon:UploadIcon }, { id:'pasajeros', label:'Pasajeros', icon:ContactRound },
+  { id:'moderacion', label:'Moderación', icon:LayoutGrid }, { id:'lotes', label:'Lotes', icon:List }, { id:'galeria', label:'Galería', icon:Image }, { id:'salidas', label:'Salidas', icon:Bus }, { id:'colegios', label:'Colegios', icon:School }, { id:'actividades', label:'Actividades', icon:List }, { id:'usuarios', label:'Usuarios', icon:Users }, { id:'carga', label:'Carga Manual', icon:UploadIcon }, { id:'pasajeros', label:'Pasajeros', icon:ContactRound },
 ] as const;
 export default function AdminDeparturePassengers() {
   const [authorized,setAuthorized] = useState(false);

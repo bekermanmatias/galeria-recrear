@@ -19,6 +19,7 @@ const date = (v?:string|null) => v ? v.slice(0,10).split('-').reverse().join('/'
 
 const ADMIN_TABS = [
   { id: 'moderacion', label: 'Moderación', icon: LayoutGrid },
+  { id: 'lotes', label: 'Lotes', icon: List },
   { id: 'galeria', label: 'Galería', icon: Image },
   { id: 'salidas', label: 'Salidas', icon: Bus },
   { id: 'colegios', label: 'Colegios', icon: SchoolIcon },

@@ -101,7 +101,7 @@ export const api = {
   mySchools: () => request<{ items: School[] }>('/lots/my-schools'),
   myDepartures: () => request<{ items: Departure[] }>('/lots/my-departures'),
   catalogs: () => request<{ activities: CatalogItem[]; shifts: CatalogItem[] }>('/lots/catalogs'),
-  lots: (status?: string) => request<{ items: LotSummary[] }>(`/lots${status ? `?status=${status}` : ''}`),
+  lots: (status?: string, pageSize = 100) => request<{ items: LotSummary[] }>(`/lots?pageSize=${pageSize}${status ? `&status=${status}` : ''}`),
   lot: (id: string) => request<{ lot: LotSummary; version: { id: string; status: string; version_number: number }; media: Media[] }>(`/lots/${id}`),
   createLot: (body: { departureId?: string; schoolId?: string; activityId?: string | null; eventDate: string; albumName?: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
   uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string; status: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
