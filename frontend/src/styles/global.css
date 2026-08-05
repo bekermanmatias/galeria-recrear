@@ -213,21 +213,9 @@
 }
 
 @media (max-width: 768px) {
-  .lot-detail-body {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 14px !important;
-  }
-  .lot-download-btn {
-    width: 100% !important;
-    height: 42px !important;
-    font-size: 14px !important;
-    justify-content: center !important;
-  }
-  .lot-rejected-banner {
-    flex-direction: column !important;
-    align-items: stretch !important;
-    gap: 12px !important;
+  .lot-title {
+    font-size: 16px !important;
+    line-height: 1.35 !important;
   }
   .lot-rejected-btn {
     width: 100% !important;
@@ -236,7 +224,8 @@
   }
   .lot-media-grid {
     grid-template-columns: repeat(2, 1fr) !important;
-    gap: 10px !important;
+    gap: 8px !important;
   }
 }
+
 

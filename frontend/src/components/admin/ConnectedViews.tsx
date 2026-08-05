@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
 import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -479,33 +479,48 @@ export function GalleryView() {
       </div>
     )}
 
-    {openedLot&&currentLot&&<section className="lot-detail-header" style={{margin:'2px 0 24px',padding:'0 0 20px',borderBottom:'1px solid #E4E4E7'}}>
-      <div style={{marginBottom:12}}>
-        <button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} className="lot-back-btn" style={{padding:'8px 14px',border:'1px solid #DCE3EB',background:'#fff',borderRadius:6,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}>← Volver a la lista</button>
+    {openedLot&&currentLot&&<section className="lot-detail-header" style={{margin:'0 0 20px',padding:'0 0 16px',borderBottom:'1px solid #E4E4E7'}}>
+      <div className="lot-top-nav" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,marginBottom:14}}>
+        <button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} className="lot-back-btn" style={{border:0,background:'none',padding:0,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}>
+          <ArrowLeft size={16}/> Volver a la lista
+        </button>
+        <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 13px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+          <Download size={14}/> Descargar lote
+        </button>
       </div>
-      <div className="lot-detail-body" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:16}}>
-        <div style={{flex:1,minWidth:0}}>
-          <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
-            <StatusBadge status={currentLot.lot.status}/>
-          </div>
-          <div style={{display:'flex',alignItems:'baseline',gap:12,flexWrap:'wrap',marginBottom:6}}>
-            <h2 style={{margin:0,fontSize:22,color:'#1A4B77',fontWeight:700,lineHeight:1.3,wordBreak:'break-word'}}>{departureLabel(currentLot.lot)} · {currentLot.lot.album_name||currentLot.lot.activity_name}</h2>
-            {currentLot.lot.departure_public_code&&<div style={{display:'inline-flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
-              <button onClick={()=>void copyPublicCode(currentLot.lot.departure_public_code)} title="Copiar código" style={{background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'4px 10px',cursor:'pointer',color:'#475569',fontWeight:600,fontSize:13}}>Cód: {copiedOnlyCode===currentLot.lot.departure_public_code?'¡Copiado!':currentLot.lot.departure_public_code}</button>
-              <button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'transparent',cursor:'pointer',padding:'4px 2px',display:'inline-flex',alignItems:'center',gap:5,color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77',fontSize:12,fontWeight:600}}>{copiedCode===currentLot.lot.departure_public_code?<Check size={14}/>:<Copy size={14}/>}<span>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span></button>
-            </div>}
-          </div>
-          <p style={{margin:'4px 0 0',fontSize:13,color:'#64748B'}}>{formatDate(currentLot.lot.event_date)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}{currentLot.lot.created_by_name?<> · por {currentLot.lot.created_by_name}</>:null}</p>
+
+      <div className="lot-main-info" style={{display:'flex',flexDirection:'column',gap:8}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
+          <StatusBadge status={currentLot.lot.status}/>
+          {currentLot.lot.departure_public_code&&<>
+            <button onClick={()=>void copyPublicCode(currentLot.lot.departure_public_code)} title="Copiar código" style={{background:'#F1F5F9',border:'1px solid #CBD5E1',borderRadius:6,padding:'3px 8px',cursor:'pointer',color:'#475569',fontWeight:600,fontSize:11}}>
+              Cód: {copiedOnlyCode===currentLot.lot.departure_public_code?'¡Copiado!':currentLot.lot.departure_public_code}
+            </button>
+            <button onClick={()=>void copyPublicLink(currentLot.lot.departure_public_code)} title="Copiar enlace público" style={{border:'none',background:'transparent',cursor:'pointer',padding:'2px',display:'inline-flex',alignItems:'center',gap:4,color:copiedCode===currentLot.lot.departure_public_code?'#166534':'#1A4B77',fontSize:12,fontWeight:600}}>
+              {copiedCode===currentLot.lot.departure_public_code?<Check size={13}/>:<Copy size={13}/>}
+              <span>{copiedCode===currentLot.lot.departure_public_code?'¡Copiado!':'Copiar link'}</span>
+            </button>
+          </>}
         </div>
-        <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8,padding:'10px 16px',background:'#F4F4F5',color:'#1A4B77',border:0,borderRadius:6,fontSize:13,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}><Download size={16}/> Descargar lote</button>
+
+        <h2 className="lot-title" style={{margin:'2px 0 0',fontSize:18,color:'#1A4B77',fontWeight:700,lineHeight:1.3,overflowWrap:'break-word',wordBreak:'normal'}}>
+          {departureLabel(currentLot.lot)} · {currentLot.lot.album_name||currentLot.lot.activity_name}
+        </h2>
+
+        <p style={{margin:0,fontSize:12,color:'#64748B'}}>
+          {formatDate(currentLot.lot.event_date)} · {currentLot.files.length} {currentLot.files.length===1?'archivo':'archivos'}{currentLot.lot.created_by_name?<> · por {currentLot.lot.created_by_name}</>:null}
+        </p>
       </div>
     </section>}
-    {openedLot&&currentLot&&currentRejected.length>0&&<div className="lot-rejected-banner" style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
-      <div style={{display:'flex',alignItems:'center',gap:12,flex:1,minWidth:0}}>
-        <div style={{width:36,height:36,borderRadius:'50%',display:'grid',placeItems:'center',background:'#FEE2E2',color:'#DC2626',fontWeight:800,flexShrink:0}}>!</div>
-        <div><strong style={{display:'block',color:'#9A3412',fontSize:14}}>{currentRejected.length} {currentRejected.length===1?'foto descartada':'fotos descartadas'}</strong><span style={{display:'block',marginTop:3,fontSize:12,color:'#9A3412'}}>{nextPurgeDays===0?'Eliminación definitiva programada para hoy':`La eliminación definitiva más próxima es en ${nextPurgeDays} ${nextPurgeDays===1?'día':'días'}`}.</span></div>
+    {openedLot&&currentLot&&currentRejected.length>0&&<div className="lot-rejected-banner" style={{display:'flex',flexDirection:'column',gap:12,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
+      <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+        <div style={{width:32,height:32,borderRadius:'50%',display:'grid',placeItems:'center',background:'#FEE2E2',color:'#DC2626',fontWeight:800,flexShrink:0,marginTop:2}}>!</div>
+        <div style={{flex:1,minWidth:0}}>
+          <strong style={{display:'block',color:'#9A3412',fontSize:14}}>{currentRejected.length} {currentRejected.length===1?'foto descartada':'fotos descartadas'}</strong>
+          <span style={{display:'block',marginTop:3,fontSize:12,color:'#9A3412',lineHeight:1.4}}>{nextPurgeDays===0?'Eliminación definitiva programada para hoy':`La eliminación definitiva más próxima es en ${nextPurgeDays} ${nextPurgeDays===1?'día':'días'}`}.</span>
+        </div>
       </div>
-      <button onClick={()=>setShowRejected(!showRejected)} className="lot-rejected-btn" style={{padding:'9px 13px',border:'1px solid #FED7AA',borderRadius:7,background:'#fff',color:'#9A3412',fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>{showRejected?'Ocultar descartadas':'Revisar descartadas'}</button>
+      <button onClick={()=>setShowRejected(!showRejected)} className="lot-rejected-btn" style={{alignSelf:'flex-start',padding:'8px 14px',border:'1px solid #FED7AA',borderRadius:7,background:'#fff',color:'#9A3412',fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}>{showRejected?'Ocultar descartadas':'Revisar descartadas'}</button>
     </div>}
     {openedLot&&displayedGroups.map(group=><section key={group.lot.id} style={{marginBottom:34}}>
       <div className="lot-media-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:24}}>

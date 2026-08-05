@@ -39,7 +39,14 @@ export default function SearchableSelect({
         </label>
       )}
       <div 
-        onClick={() => { setIsOpen(true); setSearch(''); }}
+        onClick={() => {
+          if (isOpen) {
+            setIsOpen(false);
+          } else {
+            setIsOpen(true);
+            setSearch('');
+          }
+        }}
         style={{
           position: 'relative',
           width: '100%',
@@ -59,6 +66,7 @@ export default function SearchableSelect({
           <input
             autoFocus
             value={search}
+            onClick={e => e.stopPropagation()}
             onChange={e => setSearch(e.target.value)}
             placeholder={placeholder}
             style={{ 
