@@ -9,10 +9,11 @@ interface SearchableSelectProps {
   label?: string;
   style?: React.CSSProperties;
   renderOption?: (option: string) => React.ReactNode;
+  error?: boolean;
 }
 
 export default function SearchableSelect({
-  value, onChange, options, placeholder, label, style, renderOption
+  value, onChange, options, placeholder, label, style, renderOption, error
 }: SearchableSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -43,7 +44,7 @@ export default function SearchableSelect({
           position: 'relative',
           width: '100%',
           padding: label ? '12px 32px 12px 16px' : '8px 32px 8px 16px',
-          border: `1px solid ${isOpen ? '#1A4B77' : '#E4E4E7'}`,
+          border: `1px solid ${isOpen ? '#1A4B77' : error ? '#EF4444' : '#E4E4E7'}`,
           background: '#FFFFFF',
           fontSize: label ? '14px' : '13px',
           fontFamily: 'inherit',
