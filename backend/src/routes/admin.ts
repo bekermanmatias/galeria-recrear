@@ -412,7 +412,77 @@ adminRouter.delete('/passengers/:id', asyncHandler(async (req, res) => {
     await client.query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'PASSENGER_DELETED','passenger',$2,$3)`, [req.user!.id, passengerId, JSON.stringify({ permanent: true })]);
   });
   res.set('Cache-Control','private, no-store').status(204).end();
-}));function excelFile(req: Express.Request) {
+}));
+
+// ─── Wristband linking ────────────────────────────────────────────────────────
+adminRouter.post('/passengers/:id/wristband', asyncHandler(async (req, res) => {
+  const passengerId = z.string().uuid().parse(req.params.id);
+  const { code } = z.object({ code: z.string().min(1).max(80).transform(v => v.trim()) }).parse(req.body);
+  const result = await transaction(async client => {
+    const found = await client.query('SELECT id FROM passengers WHERE id=$1 FOR UPDATE', [passengerId]);
+    if (!found.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'Pasajero no encontrado');
+    const conflict = await client.query('SELECT id, full_name FROM passengers WHERE wristband_code=$1 AND id<>$2', [code, passengerId]);
+    if (conflict.rowCount) throw new AppError(409, 'WRISTBAND_ALREADY_LINKED', `El código ${code} ya está vinculado a ${conflict.rows[0].full_name}`);
+    const updated = await client.query(
+      `UPDATE passengers SET wristband_code=$1, wristband_linked_at=now(), wristband_linked_by=$2
+       WHERE id=$3
+       RETURNING id, full_name, wristband_code, wristband_linked_at`,
+      [code, req.user!.id, passengerId]
+    );
+    return updated.rows[0];
+  });
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'WRISTBAND_LINKED','passenger',$2,$3)`, [req.user!.id, passengerId, JSON.stringify({ code })]);
+  res.set('Cache-Control', 'private, no-store').json(result);
+}));
+
+adminRouter.delete('/passengers/:id/wristband', asyncHandler(async (req, res) => {
+  const passengerId = z.string().uuid().parse(req.params.id);
+  const found = await query('SELECT id, wristband_code FROM passengers WHERE id=$1', [passengerId]);
+  if (!found.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'Pasajero no encontrado');
+  const prev = found.rows[0].wristband_code;
+  await query('UPDATE passengers SET wristband_code=NULL, wristband_linked_at=NULL, wristband_linked_by=NULL WHERE id=$1', [passengerId]);
+  await query(`INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,'WRISTBAND_UNLINKED','passenger',$2,$3)`, [req.user!.id, passengerId, JSON.stringify({ code: prev })]);
+  res.set('Cache-Control', 'private, no-store').status(204).end();
+}));
+
+adminRouter.get('/passengers/scan/:code', asyncHandler(async (req, res) => {
+  const code = String(req.params.code).trim();
+  const isAdmin = req.user!.role === 'ADMIN';
+  const result = await query<{
+    id: string; full_name: string; document_type: string; document_number: string;
+    birth_date: string | null; document_expires_at: string | null; country: string | null;
+    passenger_status: string | null; bonus: string | null; phone: string | null;
+    mobile: string | null; email: string | null; active: boolean; external_number: string | null;
+    wristband_code: string | null; wristband_linked_at: string | null;
+    schools: unknown; departures: unknown;
+  }>(`
+    SELECT p.id, p.full_name, p.document_type, p.document_number,
+           p.birth_date::text, p.document_expires_at::text, p.country,
+           p.passenger_status, p.bonus, p.phone, p.mobile, p.email, p.active,
+           p.external_number, p.wristband_code, p.wristband_linked_at,
+           COALESCE((
+             SELECT jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'code',s.code) ORDER BY s.name)
+             FROM passenger_school_assignments psa JOIN schools s ON s.id=psa.school_id
+             WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL
+           ), '[]'::jsonb) AS schools,
+           COALESCE((
+             SELECT jsonb_agg(jsonb_build_object('id',d.id,'name',d.name,'code',d.public_code,'type',d.type) ORDER BY d.start_date DESC,d.name)
+             FROM passenger_departure_assignments pda JOIN departures d ON d.id=pda.departure_id
+             WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL
+           ), '[]'::jsonb) AS departures
+    FROM passengers p
+    WHERE p.wristband_code=$1
+      AND ($2::boolean OR EXISTS (
+        SELECT 1 FROM passenger_departure_assignments pda
+        JOIN departure_coordinators dc ON dc.departure_id=pda.departure_id
+        WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL AND dc.user_id=$3
+      ))
+  `, [code, isAdmin, req.user!.id]);
+  if (!result.rowCount) throw new AppError(404, 'PASSENGER_NOT_FOUND', 'No se encontró ningún pasajero con este código de pulsera');
+  res.set('Cache-Control', 'private, no-store').json(result.rows[0]);
+}));
+
+function excelFile(req: Express.Request) {
   if (!req.file) throw new AppError(400, 'FILE_REQUIRED', 'Seleccioná un archivo Excel');
   if (!/\.(xlsx|xls)$/i.test(req.file.originalname)) throw new AppError(400, 'INVALID_EXCEL', 'Se aceptan archivos .xlsx o .xls');
   return req.file;
