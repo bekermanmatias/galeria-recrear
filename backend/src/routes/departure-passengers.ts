@@ -15,7 +15,7 @@ async function departureContext(departureId: string, user: NonNullable<Express.R
   await assertDepartureAccess(user, departureId, ['COORDINATOR']);
   const departure = await query<{id:string;name:string;type:'MICRO'|'AEREO';destination:string;start_date:string;end_date:string;active:boolean}>(`SELECT id,name,type,destination,start_date::text,end_date::text,active FROM departures WHERE id=$1`, [departureId]);
   if (!departure.rowCount) throw new AppError(404, 'DEPARTURE_NOT_FOUND', 'Salida no encontrada');
-  const schools = await query<{id:string;name:string;code:string;passenger_count:number}>(`SELECT s.id,s.name,s.code,COUNT(pda.id)::int AS passenger_count FROM departure_schools ds JOIN schools s ON s.id=ds.school_id LEFT JOIN passenger_departure_assignments pda ON pda.departure_id=ds.departure_id AND pda.school_id=ds.school_id AND pda.unassigned_at IS NULL WHERE ds.departure_id=$1 GROUP BY s.id,s.name,s.code ORDER BY s.name`, [departureId]);
+  const schools = await query<{id:string;name:string;code:string;passenger_count:number}>(`SELECT s.id,s.name,s.code,COUNT(psa.id)::int AS passenger_count FROM departure_schools ds JOIN schools s ON s.id=ds.school_id LEFT JOIN passenger_school_assignments psa ON psa.school_id=ds.school_id AND psa.unassigned_at IS NULL WHERE ds.departure_id=$1 GROUP BY s.id,s.name,s.code ORDER BY s.name`, [departureId]);
   return { departure: departure.rows[0], schools: schools.rows };
 }
 
@@ -50,11 +50,11 @@ departurePassengersRouter.get('/:departureId/passengers', asyncHandler(async (re
   const departureId = uuid.parse(req.params.departureId); const schoolId = req.query.schoolId ? uuid.parse(String(req.query.schoolId)) : undefined;
   const context = await departureContext(departureId, req.user!); if (schoolId) await assertDepartureSchool(departureId, schoolId);
   const { page, pageSize } = parsePagination(req.query); const term = String(req.query.q ?? '').trim();
-  const params: unknown[] = [departureId, `%${term}%`]; let where = 'pda.departure_id=$1 AND pda.unassigned_at IS NULL AND (p.full_name ILIKE $2 OR p.document_number ILIKE $2 OR COALESCE(p.external_number,\'\') ILIKE $2)';
-  if (schoolId) { params.push(schoolId); where += ` AND pda.school_id=$${params.length}`; }
+  const params: unknown[] = [departureId, `%${term}%`]; let where = 'ds.departure_id=$1 AND psa.unassigned_at IS NULL AND (p.full_name ILIKE $2 OR p.document_number ILIKE $2 OR COALESCE(p.external_number,\'\') ILIKE $2)';
+  if (schoolId) { params.push(schoolId); where += ` AND psa.school_id=$${params.length}`; }
   params.push(pageSize, (page - 1) * pageSize);
-  const items = await query(`${'SELECT ' + passengerFields},s.id AS school_id,s.name AS school_name,s.code AS school_code FROM passenger_departure_assignments pda JOIN passengers p ON p.id=pda.passenger_id JOIN schools s ON s.id=pda.school_id WHERE ${where} ORDER BY s.name,p.active DESC,p.full_name LIMIT $${params.length - 1} OFFSET $${params.length}` , params);
-  const total = await query<{total:number}>(`SELECT COUNT(*)::int total FROM passenger_departure_assignments pda JOIN passengers p ON p.id=pda.passenger_id WHERE ${where}`, params.slice(0, schoolId ? 3 : 2));
+  const items = await query(`${'SELECT ' + passengerFields},s.id AS school_id,s.name AS school_name,s.code AS school_code FROM departure_schools ds JOIN passenger_school_assignments psa ON psa.school_id=ds.school_id JOIN passengers p ON p.id=psa.passenger_id JOIN schools s ON s.id=psa.school_id WHERE ${where} ORDER BY s.name,p.active DESC,p.full_name LIMIT $${params.length - 1} OFFSET $${params.length}` , params);
+  const total = await query<{total:number}>(`SELECT COUNT(*)::int total FROM departure_schools ds JOIN passenger_school_assignments psa ON psa.school_id=ds.school_id JOIN passengers p ON p.id=psa.passenger_id WHERE ${where}`, params.slice(0, schoolId ? 3 : 2));
   res.set('Cache-Control', 'private, no-store').json({ ...context, total: total.rows[0].total, items: items.rows, page, pageSize });
 }));
 

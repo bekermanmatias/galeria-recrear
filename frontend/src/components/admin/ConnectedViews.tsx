@@ -59,12 +59,12 @@ export function ModerationView() {
 type ResourceKind = 'activities' | 'shifts';
 export function CatalogView({ kind }: { kind: ResourceKind }) {
   const [items,setItems]=useState<CatalogItem[]>([]); const [search,setSearch]=useState(''); const [editing,setEditing]=useState<CatalogItem|null>(null); const [open,setOpen]=useState(false); const [name,setName]=useState(''); const [code,setCode]=useState(''); const [error,setError]=useState('');
-  const label=kind==='activities'?'Actividad':'Turno'; const load=()=>adminRequest<{items:CatalogItem[]}>('/'+kind+'?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudo cargar el catálogo.'));},[kind]);
+  const label=kind==='activities'?'Actividad':'Turno'; const pluralLabel=kind==='activities'?'Actividades':'Turnos'; const load=()=>adminRequest<{items:CatalogItem[]}>('/'+kind+'?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudo cargar el catálogo.'));},[kind]);
   const edit=(item?:CatalogItem)=>{setEditing(item??null);setName(item?.name??'');setCode(item?.bot_code??'');setOpen(true);};
   const save=async()=>{try{await adminRequest('/'+kind+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({name,botCode:code})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
   const updateStatus=async(item:CatalogItem,active:boolean)=>{if(!active&&!confirm('¿Inactivar esta '+label.toLowerCase()+'? No aparecerá en nuevas cargas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/'+kind+'/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
   const remove=async(item:CatalogItem)=>{if(kind!=='activities'||!confirm('¿Eliminar definitivamente esta actividad? Los lotes existentes conservarán su historial, pero quedarán sin actividad asociada.'))return;try{await adminRequest('/activities/'+item.id,{method:'DELETE'});setItems(current=>current.filter(value=>value.id!==item.id));}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo eliminar la actividad.');}};
-  return <div style={page}><PageHeader title={label+'s'} subtitle={'Gestión del catálogo global de '+label.toLowerCase()+'s.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><td style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>{kind=== 'schools'&&<button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>}<button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>{kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}</div></td></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
+  return <div style={page}><PageHeader title={pluralLabel} subtitle={'Gestión del catálogo global de '+pluralLabel.toLowerCase()+'.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong>{item.bot_code}</Td><Td>{item.name}</Td><Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><td style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>{kind=== 'schools'&&<button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>}<button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>{kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}</div></td></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
 }
 export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -125,6 +125,7 @@ export function UsersView() {
     setDepartureSearch('');
     setForm({name:item?.name??'',email:item?.email??'',password:'',role:item?.role??'COORDINATOR',departureIds:item?.departure_ids??[]});
     if (item?.id && item.role === 'COORDINATOR') { adminRequest<UserPermissions>('/users/'+item.id+'/permissions').then(data=>{setPermissionData(data);setPermissionDraft(data.permissions);}).catch(()=>{}); }
+    setError('');
     setOpen(true);
   };
   const toggleDeparture=(id:string)=>{
@@ -137,6 +138,7 @@ export function UsersView() {
     setForm(current=>({...current,departureIds:all?current.departureIds.filter(id=>!ids.includes(id)):[...new Set([...current.departureIds,...ids])]}));
   };
   const save=async()=>{
+    setError('');
     try{
       const body:any={name:form.name,email:form.email,role:form.role,departureIds:form.role==='COORDINATOR'?form.departureIds:[]};
       if(form.role==='COORDINATOR' && permissionTouched) body.permissions = permissionReset ? [] : permissionModules.map(module => ({module,...(permissionDraft[module] ?? {view:false,create:false,edit:false,delete:false})}));
@@ -172,6 +174,7 @@ export function UsersView() {
       </tr>)}
     </DataTable>
     {open&&<Modal title={editing?'Editar Usuario':'Nuevo Usuario'} onClose={()=>setOpen(false)} onSave={save}>
+      <ErrorMessage value={error}/>
       <Field label="Nombre completo" value={form.name} onChange={value=>setForm({...form,name:value})}/>
       <Field label="Email" type="email" value={form.email} onChange={value=>setForm({...form,email:value})}/>
       <Field label={editing?'Nueva contraseña (opcional)':'Contraseña inicial'} type="password" value={form.password} onChange={value=>setForm({...form,password:value})}/>
@@ -227,7 +230,13 @@ function StatusBadge({ status }: { status: string }) {
 export function GalleryView() {
   const [lots,setLots]=useState<LotSummary[]>([]);
   const [media,setMedia]=useState<Array<Media&{lot:LotSummary}>>([]);
-  const [departure,setDeparture]=useState('Todos');
+  const [departure,setDeparture]=useState(() => {
+    if (typeof window !== 'undefined') {
+      const q = new URLSearchParams(window.location.search).get('galleryDeparture');
+      if (q) return decodeURIComponent(q);
+    }
+    return 'Todos';
+  });
   const [activity,setActivity]=useState('Todos');
   const [from,setFrom]=useState('');
   const [to,setTo]=useState('');
