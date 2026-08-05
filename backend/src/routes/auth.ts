@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { clearSession, createSession, hashPassword, verifyPassword, writeSession, type CurrentUser } from '../auth.js';
 import { query } from '../db.js';
@@ -7,4 +7,18 @@ import { asyncHandler } from '../http.js';
 const loginSchema=z.object({email:z.string().email(),password:z.string().min(1)});const passwordSchema=z.object({currentPassword:z.string().min(1),newPassword:z.string().min(8).max(128)});
 export const authRouter=Router();
 authRouter.post('/login',asyncHandler(async(req,res)=>{const input=loginSchema.parse(req.body);const result=await query<CurrentUser&{password_hash:string}>(`SELECT u.id,u.name,u.email,u.role_id AS "roleId",r.name AS "roleName",r.is_system_admin AS "isAdmin",CASE WHEN r.is_system_admin THEN 'ADMIN' ELSE 'COORDINATOR' END::text AS role,u.password_hash FROM users u JOIN roles r ON r.id=u.role_id WHERE lower(u.email)=lower($1) AND u.active AND r.active`,[input.email]);const user=result.rows[0];if(!user||!(await verifyPassword(input.password,user.password_hash)))throw new AppError(401,'INVALID_CREDENTIALS','Email o contraseña incorrectos');writeSession(res,await createSession(user));await query('UPDATE users SET last_login_at=now() WHERE id=$1',[user.id]);res.json({user});}));
-authRouter.post('/logout',asyncHandler(async(req,res)=>{const token=req.cookies?.galeria_session;if(token)await query("UPDATE sessions SET revoked_at=now() WHERE token_hash=encode(digest($1,'sha256'),'hex') AND revoked_at IS NULL",[token]);clearSession(res);res.status(204).end();}));authRouter.get('/me',(req,res)=>res.json({user:req.user}));authRouter.post('/change-password',asyncHandler(async(req,res)=>{const input=passwordSchema.parse(req.body);const result=await query<{password_hash:string}>('SELECT password_hash FROM users WHERE id=$1',[req.user!.id]);if(!result.rows[0]||!(await verifyPassword(input.currentPassword,result.rows[0].password_hash)))throw new AppError(400,'INVALID_PASSWORD','La contraseña actual es incorrecta');await query('UPDATE users SET password_hash=$1 WHERE id=$2',[await hashPassword(input.newPassword),req.user!.id]);res.status(204).end();}));
+authRouter.post('/logout',asyncHandler(async(req,res)=>{const token=req.cookies?.galeria_session;if(token)await query("UPDATE sessions SET revoked_at=now() WHERE token_hash=encode(digest($1,'sha256'),'hex') AND revoked_at IS NULL",[token]);clearSession(res);res.status(204).end();}));
+authRouter.get('/me',asyncHandler(async(req,res)=>{
+  if (!req.user) { res.json({ user: null }); return; }
+  const permissions: Record<string, any> = {};
+  const modules = ['departures', 'lots', 'moderation', 'gallery', 'activities', 'schools', 'passengers', 'users', 'imports'];
+  if (req.user.isAdmin) {
+    for (const m of modules) permissions[m] = { view: true, create: true, edit: true, delete: true };
+  } else {
+    for (const m of modules) permissions[m] = { view: false, create: false, edit: false, delete: false };
+    const result = await query('SELECT module, can_view, can_create, can_edit, can_delete FROM role_permissions WHERE role_id=$1', [req.user.roleId]);
+    for (const row of result.rows) permissions[row.module] = { view: row.can_view, create: row.can_create, edit: row.can_edit, delete: row.can_delete };
+  }
+  res.json({ user: { ...req.user, permissions } });
+}));
+authRouter.post('/change-password',asyncHandler(async(req,res)=>{const input=passwordSchema.parse(req.body);const result=await query<{password_hash:string}>('SELECT password_hash FROM users WHERE id=$1',[req.user!.id]);if(!result.rows[0]||!(await verifyPassword(input.currentPassword,result.rows[0].password_hash)))throw new AppError(400,'INVALID_PASSWORD','La contraseña actual es incorrecta');await query('UPDATE users SET password_hash=$1 WHERE id=$2',[await hashPassword(input.newPassword),req.user!.id]);res.status(204).end();}));

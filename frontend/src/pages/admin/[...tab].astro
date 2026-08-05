@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import AdminPanel from '../../components/admin/AdminPanel';
+
+export function getStaticPaths() {
+  return [
+    { params: { tab: undefined } },
+    { params: { tab: 'carga' } },
+    { params: { tab: 'moderacion' } },
+    { params: { tab: 'galeria' } },
+    { params: { tab: 'salidas' } },
+    { params: { tab: 'pasajeros' } },
+    { params: { tab: 'colegios' } },
+    { params: { tab: 'actividades' } },
+    { params: { tab: 'usuarios' } },
+    { params: { tab: 'roles' } },
+  ];
+}
+---
+
+<BaseLayout title="Panel">
+  <AdminPanel client:load />
+</BaseLayout>
