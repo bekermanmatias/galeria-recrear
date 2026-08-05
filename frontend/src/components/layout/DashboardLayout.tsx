@@ -22,7 +22,7 @@ export default function DashboardLayout({ role, tabs, activeTab, onTabChange, ch
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF' }}>
+    <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif", display: 'flex', flexDirection: 'column', height: '100vh', background: '#FFFFFF', maxWidth: '100vw', overflowX: 'hidden' }}>
       <Navbar role={role} onMenuToggle={() => setMobileMenuOpen(true)} />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

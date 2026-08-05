@@ -3,10 +3,9 @@ import { LayoutGrid, School, Users, Upload as UploadIcon, List, Image as ImageIc
 import { api, type SessionUser } from '../../lib/api';
 import DashboardLayout from '../layout/DashboardLayout';
 import AdminModeration from './AdminModeration';
-import { UsersView, CatalogView, SchoolsView } from './ConnectedViews';
+import { UsersView, CatalogView, SchoolsView, GalleryView } from './ConnectedViews';
 import AdminCargaManual from './AdminCargaManual';
 import AdminGaleria from './AdminGaleria';
-import AdminEstadoCargas from './AdminEstadoCargas';
 import AdminSalidas from './AdminSalidas';
 import AdminPasajeros from './AdminPasajeros';
 import RolesView from './RolesView';
@@ -77,7 +76,7 @@ export default function AdminPanel() {
   switch (currentTab) {
     case 'carga': tabContent = <AdminCargaManual />; break;
     case 'moderacion': tabContent = <AdminModeration />; break;
-    case 'lotes': tabContent = <AdminEstadoCargas />; break;
+    case 'lotes': tabContent = <GalleryView />; break;
     case 'salidas': tabContent = <AdminSalidas />; break;
     case 'pasajeros': tabContent = <AdminPasajeros />; break;
     case 'colegios': tabContent = <SchoolsView />; break;

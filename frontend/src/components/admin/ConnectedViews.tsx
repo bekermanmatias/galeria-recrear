@@ -363,23 +363,41 @@ export function GalleryView() {
 
   const downloadLot=async (group: typeof groups[number])=>{try{setError('');const approved=group.files.filter(file=>file.status==='APPROVED');if(!approved.length)throw new Error('El lote no tiene archivos aprobados para descargar');const blob=await api.downloadZip(approved.map(file=>file.id));const url=URL.createObjectURL(blob);const link=document.createElement('a');link.href=url;link.download=`${departureLabel(group.lot)} - ${group.lot.activity_name}.zip`;link.click();URL.revokeObjectURL(url);}catch(reason:any){setError(reason.message||'No se pudo descargar el lote');}};
 
-  return <div style={{flex:1,display:'flex',flexDirection:'column',padding:32,overflowY:'auto'}}>
+  return <div style={{flex:1,display:'flex',flexDirection:'column',padding:32,overflowY:'auto'}} className="gallery-page-container">
+    <style dangerouslySetInnerHTML={{__html: `
+      @media (max-width: 768px) {
+        .gallery-page-container { padding: 16px !important; overflow-x: hidden !important; }
+        .gallery-filters { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
+        .gallery-filters > div { width: 100% !important; min-width: 0 !important; }
+        .gallery-date-filter { display: grid !important; grid-template-columns: max-content 1fr !important; gap: 8px 12px !important; padding: 12px !important; }
+        .gallery-date-filter input { width: 100% !important; box-sizing: border-box !important; }
+        .gallery-table-header { display: none !important; }
+        .gallery-table-row { grid-template-columns: 1fr !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
+        .gallery-table-row > div { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+        .gallery-table-row > div::before { font-weight: 600; font-size: 11px; color: #64748B; text-transform: uppercase; }
+        .gallery-table-row > div:nth-child(2)::before { content: "Álbum / Actividad"; }
+        .gallery-table-row > div:nth-child(3)::before { content: "Fecha"; }
+        .gallery-table-row > div:nth-child(4)::before { content: "Creador"; }
+        .gallery-table-row > div:nth-child(5)::before { content: "Estado"; }
+        .gallery-table-row > div:nth-child(6) { flex-direction: row !important; justify-content: space-between !important; margin-top: 8px; padding-top: 12px; border-top: 1px solid #F1F5F9; }
+        .gallery-table-row > div:nth-child(6) > div { justify-content: flex-end; }
+      }
+    `}} />
     {!openedLot&&<div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:24}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
         <div><h2 style={{margin:'0 0 4px',fontSize:24,color:'#1A4B77'}}>Galería de Lotes</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Gestión y listado global de lotes en el sistema.</p></div>
       </div>
-      <div style={{display:'flex',flexWrap:'wrap',gap:12}}>
-        <SearchableSelect value={departure} onChange={setDeparture} options={departureOptions} placeholder="Todas las salidas" style={{width:240}}/>
-
-        <SearchableSelect value={activity} onChange={setActivity} options={activityOptions} placeholder="Todas las actividades" style={{width:200}}/>
-        <div style={{display:'flex',alignItems:'center',gap:8,background:'#F4F4F5',padding:'4px 8px',borderRadius:6}}><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Desde:</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Hasta:</span><input type="date" value={to} onChange={event=>setTo(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/></div>
+      <div className="gallery-filters" style={{display:'flex',flexWrap:'wrap',gap:12}}>
+        <div style={{flex: 1, minWidth: 240}}><SearchableSelect value={departure} onChange={setDeparture} options={departureOptions} placeholder="Todas las salidas" style={{width:'100%'}}/></div>
+        <div style={{flex: 1, minWidth: 200}}><SearchableSelect value={activity} onChange={setActivity} options={activityOptions} placeholder="Todas las actividades" style={{width:'100%'}}/></div>
+        <div className="gallery-date-filter" style={{display:'flex',alignItems:'center',gap:8,background:'#F4F4F5',padding:'4px 8px',borderRadius:6}}><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Desde:</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Hasta:</span><input type="date" value={to} onChange={event=>setTo(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/></div>
       </div>
     </div>}
     <ErrorMessage value={error}/>
 
     {!openedLot&&(
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        <div style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',padding:'12px 16px',background:'#F8FAFC',borderRadius:'8px',fontSize:'12px',fontWeight:600,color:'#64748B',textTransform:'uppercase',letterSpacing:'0.04em'}}>
+        <div className="gallery-table-header" style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',padding:'12px 16px',background:'#F8FAFC',borderRadius:'8px',fontSize:'12px',fontWeight:600,color:'#64748B',textTransform:'uppercase',letterSpacing:'0.04em'}}>
           <div>Salida / Código</div>
           <div>Álbum / Actividad</div>
           <div>Fecha</div>
@@ -395,7 +413,7 @@ export function GalleryView() {
           const publicCode=lot.departure_public_code;
 
           return (
-            <div key={lot.id} style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',alignItems:'center',padding:'14px 16px',background:'#FFFFFF',border:'1px solid #E2E8F0',borderRadius:'8px',transition:'all 0.2s ease'}}>
+            <div className="gallery-table-row" key={lot.id} style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',alignItems:'center',padding:'14px 16px',background:'#FFFFFF',border:'1px solid #E2E8F0',borderRadius:'8px',transition:'all 0.2s ease'}}>
               <div>
                 <div style={{fontWeight:600,color:'#1A4B77',fontSize:'14px'}}>
                   {departureLabel(lot)}
