@@ -111,6 +111,7 @@ export const api = {
   renameLot: (lotId: string, albumName: string) => request<{ id: string; title: string }>(`/lots/${lotId}`, { method: 'PATCH', body: JSON.stringify({ albumName }) }),
   deleteLot: (lotId: string) => request<void>(`/lots/${lotId}`, { method: 'DELETE' }),
   approveLot: (lotId: string) => request<void>(`/lots/${lotId}/approve`, { method: 'POST' }),
+  rejectLot: (lotId: string) => request<void>(`/lots/${lotId}/reject`, { method: 'POST' }),
   moderateMedia: (mediaId: string, action: 'reject' | 'restore') => request<void>(`/lots/media/${mediaId}/moderation`, { method: 'PATCH', body: JSON.stringify({ action }) }),
   departurePassengers: (departureId: string, options: { schoolId?: string; q?: string } = {}) => { const params = new URLSearchParams(); if (options.schoolId) params.set('schoolId', options.schoolId); if (options.q) params.set('q', options.q); const suffix = params.size ? `?${params}` : ''; return request<DeparturePassengerData>(`/departures/${departureId}/passengers${suffix}`); },
   availableDeparturePassengers: (departureId: string, schoolId: string, q = '') => request<{ items: Passenger[] }>(`/departures/${departureId}/schools/${schoolId}/passengers/available${q ? `?q=${encodeURIComponent(q)}` : ''}`),

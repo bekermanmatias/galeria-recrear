@@ -4,6 +4,7 @@ import { createReadStream, createWriteStream, existsSync } from 'node:fs';
 import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { google } from 'googleapis';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { config, paths } from './config.js';
 import { AppError } from './errors.js';
 
@@ -49,5 +50,104 @@ class GoogleDriveStorage implements MediaStorage {
   async stream(fileId:string,range?:string):Promise<RemoteStream> { try { const meta=await this.drive.files.get({fileId,fields:'mimeType,size',supportsAllDrives:true}); const response=await this.drive.files.get({fileId,alt:'media',supportsAllDrives:true},{responseType:'stream',headers:range?{Range:range}:undefined}); const contentRange=String(response.headers['content-range'] ?? ''); const total=meta.data.size?Number(meta.data.size):undefined; const size=Number(response.headers['content-length'] ?? total); const isPartial=response.status===206 && Boolean(contentRange); return {stream:response.data,mimeType:meta.data.mimeType ?? undefined,size,totalSize:total,status:isPartial?206:200,contentRange:isPartial?contentRange:undefined}; } catch(error) { return this.driveFailure(error); } }
   async trash(fileId:string) { try { await this.drive.files.update({fileId,requestBody:{trashed:true},supportsAllDrives:true}); } catch(error) { return this.driveFailure(error); } }
 }
+
+class S3Storage implements MediaStorage {
+  private client: S3Client;
+  private bucket: string;
+
+  constructor() {
+    if (!config.S3_ENDPOINT || !config.S3_ACCESS_KEY || !config.S3_SECRET_KEY || !config.S3_BUCKET) {
+      throw new Error('Faltan credenciales de S3/R2 en la configuración');
+    }
+    this.bucket = config.S3_BUCKET;
+    this.client = new S3Client({
+      endpoint: config.S3_ENDPOINT,
+      region: 'auto',
+      credentials: {
+        accessKeyId: config.S3_ACCESS_KEY,
+        secretAccessKey: config.S3_SECRET_KEY,
+      },
+    });
+  }
+
+  async createVersionFolder(context: FolderContext, contentFolder: 'originales' | 'marcados' = 'originales') {
+    return `Salidas/${context.departureFolder}/${context.lotFolder}/v${context.version}/${contentFolder}`;
+  }
+
+  async uploadOriginal(input: UploadInput) {
+    const id = crypto.randomUUID();
+    const key = `${input.parentId}/${id}`;
+    
+    // Convert ASCII only for metadata filename
+    const safeFilename = Buffer.from(input.filename, 'utf-8').toString('ascii');
+
+    await this.client.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: createReadStream(input.path),
+      ContentType: input.mimeType,
+      Metadata: {
+        filename: safeFilename
+      }
+    }));
+    return key;
+  }
+
+  async download(fileId: string, target: string) {
+    await ensureDirectory(path.dirname(target));
+    const response = await this.client.send(new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: fileId
+    }));
+    
+    if (!response.Body) throw new Error('Cuerpo de respuesta vacío desde S3');
+    await pipeline(response.Body as NodeJS.ReadableStream, createWriteStream(target));
+  }
+
+  async stream(fileId: string, range?: string): Promise<RemoteStream> {
+    try {
+      const response = await this.client.send(new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: fileId,
+        Range: range
+      }));
+
+      if (!response.Body) throw new Error('Cuerpo de respuesta vacío desde S3');
+
+      const isPartial = response.$metadata.httpStatusCode === 206;
+      
+      // Parse content length from ContentRange if partial, or use ContentLength
+      let size = response.ContentLength ?? 0;
+      let totalSize = size;
+      
+      if (isPartial && response.ContentRange) {
+        const match = /\/(\d+)$/.exec(response.ContentRange);
+        if (match) totalSize = Number(match[1]);
+      }
+
+      return {
+        stream: response.Body as NodeJS.ReadableStream,
+        mimeType: response.ContentType,
+        size,
+        totalSize,
+        status: isPartial ? 206 : 200,
+        contentRange: response.ContentRange
+      };
+    } catch (error: any) {
+      if (error.name === 'NoSuchKey') {
+        throw new AppError(404, 'MEDIA_NOT_FOUND', 'Archivo no encontrado');
+      }
+      throw error;
+    }
+  }
+
+  async trash(fileId: string) {
+    await this.client.send(new DeleteObjectCommand({
+      Bucket: this.bucket,
+      Key: fileId
+    }));
+  }
+}
+
 let storage: MediaStorage | undefined;
-export function getStorage():MediaStorage { if (!storage) storage=config.MEDIA_STORAGE==='drive'?new GoogleDriveStorage():new LocalStorage(); return storage; }
+export function getStorage():MediaStorage { if (!storage) storage=config.MEDIA_STORAGE==='s3'?new S3Storage():config.MEDIA_STORAGE==='drive'?new GoogleDriveStorage():new LocalStorage(); return storage; }
