@@ -366,10 +366,11 @@ export function GalleryView() {
   return <div style={{flex:1,display:'flex',flexDirection:'column',padding:32,overflowY:'auto'}} className="gallery-page-container">
     <style dangerouslySetInnerHTML={{__html: `
       @media (max-width: 768px) {
-        .gallery-page-container { padding: 16px !important; }
+        .gallery-page-container { padding: 16px !important; overflow-x: hidden !important; }
         .gallery-filters { flex-direction: column !important; align-items: stretch !important; gap: 12px !important; }
-        .gallery-filters > div { width: 100% !important; }
-        .gallery-date-filter { width: 100% !important; justify-content: space-between !important; }
+        .gallery-filters > div { width: 100% !important; min-width: 0 !important; }
+        .gallery-date-filter { display: grid !important; grid-template-columns: max-content 1fr !important; gap: 8px 12px !important; padding: 12px !important; }
+        .gallery-date-filter input { width: 100% !important; box-sizing: border-box !important; }
         .gallery-table-header { display: none !important; }
         .gallery-table-row { grid-template-columns: 1fr !important; display: flex !important; flex-direction: column !important; align-items: flex-start !important; gap: 8px !important; }
         .gallery-table-row > div { width: 100%; display: flex; flex-direction: column; gap: 4px; }
