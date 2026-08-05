@@ -140,6 +140,7 @@
   .page-header-search {
     order: 3;
     width: 100% !important;
+    max-width: none !important;
     flex: 1 1 100% !important;
   }
   .page-header-search input {
