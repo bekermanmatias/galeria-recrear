@@ -63,20 +63,52 @@ export function CatalogView({ kind }: { kind: ResourceKind }) {
   const save=async()=>{try{await adminRequest('/'+kind+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({name,botCode:code})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
   const updateStatus=async(item:CatalogItem,active:boolean)=>{if(!active&&!confirm('¿Inactivar esta '+label.toLowerCase()+'? No aparecerá en nuevas cargas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/'+kind+'/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
   const remove=async(item:CatalogItem)=>{if(kind!=='activities'||!confirm('¿Eliminar definitivamente esta actividad? Los lotes existentes conservarán su historial, pero quedarán sin actividad asociada.'))return;try{await adminRequest('/activities/'+item.id,{method:'DELETE'});setItems(current=>current.filter(value=>value.id!==item.id));}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo eliminar la actividad.');}};
+  const filtered = items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase()));
   return <div style={page}>
     <style dangerouslySetInnerHTML={{__html: `
       @media (max-width: 768px) {
-        .responsive-card-table thead { display: none; }
-        .responsive-card-table, .responsive-card-table tbody, .responsive-card-table tr, .responsive-card-table td { display: block; width: 100%; box-sizing: border-box; }
-        .responsive-card-table { min-width: 0 !important; }
-        .responsive-card-table tr { margin-bottom: 16px; border: 1px solid #E2E8F0 !important; border-radius: 8px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 12px; }
-        .responsive-card-table td { display: flex; flex-direction: column; align-items: flex-start; padding: 0 !important; border: none !important; text-align: left; width: 100%; box-sizing: border-box; gap: 4px; word-break: break-word; }
-        .responsive-card-table td::before { content: attr(data-label); font-weight: 600; font-size: 11px; color: #64748B; text-transform: uppercase; margin-bottom: 2px; }
-        .responsive-card-table td:last-child { flex-direction: row; justify-content: flex-end; gap: 8px; margin-top: 8px; padding-top: 12px !important; border-top: 1px solid #F1F5F9 !important; }
-        .responsive-card-table td:last-child::before { display: none; }
+        .catalog-table-wrap { display: none; }
+        .catalog-mobile { display: flex !important; }
+      }
+      @media (min-width: 769px) {
+        .catalog-mobile { display: none !important; }
       }
     `}} />
-    <PageHeader title={pluralLabel} subtitle={'Gestión del catálogo global de '+pluralLabel.toLowerCase()+'.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable className="responsive-card-table" headers={['Código','Nombre','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.bot_code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong dataLabel="Código">{item.bot_code}</Td><Td dataLabel="Nombre">{item.name}</Td><Td dataLabel="Estado"><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td><td data-label="Acciones" style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>{kind=== 'schools'&&<button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>}<button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>{kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}</div></td></tr>)}</DataTable>{open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}</div>;
+    <PageHeader title={pluralLabel} subtitle={'Gestión del catálogo global de '+pluralLabel.toLowerCase()+'.'} action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo {label}</button>} search={search} onSearch={setSearch}/>
+    <ErrorMessage value={error}/>
+    {/* Desktop table */}
+    <div className="catalog-table-wrap" style={{overflowX:'auto'}}>
+      <DataTable headers={['Código','Nombre','Estado','Acciones']}>
+        {filtered.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}>
+          <Td strong>{item.bot_code}</Td>
+          <Td>{item.name}</Td>
+          <Td><AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/></Td>
+          <td style={{padding:'12px 20px',textAlign:'right'}}>
+            <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>
+              <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+              {kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}
+            </div>
+          </td>
+        </tr>)}
+      </DataTable>
+    </div>
+    {/* Mobile list */}
+    <div className="catalog-mobile" style={{flexDirection:'column',gap:0,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+      {!filtered.length && <div style={{padding:28,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron {pluralLabel.toLowerCase()}.</div>}
+      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'12px 14px',borderBottom:idx<filtered.length-1?'1px solid #F1F5F9':'none',opacity:item.active!==false?1:.6}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77'}}>{item.name}</div>
+          <div style={{fontSize:12,color:'#64748B',marginTop:2}}>Cód: {item.bot_code}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+          <AdminStatusSelect active={item.active!==false} activeLabel={kind==='activities'?'Activa':'Activo'} inactiveLabel={kind==='activities'?'Inactiva':'Inactivo'} onChange={value=>void updateStatus(item,value)}/>
+          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+          {kind==='activities'&&<button onClick={()=>void remove(item)} title="Eliminar actividad definitivamente" aria-label="Eliminar actividad definitivamente" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>}
+        </div>
+      </div>)}
+    </div>
+    {open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}
+  </div>;
 }
 export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -101,8 +133,54 @@ export function SchoolsView() {
   const load=()=>adminRequest<{items:School[]}>('/schools?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los colegios.'));},[]);
   const edit=(item?:School)=>{setEditing(item??null);setForm({name:item?.name??'',code:item?.code??'',botCode:item?.bot_code??'',startDate:item?.start_date??'',endDate:item?.end_date??''});setOpen(true);};
   const save=async()=>{try{await adminRequest('/schools'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({...form,startDate:form.startDate||null,endDate:form.endDate||null})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
-  const updateStatus=async(item:School,active:boolean)=>{if(!active&&!confirm('¿Inactivar este colegio? No aparecer? al configurar nuevas salidas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/schools/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
-  return <div style={page}><PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/><ErrorMessage value={error}/><DataTable className="responsive-card-table" headers={['Código','Nombre','Código bot','Estado','Acciones']}>{items.filter(item=>(item.name+' '+item.code).toLowerCase().includes(search.toLowerCase())).map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}><Td strong dataLabel="Código">{item.code}</Td><Td dataLabel="Nombre">{item.name}</Td><Td dataLabel="Código bot">{item.bot_code}</Td><Td dataLabel="Estado"><AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/></Td><td data-label="Acciones" style={{padding:'12px 20px',textAlign:'right'}}><div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}><button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button><button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button></div></td></tr>)}</DataTable>{open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}</div>;
+  const updateStatus=async(item:School,active:boolean)=>{if(!active&&!confirm('¿Inactivar este colegio? No aparecerá al configurar nuevas salidas.'))return;const previous=item.active!==false;setItems(current=>current.map(value=>value.id===item.id?{...value,active}:value));try{await adminRequest('/schools/'+item.id,{method:'PATCH',body:JSON.stringify({active})});}catch(reason){setItems(current=>current.map(value=>value.id===item.id?{...value,active:previous}:value));setError(reason instanceof Error?reason.message:'No se pudo actualizar el estado.');}};
+  const filtered = items.filter(item=>(item.name+' '+item.code).toLowerCase().includes(search.toLowerCase()));
+  return <div style={page}>
+    <style dangerouslySetInnerHTML={{__html: `
+      @media (max-width: 768px) {
+        .schools-table-wrap { display: none; }
+        .schools-mobile { display: flex !important; }
+      }
+      @media (min-width: 769px) {
+        .schools-mobile { display: none !important; }
+      }
+    `}} />
+    <PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/>
+    <ErrorMessage value={error}/>
+    {/* Desktop table */}
+    <div className="schools-table-wrap" style={{overflowX:'auto'}}>
+      <DataTable headers={['Código','Nombre','Código bot','Estado','Acciones']}>
+        {filtered.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}>
+          <Td strong>{item.code}</Td>
+          <Td>{item.name}</Td>
+          <Td>{item.bot_code}</Td>
+          <Td><AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/></Td>
+          <td style={{padding:'12px 20px',textAlign:'right'}}>
+            <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>
+              <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>
+              <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+            </div>
+          </td>
+        </tr>)}
+      </DataTable>
+    </div>
+    {/* Mobile list */}
+    <div className="schools-mobile" style={{flexDirection:'column',gap:0,border:'1px solid #E2E8F0',borderRadius:10,overflow:'hidden',background:'#fff'}}>
+      {!filtered.length && <div style={{padding:28,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron colegios.</div>}
+      {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'12px 14px',borderBottom:idx<filtered.length-1?'1px solid #F1F5F9':'none',opacity:item.active!==false?1:.6}}>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:14,color:'#1A4B77'}}>{item.name}</div>
+          <div style={{fontSize:12,color:'#64748B',marginTop:2}}>Cód: {item.code}{item.bot_code ? ` · Bot: ${item.bot_code}` : ''}</div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+          <AdminStatusSelect active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/>
+          <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>
+          <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+        </div>
+      </div>)}
+    </div>
+    {open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}
+  </div>;
 }
 export function UsersView() {
   const [items,setItems]=useState<AdminUser[]>([]);
