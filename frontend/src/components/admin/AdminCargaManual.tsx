@@ -53,7 +53,7 @@ export default function AdminCargaManual() {
   };
   const current=files.find(item=>item.id===selected); const currentIndex=files.findIndex(item=>item.id===selected); const totalSize=files.reduce((sum,item)=>sum+item.file.size,0);
   return <div style={{flex:1,overflowY:'auto',padding:32}}><div style={{maxWidth:720,margin:'0 auto'}}>
-    <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná la actividad y todas las fotos o videos del lote. Se procesan de a {MAX_PARALLEL_UPLOADS} para una carga estable.</p></div>
+    <div style={{marginBottom:32}}><h2 style={{margin:'0 0 8px',fontSize:24,color:'#1A4B77'}}>Subir material</h2><p style={{margin:0,fontSize:14,color:'#71717A'}}>Seleccioná la actividad y todas las fotos o videos del lote.</p></div>
     <div className="upload-fields-grid">
       <SearchableSelect label="Salida *" value={departure} onChange={setDeparture} options={departures.map(departureOption)} placeholder="Seleccionar salida..." error={hasAttemptedUpload&&!departure}/>
       <label style={{display:'grid',gap:8,fontSize:13,fontWeight:500,color:hasAttemptedUpload&&!date?'#EF4444':'inherit'}}>Fecha *<input type="date" value={date} onChange={event=>setDate(event.target.value)} style={{...dateInput,borderColor:hasAttemptedUpload&&!date?'#EF4444':'#E4E4E7'}}/></label>
