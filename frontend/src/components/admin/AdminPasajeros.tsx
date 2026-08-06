@@ -24,7 +24,7 @@ const asBody = (form:Form) => Object.fromEntries(Object.entries(form).map(([key,
 const date = (value?:string|null) => value ? value.slice(0,10).split('-').reverse().join('/') : '-';
 
 function AssociationChips({items,empty}:{items:Passenger['schools'];empty:string}) {
-  return <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{items?.length ? items.map(item => <span key={item.id} title={`${item.name}${item.code ? ` (${item.code})` : ''}`} style={{display:'inline-flex',padding:'3px 7px',borderRadius:5,background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#475569',fontSize:11,fontWeight:600,wordBreak:'break-word'}}>{item.name}{item.code ? ` · ${item.code}` : ''}</span>) : <span style={{fontSize:12,color:'#94A3B8'}}>{empty}</span>}</div>;
+  return <div style={{display:'flex',flexWrap:'wrap',gap:5}}>{items?.length ? items.map(item => <span key={item.id} title={`${item.name}${item.code ? ` (${item.code})` : ''}`} style={{display:'inline-flex',padding:'3px 7px',borderRadius:5,background:'#F1F5F9',border:'1px solid #E2E8F0',color:'#475569',fontSize:11,fontWeight:600,wordBreak:'break-word'}}>{item.name}{item.code ? ` - ${item.code}` : ''}</span>) : <span style={{fontSize:12,color:'#94A3B8'}}>{empty}</span>}</div>;
 }
 
 export default function AdminPasajeros() {

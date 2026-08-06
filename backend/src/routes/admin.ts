@@ -296,7 +296,7 @@ adminRouter.post('/imports/:kind/commit', requireAdmin, upload.single('file'), a
   res.status(201).json({ imported: rows.length });
 }));
 
-const passengerFields = `p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.created_at,p.updated_at,p.deactivated_at`;
+const passengerFields = `p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.wristband_code,p.created_at,p.updated_at,p.deactivated_at`;
 async function passengerSchoolExists(schoolId: string) {
   await schoolExists(schoolId);
   return schoolId;
@@ -350,7 +350,7 @@ adminRouter.get('/passengers', requirePermission('passengers', 'view'), asyncHan
   const updatedTo = req.query.updatedTo ? z.string().date().parse(req.query.updatedTo) : null;
   const values: unknown[] = [`%${term}%`, schoolId, departureId, active, updatedFrom, updatedTo, pageSize, (page - 1) * pageSize, req.user!.role === 'ADMIN', req.user!.id];
   const result = await query(`
-    SELECT p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.created_at,p.updated_at,p.deactivated_at,
+    SELECT p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.wristband_code,p.created_at,p.updated_at,p.deactivated_at,
       COALESCE((SELECT jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'code',s.code) ORDER BY s.name) FROM passenger_school_assignments psa JOIN schools s ON s.id=psa.school_id WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL), '[]'::jsonb) AS schools,
       COALESCE((SELECT jsonb_agg(jsonb_build_object('id',d.id,'name',d.name,'code',d.public_code,'type',d.type) ORDER BY d.start_date DESC,d.name) FROM passenger_departure_assignments pda JOIN departures d ON d.id=pda.departure_id WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL), '[]'::jsonb) AS departures
     FROM passengers p

@@ -9,7 +9,7 @@ import { parsePassengerWorkbook, passengerSchema } from '../passengers.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024 } });
 const uuid = z.string().uuid();
-const passengerFields = 'p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.created_at,p.updated_at,p.deactivated_at';
+const passengerFields = 'p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.wristband_code,p.created_at,p.updated_at,p.deactivated_at';
 
 async function departureContext(departureId: string, user: NonNullable<Express.Request['user']>) {
   await assertDepartureAccess(user, departureId, ['COORDINATOR']);
