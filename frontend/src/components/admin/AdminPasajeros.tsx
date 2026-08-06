@@ -52,11 +52,18 @@ export default function AdminPasajeros() {
   const [statusChange,setStatusChange] = useState<{item:Passenger;next:boolean}|null>(null);
   const [statusBusy,setStatusBusy] = useState(false);
   const [associationBusy,setAssociationBusy] = useState(false);
+  const [canImport, setCanImport] = useState(true);
   const openView = (item:Passenger) => { setViewing(item); };
 
   const loadHistory = async () => {
-    const imports = await adminRequest<{items:PassengerImport[]}>('/passengers/imports');
-    setHistory(imports.items);
+    try {
+      const imports = await adminRequest<{items:PassengerImport[]}>('/passengers/imports');
+      setHistory(imports.items);
+      setCanImport(true);
+    } catch (error: any) {
+      if (error?.status === 403) setCanImport(false);
+      setHistory([]);
+    }
   };
   const load = async () => {
     const params = new URLSearchParams({pageSize:'100'});
@@ -141,7 +148,7 @@ export default function AdminPasajeros() {
             <SlidersHorizontal size={16}/>Filtros
             {activeFilters.length > 0 && <span style={{position:'absolute',top:-5,right:-5,width:18,height:18,borderRadius:'50%',background:'#1A4B77',color:'#fff',fontSize:11,fontWeight:700,display:'flex',alignItems:'center',justifyContent:'center',lineHeight:1}}>{activeFilters.length}</span>}
           </button>
-          <button className="page-header-btn passengers-action-btn" onClick={()=>{setImportOpen(true);setPreview(null);setFile(null);setError('');setMessage('');}} style={button}><Upload size={16}/>Importar Excel</button>
+          {canImport && <button className="page-header-btn passengers-action-btn" onClick={()=>{setImportOpen(true);setPreview(null);setFile(null);setError('');setMessage('');}} style={button}><Upload size={16}/>Importar Excel</button>}
         </div>
       </div>
     </header>
