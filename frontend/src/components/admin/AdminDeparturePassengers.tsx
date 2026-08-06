@@ -9,9 +9,10 @@ const tabs = [
 ] as const;
 export default function AdminDeparturePassengers() {
   const [authorized,setAuthorized] = useState(false);
+  const [userRole,setUserRole] = useState<'admin'|'coordinator'|'parent'>('admin');
   const departureId = useMemo(() => new URLSearchParams(window.location.search).get('departureId') ?? '', []);
-  useEffect(() => { void api.me().then(({user}) => { if (user.role !== 'ADMIN') window.location.href = user.role === 'COORDINATOR' ? '/coordinator' : '/parent'; else setAuthorized(true); }).catch(() => { window.location.href = '/login'; }); }, []);
+  useEffect(() => { void api.me().then(({user}) => { if (user.role === 'PARENT') window.location.href = '/parent'; else { setAuthorized(true); setUserRole(user.role === 'ADMIN' ? 'admin' : 'coordinator'); } }).catch(() => { window.location.href = '/login'; }); }, []);
   if (!authorized) return <div style={{minHeight:'100vh',display:'grid',placeItems:'center',color:'#64748B'}}>Cargando…</div>;
   if (!departureId) return <div style={{padding:36,color:'#B91C1C'}}>Falta identificar la salida.</div>;
-  return <DashboardLayout role="admin" tabs={tabs as any} activeTab="salidas" onTabChange={() => { window.location.href='/admin#salidas'; }}><DeparturePassengers departureId={departureId} onBack={() => { window.location.href='/admin#salidas'; }}/></DashboardLayout>;
+  return <DashboardLayout role={userRole} tabs={tabs as any} activeTab="salidas" onTabChange={() => { window.location.href='/admin#salidas'; }}><DeparturePassengers departureId={departureId} onBack={() => { window.location.href='/admin#salidas'; }}/></DashboardLayout>;
 }

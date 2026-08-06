@@ -110,7 +110,7 @@ export function CatalogView({ kind }: { kind: ResourceKind }) {
     {open&&<Modal title={(editing?'Editar ':'Nuevo ')+label} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={name} onChange={setName}/><Field label="Código del bot" value={code} onChange={setCode}/></Modal>}
   </div>;
 }
-export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false, compact = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean; compact?: boolean }) {
+export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabel = "Inactivo", onChange, fullWidth = false, compact = false, disabled = false }: { active: boolean; activeLabel?: string; inactiveLabel?: string; onChange: (next: boolean) => void; fullWidth?: boolean; compact?: boolean; disabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -119,6 +119,7 @@ export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabe
     return () => document.removeEventListener('mousedown', close);
   }, []);
   const choose = (next: boolean) => { setOpen(false); if (next !== active) onChange(next); };
+  if (disabled) return <span style={{ display: fullWidth ? 'block' : 'inline-flex', padding: compact ? '4px 8px' : '6px 10px', background: '#F1F5F9', color: '#64748B', borderRadius: 6, fontSize: compact ? 11 : 12, fontWeight: 600, border: '1px solid #E2E8F0', alignItems: 'center', justifyContent: 'center' }}>{active ? activeLabel : inactiveLabel}</span>;
   return <div ref={ref} style={{ position: 'relative', display: fullWidth ? 'block' : 'inline-block', width: fullWidth ? '100%' : undefined }}>
     <button type="button" onClick={() => setOpen(value => !value)} aria-haspopup="listbox" aria-expanded={open} style={{ display: 'inline-flex', width: fullWidth ? '100%' : undefined, alignItems: 'center', justifyContent: 'space-between', gap: compact ? 4 : 14, minWidth: compact ? 'auto' : 95, padding: compact ? '4px 6px 4px 8px' : '6px 8px 6px 10px', border: '1px solid #DCE3EB', borderRadius: 6, background: '#fff', color: '#334155', fontSize: compact ? 11 : 12, fontWeight: 600, cursor: 'pointer' }}>
       {active ? activeLabel : inactiveLabel}<ChevronDown size={compact ? 12 : 14} color="#64748B" style={{ transform: open ? 'rotate(180deg)' : undefined, transition: 'transform .15s', flexShrink: 0 }} />
