@@ -76,7 +76,7 @@ export default function AdminPanel() {
   switch (currentTab) {
     case 'carga': tabContent = <AdminCargaManual />; break;
     case 'moderacion': tabContent = <AdminModeration />; break;
-    case 'lotes': tabContent = <GalleryView />; break;
+    case 'lotes': tabContent = <GalleryView user={user} />; break;
     case 'salidas': tabContent = <AdminSalidas />; break;
     case 'pasajeros': tabContent = <AdminPasajeros />; break;
     case 'colegios': tabContent = <SchoolsView />; break;

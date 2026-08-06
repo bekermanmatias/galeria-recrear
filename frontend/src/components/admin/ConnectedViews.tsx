@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
-import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction } from '../../lib/api';
+import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction, type SessionUser } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -332,7 +332,8 @@ function StatusBadge({ status }: { status: string }) {
   return <span style={{ display: 'inline-block', padding: '3px 9px', borderRadius: 6, background: bg, color: color, fontSize: 12, fontWeight: 700 }}>{label}</span>;
 }
 
-export function GalleryView() {
+export function GalleryView({ user }: { user?: SessionUser }) {
+  const canManage = user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.update;
   const [lots,setLots]=useState<LotSummary[]>([]);
   const [media,setMedia]=useState<Array<Media&{lot:LotSummary}>>([]);
   const [departure,setDeparture]=useState(() => {
@@ -540,22 +541,24 @@ export function GalleryView() {
                   </button>
                 )}
 
-                <div style={{position:'relative'}}>
-                  <button onClick={(e)=>{e.stopPropagation();setOpenLotMenu(menuOpen?null:lot.id);}} title="Más opciones" style={{width:32,height:32,display:'grid',placeItems:'center',border:'1px solid #DCE3EB',borderRadius:6,background:'#fff',color:'#475569',cursor:'pointer'}}>
-                    <MoreVertical size={16}/>
-                  </button>
+                {canManage && (
+                  <div style={{position:'relative'}}>
+                    <button onClick={(e)=>{e.stopPropagation();setOpenLotMenu(menuOpen?null:lot.id);}} title="Más opciones" style={{width:32,height:32,display:'grid',placeItems:'center',border:'1px solid #DCE3EB',borderRadius:6,background:'#fff',color:'#475569',cursor:'pointer'}}>
+                      <MoreVertical size={16}/>
+                    </button>
 
-                  {menuOpen&&(
-                    <div style={{position:'absolute',right:0,top:36,zIndex:50,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.15)',minWidth:210,padding:4}}>
-                      <button onClick={()=>openEditModal(lot)} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#334155',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#F1F5F9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                        <Edit2 size={15}/> Modificar lote
-                      </button>
-                      <button onClick={()=>{setOpenLotMenu(null);setDeletingLot(lot);}} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#DC2626',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
-                        <Trash2 size={15}/> Eliminar lote por completo
-                      </button>
-                    </div>
-                  )}
-                </div>
+                    {menuOpen&&(
+                      <div style={{position:'absolute',right:0,top:36,zIndex:50,background:'#fff',border:'1px solid #E2E8F0',borderRadius:8,boxShadow:'0 10px 25px rgba(15,23,42,.15)',minWidth:210,padding:4}}>
+                        <button onClick={()=>openEditModal(lot)} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#334155',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#F1F5F9'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                          <Edit2 size={15}/> Modificar lote
+                        </button>
+                        <button onClick={()=>{setOpenLotMenu(null);setDeletingLot(lot);}} style={{width:'100%',border:0,background:'none',padding:'10px 12px',display:'flex',alignItems:'center',gap:8,color:'#DC2626',fontSize:13,fontWeight:600,cursor:'pointer',borderRadius:6,textAlign:'left'}} onMouseEnter={e=>e.currentTarget.style.background='#FEF2F2'} onMouseLeave={e=>e.currentTarget.style.background='none'}>
+                          <Trash2 size={15}/> Eliminar lote por completo
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           );
