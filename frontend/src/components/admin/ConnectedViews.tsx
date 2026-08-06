@@ -433,8 +433,8 @@ export function GalleryView() {
   const filteredLots=useMemo(()=>{
     const filtered = lots.filter(lot=>(departure==='Todos'||departureLabel(lot)===departure)&&(activity==='Todos'||lot.activity_name===activity)&&(!from||lot.event_date.slice(0,10)>=from)&&(!to||lot.event_date.slice(0,10)<=to));
     return filtered.sort((a,b) => {
-      if (sort === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      if (sort === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      if (sort === 'newest') return new Date(b.version_created_at || 0).getTime() - new Date(a.version_created_at || 0).getTime();
+      if (sort === 'oldest') return new Date(a.version_created_at || 0).getTime() - new Date(b.version_created_at || 0).getTime();
       if (sort === 'departure') return departureLabel(a).localeCompare(departureLabel(b));
       return 0;
     });
