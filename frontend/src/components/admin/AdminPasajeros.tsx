@@ -185,7 +185,7 @@ export default function AdminPasajeros() {
     </tbody></table></div>
     {/* Mobile simple table */}
     <div className="passengers-mobile">
-      <table style={{width:'100%',borderCollapse:'collapse'}}>
+      <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
         <thead><tr style={{borderBottom:'1px solid #E2E8F0'}}>
           <th style={{padding:'10px 12px',textAlign:'left',fontSize:11,color:'#64748B',textTransform:'uppercase',fontWeight:600}}>Pasajero</th>
           <th style={{padding:'10px 12px',textAlign:'left',fontSize:11,color:'#64748B',textTransform:'uppercase',fontWeight:600}}>DNI</th>
@@ -193,8 +193,8 @@ export default function AdminPasajeros() {
         </tr></thead>
         <tbody>
           {items.map(item=><tr key={item.id} onClick={()=>openView(item)} style={{borderBottom:'1px solid #F1F5F9',cursor:'pointer',opacity:item.active?1:.6}}>
-            <td style={{padding:'12px 12px',fontSize:13,color:'#1A4B77',fontWeight:600,lineHeight:1.4}}>{item.full_name}{item.external_number&&<div style={{fontSize:11,color:'#94A3B8',fontWeight:400}}>Nro. {item.external_number}</div>}</td>
-            <td style={{padding:'12px 12px',fontSize:13,color:'#475569',whiteSpace:'nowrap'}}>{item.document_type} {item.document_number}</td>
+            <td style={{padding:'12px 12px',fontSize:13,color:'#1A4B77',fontWeight:600,lineHeight:1.4,overflowWrap:'break-word',wordWrap:'break-word'}}>{item.full_name}{item.external_number&&<div style={{fontSize:11,color:'#94A3B8',fontWeight:400}}>Nro. {item.external_number}</div>}</td>
+            <td style={{padding:'12px 12px',fontSize:13,color:'#475569',overflowWrap:'break-word',wordWrap:'break-word'}}>{item.document_type} {item.document_number}</td>
             <td style={{padding:'8px 8px',textAlign:'right'}} onClick={e=>e.stopPropagation()}>
               <button onClick={()=>setWristbandTarget(item)} title="Pulsera" style={{...iconButton,color:item.wristband_code?'#15803D':'#94A3B8',width:32,height:32}}><QrCode size={15}/></button>
             </td>
