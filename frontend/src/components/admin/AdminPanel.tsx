@@ -78,7 +78,7 @@ export default function AdminPanel() {
     case 'moderacion': tabContent = <AdminModeration />; break;
     case 'lotes': tabContent = <GalleryView user={user} />; break;
     case 'salidas': tabContent = <AdminSalidas />; break;
-    case 'pasajeros': tabContent = <AdminPasajeros />; break;
+    case 'pasajeros': tabContent = <AdminPasajeros user={user} />; break;
     case 'colegios': tabContent = <SchoolsView />; break;
     case 'actividades': tabContent = <CatalogView kind="activities" />; break;
     case 'usuarios': tabContent = <UsersView />; break;
