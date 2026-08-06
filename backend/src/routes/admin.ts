@@ -360,7 +360,7 @@ adminRouter.get('/passengers', requirePermission('passengers', 'view'), asyncHan
       AND ($4::boolean IS NULL OR p.active=$4)
       AND ($5::date IS NULL OR p.updated_at >= $5::date)
       AND ($6::date IS NULL OR p.updated_at < ($6::date + interval '1 day'))
-      AND ($9::boolean OR EXISTS(SELECT 1 FROM passenger_departure_assignments pda JOIN departure_coordinators dc ON dc.departure_id=pda.departure_id WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL AND dc.user_id=$10))
+      AND ($9::boolean OR EXISTS(SELECT 1 FROM passenger_departure_assignments pda JOIN departure_coordinators dc ON dc.departure_id=pda.departure_id WHERE pda.passenger_id=p.id AND pda.unassigned_at IS NULL AND dc.user_id=$10) OR EXISTS(SELECT 1 FROM passenger_school_assignments psa JOIN departure_schools ds ON ds.school_id=psa.school_id JOIN departure_coordinators dc ON dc.departure_id=ds.departure_id WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL AND dc.user_id=$10))
     ORDER BY p.active DESC,p.full_name LIMIT $7 OFFSET $8`, values);
   const [schools,departures] = await Promise.all([
     query(`SELECT id,name,code FROM schools WHERE active AND deleted_at IS NULL ORDER BY name`),
@@ -531,8 +531,9 @@ const departurePatchSchema = departureSchemaBase.partial().refine(value => !valu
 const idsSchema = z.object({ ids: z.array(z.string().uuid()) });
 
 async function departureExists(id: string) {
-  const result = await query('SELECT id FROM departures WHERE id=$1', [id]);
+  const result = await query('SELECT id, start_date::text, end_date::text FROM departures WHERE id=$1 AND deleted_at IS NULL', [id]);
   if (!result.rowCount) throw new AppError(404, 'DEPARTURE_NOT_FOUND', 'Salida no encontrada');
+  return result.rows[0];
 }
 
 adminRouter.get('/departures', requirePermission('departures', 'view'), asyncHandler(async (req, res) => {
@@ -550,8 +551,8 @@ adminRouter.get('/departures', requirePermission('departures', 'view'), asyncHan
     LEFT JOIN schools s ON s.id=ds.school_id
     LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id
     LEFT JOIN users u ON u.id=dc.user_id AND u.active
-    LEFT JOIN lots l ON l.departure_id=d.id
-    WHERE ($1::boolean OR d.active = true)
+    LEFT JOIN lots l ON l.departure_id=d.id AND l.deleted_at IS NULL
+    WHERE d.deleted_at IS NULL AND ($1::boolean OR d.active = true)
       AND ($2::boolean OR d.id IN (SELECT departure_id FROM departure_coordinators WHERE user_id=$3))
     GROUP BY d.id
     ORDER BY d.start_date DESC,d.name
@@ -565,32 +566,27 @@ adminRouter.post('/departures', requirePermission('departures', 'create'), async
   res.status(201).json(result.rows[0]);
 }));
 adminRouter.patch('/departures/:id', requirePermission('departures', 'edit'), asyncHandler(async(req,res) => {
-  const input=departurePatchSchema.parse(req.body); await departureExists(String(req.params.id));
-  const current=await query<{start_date:string;end_date:string}>('SELECT start_date::text,end_date::text FROM departures WHERE id=$1',[String(req.params.id)]);
-  const startDate=input.startDate ?? current.rows[0].start_date;
-  const endDate=input.endDate ?? current.rows[0].end_date;
-  if(endDate < startDate) throw new AppError(400,'INVALID_DATE_RANGE','La fecha de fin debe ser igual o posterior a la fecha de inicio');
+  const input=departurePatchSchema.parse(req.body); const current = await departureExists(String(req.params.id));
+  const startDate=input.startDate ?? current.start_date;
+  const endDate=input.endDate ?? current.end_date;
   const result=await query(`UPDATE departures SET type=COALESCE($1,type),name=COALESCE($2,name),destination=COALESCE($3,destination),event_date=$4,start_date=$4,end_date=$5,active=COALESCE($6,active),public_access_active=COALESCE($7,public_access_active),public_code=COALESCE($8,public_code),archived_at=CASE WHEN COALESCE($6,active) THEN NULL WHEN active THEN now() ELSE archived_at END WHERE id=$9 RETURNING id,type,name,destination,event_date::text,start_date::text,end_date::text,active,archived_at,public_code,public_access_active`,[input.type??null,input.name??null,input.destination??null,startDate,endDate,input.active??null,input.publicAccessActive??null,input.publicCode??null,String(req.params.id)]);  await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,input.active===false?'DEPARTURE_ARCHIVED':input.active===true?'DEPARTURE_REACTIVATED':'DEPARTURE_UPDATED','departure',String(req.params.id),JSON.stringify({...input,startDate,endDate})]);
   res.json(result.rows[0]);
 }));
 adminRouter.put('/departures/:id/schools', requirePermission('departures', 'edit'), asyncHandler(async(req,res) => {
-  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida est? archivada o no existe');
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe');
   await transaction(async client=>{await client.query('DELETE FROM departure_schools WHERE departure_id=$1',[String(req.params.id)]);for(const schoolId of input.ids){const school=await client.query('SELECT 1 FROM schools WHERE id=$1 AND active AND deleted_at IS NULL',[schoolId]);if(!school.rowCount)throw new AppError(400,'INVALID_SCHOOL','Colegio invalido');await client.query('INSERT INTO departure_schools(departure_id,school_id) VALUES($1,$2)',[req.params.id,schoolId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_SCHOOLS_UPDATED','departure',String(req.params.id),JSON.stringify({schoolIds:input.ids})]);res.status(204).end();
 }));
 adminRouter.put('/departures/:id/coordinators', requirePermission('departures', 'edit'), asyncHandler(async(req,res) => {
-  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida est? archivada o no existe');
+  const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe');
   await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role='COORDINATOR' AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador invalido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_COORDINATORS_UPDATED','departure',String(req.params.id),JSON.stringify({coordinatorIds:input.ids})]);res.status(204).end();
 }));
 adminRouter.delete('/departures/:id', requirePermission('departures', 'delete'), asyncHandler(async(req,res) => {
   await departureExists(String(req.params.id));
   await transaction(async client => {
-    await client.query('UPDATE lots SET deleted_at=now(), current_published_version_id=NULL WHERE departure_id=$1', [String(req.params.id)]);
-    await client.query('DELETE FROM departure_schools WHERE departure_id=$1', [String(req.params.id)]);
-    await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1', [String(req.params.id)]);
-    await client.query('DELETE FROM passenger_departure_assignments WHERE departure_id=$1', [String(req.params.id)]);
-    await client.query('UPDATE departures SET active=false, archived_at=now() WHERE id=$1', [String(req.params.id)]);
+    await client.query('UPDATE lots SET deleted_at=now(), current_published_version_id=NULL WHERE departure_id=$1 AND deleted_at IS NULL', [String(req.params.id)]);
+    await client.query('UPDATE departures SET active=false, deleted_at=now() WHERE id=$1', [String(req.params.id)]);
   });
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id) VALUES($1,$2,$3,$4)', [req.user!.id, 'DEPARTURE_DELETED', 'departure', String(req.params.id)]);
   res.status(204).end();

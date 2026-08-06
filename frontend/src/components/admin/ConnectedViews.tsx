@@ -131,6 +131,7 @@ export function AdminStatusSelect({ active, activeLabel = "Activo", inactiveLabe
 }
 export function SchoolsView() {
   const [items,setItems]=useState<School[]>([]); const [search,setSearch]=useState(''); const [editing,setEditing]=useState<School|null>(null); const [open,setOpen]=useState(false); const [form,setForm]=useState({name:'',code:'',botCode:'',startDate:'',endDate:''}); const [error,setError]=useState('');
+  const [pendingDelete, setPendingDelete] = useState<School|null>(null); const [saving, setSaving] = useState(false);
   const load=()=>adminRequest<{items:School[]}>('/schools?includeInactive=true').then(data=>setItems(data.items)); useEffect(()=>{load().catch(reason=>setError(reason instanceof Error?reason.message:'No se pudieron cargar los colegios.'));},[]);
   const edit=(item?:School)=>{setEditing(item??null);setForm({name:item?.name??'',code:item?.code??'',botCode:item?.bot_code??'',startDate:item?.start_date??'',endDate:item?.end_date??''});setOpen(true);};
   const save=async()=>{try{await adminRequest('/schools'+(editing?'/'+editing.id:''),{method:editing?'PATCH':'POST',body:JSON.stringify({...form,startDate:form.startDate||null,endDate:form.endDate||null})});setOpen(false);await load();}catch(reason){setError(reason instanceof Error?reason.message:'No se pudo guardar.');}};
@@ -148,7 +149,6 @@ export function SchoolsView() {
     `}} />
     <PageHeader title="Colegios" subtitle="Gestión de colegios y coordinadores que pueden integrarse a cada salida." action={<button onClick={()=>edit()} style={primary}><Plus size={16}/> Nuevo Colegio</button>} search={search} onSearch={setSearch}/>
     <ErrorMessage value={error}/>
-    {/* Desktop table */}
     <div className="schools-table-wrap" style={{overflowX:'auto'}}>
       <DataTable headers={['Código','Nombre','Código bot','Estado','Acciones']}>
         {filtered.map(item=><tr key={item.id} style={{borderBottom:'1px solid #E4E4E7'}}>
@@ -160,12 +160,12 @@ export function SchoolsView() {
             <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8}}>
               <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={16}/></button>
               <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={16}/></button>
+              <button onClick={()=>setPendingDelete(item)} aria-label="Eliminar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:30,height:30,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={16}/></button>
             </div>
           </td>
         </tr>)}
       </DataTable>
     </div>
-    {/* Mobile list */}
     <div className="schools-mobile" style={{flexDirection:'column',gap:0}}>
       {!filtered.length && <div style={{padding:28,textAlign:'center',color:'#94A3B8',fontSize:14}}>No se encontraron colegios.</div>}
       {filtered.map((item,idx)=><div key={item.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:10,padding:'12px 0',borderBottom:'1px solid #F1F5F9',opacity:item.active!==false?1:.6}}>
@@ -177,10 +177,12 @@ export function SchoolsView() {
           <AdminStatusSelect compact active={item.active!==false} activeLabel="Activo" inactiveLabel="Inactivo" onChange={value=>void updateStatus(item,value)}/>
           <button type="button" title="Ver pasajeros" aria-label="Ver pasajeros" onClick={()=>{window.location.href='/admin/colegios-pasajeros?schoolId='+item.id}} style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',color:'#1A4B77',cursor:'pointer'}}><ContactRound size={15}/></button>
           <button onClick={()=>edit(item)} aria-label="Editar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',cursor:'pointer',color:'#64748B'}}><Edit2 size={15}/></button>
+          <button onClick={()=>setPendingDelete(item)} aria-label="Eliminar" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',width:28,height:28,border:0,background:'none',cursor:'pointer',color:'#DC2626'}}><Trash2 size={15}/></button>
         </div>
       </div>)}
     </div>
-    {open&&<Modal title={editing?'Editar Colegio':'Nuevo Colegio'} onClose={()=>setOpen(false)} onSave={save}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/><Field label="Código" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Fecha inicio" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Fecha fin" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></Modal>}
+    <ConfirmDialog open={pendingDelete!==null} title="¿Eliminar colegio?" description="Se eliminará de la vista, pero se conservarán los registros históricos." confirmLabel="Eliminar colegio" tone="danger" busy={saving} onCancel={()=>setPendingDelete(null)} onConfirm={async()=>{if(!pendingDelete)return;setSaving(true);try{await adminRequest(`/schools/${pendingDelete.id}`,{method:'DELETE'});setPendingDelete(null);await load();}catch(caught){setError(caught instanceof Error?caught.message:'No se pudo eliminar.');setPendingDelete(null);}finally{setSaving(false);}}}/>
+    {open&&<Modal title={(editing?'Editar ':'Nuevo ')+'Colegio'} onClose={()=>setOpen(false)} onSave={save}><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><div style={{gridColumn:'1 / -1'}}><Field label="Nombre" value={form.name} onChange={value=>setForm({...form,name:value})}/></div><Field label="Código identificador" value={form.code} onChange={value=>setForm({...form,code:value})}/><Field label="Código del bot (opcional)" value={form.botCode} onChange={value=>setForm({...form,botCode:value})}/><div style={{gridColumn:'1 / -1'}}><p style={{margin:'10px 0',fontSize:13,color:'#64748B'}}>Rango de fechas para restringir cargas (opcional):</p><div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}><Field label="Desde" type="date" value={form.startDate} onChange={value=>setForm({...form,startDate:value})}/><Field label="Hasta" type="date" value={form.endDate} onChange={value=>setForm({...form,endDate:value})}/></div></div></div></Modal>}
   </div>;
 }
 export function UsersView() {
