@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, ArrowUpDown, Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
 import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
@@ -349,8 +349,6 @@ export function GalleryView() {
   const [activeLot,setActiveLot]=useState('');
   const [openedLot,setOpenedLot]=useState<string|null>(null);
   const [showRejected,setShowRejected]=useState(false);
-  const [sort,setSort]=useState<'newest'|'oldest'|'departure'>('newest');
-  const [sortOpen,setSortOpen]=useState(false);
   const [recovering,setRecovering]=useState<string|null>(null);
   const [openMediaMenu,setOpenMediaMenu]=useState<string|null>(null);
   const [openLotMenu,setOpenLotMenu]=useState<string|null>(null);
@@ -432,13 +430,8 @@ export function GalleryView() {
   const activityOptions=useMemo(()=>['Todos',...Array.from(new Set(lots.map(item=>item.activity_name)))],[lots]);
   const filteredLots=useMemo(()=>{
     const filtered = lots.filter(lot=>(departure==='Todos'||departureLabel(lot)===departure)&&(activity==='Todos'||lot.activity_name===activity)&&(!from||lot.event_date.slice(0,10)>=from)&&(!to||lot.event_date.slice(0,10)<=to));
-    return filtered.sort((a,b) => {
-      if (sort === 'newest') return new Date(b.version_created_at || 0).getTime() - new Date(a.version_created_at || 0).getTime();
-      if (sort === 'oldest') return new Date(a.version_created_at || 0).getTime() - new Date(b.version_created_at || 0).getTime();
-      if (sort === 'departure') return departureLabel(a).localeCompare(departureLabel(b));
-      return 0;
-    });
-  },[lots,departure,activity,from,to,sort]);
+    return filtered.sort((a,b) => new Date(b.version_created_at || 0).getTime() - new Date(a.version_created_at || 0).getTime());
+  },[lots,departure,activity,from,to]);
   const groups=useMemo(()=>filteredLots.map(lot=>({lot,files:media.filter(file=>file.lot.id===lot.id)})),[filteredLots,media]);
   const displayedGroups=useMemo(()=>openedLot?groups.filter(group=>group.lot.id===openedLot):groups,[groups,openedLot]);
   const filesForDisplay=(group:typeof groups[number])=>openedLot&&showRejected?group.files.filter(file=>file.status==='APPROVED'||file.status==='REJECTED'):group.files.filter(file=>file.status==='APPROVED');
@@ -482,14 +475,6 @@ export function GalleryView() {
         <div style={{flex: 1, minWidth: 240}}><SearchableSelect value={departure} onChange={setDeparture} options={departureOptions} placeholder="Todas las salidas" style={{width:'100%'}}/></div>
         <div style={{flex: 1, minWidth: 200}}><SearchableSelect value={activity} onChange={setActivity} options={activityOptions} placeholder="Todas las actividades" style={{width:'100%'}}/></div>
         <div className="gallery-date-filter" style={{display:'flex',alignItems:'center',gap:8,background:'#F4F4F5',padding:'4px 8px',borderRadius:6}}><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Desde:</span><input type="date" value={from} onChange={event=>setFrom(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/><span style={{fontSize:12,color:'#71717A',fontWeight:500}}>Hasta:</span><input type="date" value={to} onChange={event=>setTo(event.target.value)} style={{padding:4,border:'none',background:'transparent',fontSize:13,outline:'none',color:'#09090B'}}/></div>
-        <div onMouseLeave={()=>setSortOpen(false)} style={{position:'relative', display:'flex', alignItems:'center'}}>
-          <button title="Ordenar lotes" aria-label="Ordenar lotes" aria-expanded={sortOpen} onClick={()=>setSortOpen(!sortOpen)} style={{height:39,padding:'0 12px',display:'inline-flex',alignItems:'center',gap:8,border:'1px solid #DCE3EB',borderRadius:6,background:sort==='newest'?'#fff':'#EAF2F8',color:'#1A4B77',cursor:'pointer',fontSize:13,fontWeight:600}}>
-            <ArrowUpDown size={15}/> {sort==='newest'?'Más recientes':sort==='oldest'?'Más antiguos':'Salida A-Z'}
-          </button>
-          {sortOpen&&<div style={{position:'absolute',right:0,top:43,zIndex:30,width:180,padding:5,border:'1px solid #E2E8F0',borderRadius:8,background:'#fff',boxShadow:'0 10px 24px rgba(15,23,42,.16)'}}>
-            {([['newest','Más recientes primero'],['oldest','Más antiguos primero'],['departure','Salida A-Z']] as const).map(([value,label])=><button key={value} onClick={()=>{setSort(value);setSortOpen(false);}} style={{width:'100%',padding:'8px 10px',border:0,borderRadius:5,background:sort===value?'#EEF4F8':'transparent',color:sort===value?'#1A4B77':'#475569',fontSize:12,fontWeight:sort===value?700:500,textAlign:'left',cursor:'pointer'}}>{label}</button>)}
-          </div>}
-        </div>
       </div>
     </div>}
     <ErrorMessage value={error}/>
