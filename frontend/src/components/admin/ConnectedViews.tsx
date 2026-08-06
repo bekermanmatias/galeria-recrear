@@ -544,9 +544,11 @@ export function GalleryView() {
               </div>
 
               <div style={{display:'flex',gap:6,justifyContent:'flex-end',alignItems:'center'}}>
-                <button onClick={()=>{setOpenedLot(lot.id);setActiveLot(lot.id);}} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'7px 10px',background:'#1A4B77',color:'#fff',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
-                  <Eye size={14}/> Ver lote ({filesCount})
-                </button>
+                {lot.status !== 'PENDING' && (
+                  <button onClick={()=>{setOpenedLot(lot.id);setActiveLot(lot.id);}} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'7px 10px',background:'#1A4B77',color:'#fff',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                    <Eye size={14}/> Ver lote ({filesCount})
+                  </button>
+                )}
                 {group&&(
                   <button onClick={()=>downloadLot(group)} title="Descargar lote" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'7px 9px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
                     <Download size={14}/>
