@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Bus, Check, ContactRound, Copy, Edit2, Plane, Plus, Search, Trash2, Users, X, Image as ImageIcon } from 'lucide-react';
-import { adminRequest, type AdminUser, type Departure, type School } from '../../lib/api';
+import { api, adminRequest, type AdminUser, type Departure, type School } from '../../lib/api';
 import ConfirmDialog from '../ui/ConfirmDialog';
 import { AdminStatusSelect } from './ConnectedViews';
 import DepartureGallery from './AdminGaleria';
