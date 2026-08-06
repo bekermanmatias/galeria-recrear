@@ -31,8 +31,8 @@ export function createApp() {
   app.get('/api/health', async (_req, res, next) => { try { await query('SELECT 1'); res.json({ status: 'ok' }); } catch (error) { next(error); } });
   app.use('/api/v1/auth', (req, res, next) => req.path === '/me' || req.path === '/change-password' ? authenticate(req, res, next) : next(), authRouter);
   app.use('/api/v1/public', publicRouter);
-  app.use('/api/v1/admin', authenticate, requireAdmin, adminRouter);
-  app.use('/api/v1/admin/roles', authenticate, requireAdmin, rolesRouter);
+  app.use('/api/v1/admin', authenticate, adminRouter);
+  app.use('/api/v1/admin/roles', authenticate, rolesRouter);
   app.use('/api/v1/lots', authenticate, reopenRouter, lotsRouter);
   app.use('/api/v1/departures', authenticate, departurePassengersRouter);
   app.use('/api/v1/media', authenticate, mediaRouter);

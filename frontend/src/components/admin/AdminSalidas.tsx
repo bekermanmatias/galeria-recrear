@@ -16,7 +16,15 @@ export default function AdminSalidas(){
   const [copiedCode,setCopiedCode]=useState<string|null>(null),[items,setItems]=useState<Departure[]>([]),[schools,setSchools]=useState<School[]>([]),[coordinators,setCoordinators]=useState<AdminUser[]>([]),[open,setOpen]=useState(false),[detail,setDetail]=useState<Departure|null>(null),[archive,setArchive]=useState<Departure|null>(null),[pendingDelete,setPendingDelete]=useState<Departure|null>(null),[search,setSearch]=useState(''),[saving,setSaving]=useState(false),[error,setError]=useState('');
   const [galleryDeparture,setGalleryDeparture]=useState<Departure|null>(null);
   const [form,setForm]=useState({type:'MICRO' as 'MICRO'|'AEREO',name:'',destination:'',startDate:new Date().toISOString().slice(0,10),endDate:new Date().toISOString().slice(0,10)}); const [edit,setEdit]=useState({type:'MICRO' as 'MICRO'|'AEREO',name:'',destination:'',startDate:'',endDate:''});const [schoolIds,setSchoolIds]=useState<string[]>([]),[coordinatorIds,setCoordinatorIds]=useState<string[]>([]);
-  const load=()=>Promise.all([adminRequest<{items:Departure[]}>('/departures?includeInactive=true'),adminRequest<{items:School[]}>('/schools?includeInactive=true'),adminRequest<{items:AdminUser[]}>('/users')]).then(([departures,schoolData,userData])=>{setItems(departures.items);setSchools(schoolData.items.filter(item=>item.active));setCoordinators(userData.items.filter(item=>item.role==='COORDINATOR'&&item.active));});
+  const load=()=>Promise.all([
+    adminRequest<{items:Departure[]}>('/departures?includeInactive=true'),
+    adminRequest<{items:School[]}>('/schools?includeInactive=true').catch(() => ({ items: [] })),
+    adminRequest<{items:AdminUser[]}>('/users').catch(() => ({ items: [] }))
+  ]).then(([departures,schoolData,userData])=>{
+    setItems(departures.items);
+    setSchools(schoolData.items.filter(item=>item.active));
+    setCoordinators(userData.items.filter(item=>item.role==='COORDINATOR'&&item.active));
+  });
   useEffect(()=>{void load();},[]);
   const visible=useMemo(()=>items.filter(item=>`${item.name} ${item.destination} ${item.type} ${(item.school_names??[]).join(' ')+' '+(item.school_codes??[]).join(' ')}`.toLowerCase().includes(search.toLowerCase())),[items,search]);
   const create=async()=>{setSaving(true);setError('');try{await adminRequest('/departures',{method:'POST',body:JSON.stringify(form)});setOpen(false);await load();}catch(caught){setError(caught instanceof Error?caught.message:'No se pudo crear');}finally{setSaving(false);}};

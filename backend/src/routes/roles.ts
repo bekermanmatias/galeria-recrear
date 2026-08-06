@@ -1,4 +1,4 @@
-﻿import { Router } from 'express';
+import { Router } from 'express';
 import { z } from 'zod';
 import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
@@ -10,7 +10,10 @@ const item=z.object({module:z.enum(modules),view:z.boolean(),create:z.boolean(),
 const payload=z.object({name:z.string().trim().min(2).max(100),description:z.string().trim().max(280).default(''),permissions:z.array(item)});
 const toMatrix=(rows:any[])=>Object.fromEntries(modules.map(module=>{const value=rows.find(row=>row.module===module);return [module,{view:Boolean(value?.can_view),create:Boolean(value?.can_create),edit:Boolean(value?.can_edit),delete:Boolean(value?.can_delete)}];}));
 async function writePermissions(client:any,roleId:string,permissions:z.infer<typeof item>[]){await client.query('DELETE FROM role_permissions WHERE role_id=$1',[roleId]);for(const p of permissions)await client.query('INSERT INTO role_permissions(role_id,module,can_view,can_create,can_edit,can_delete) VALUES($1,$2,$3,$4,$5,$6)',[roleId,p.module,p.view,p.create,p.edit,p.delete]);}
+import { requireAdmin } from '../auth.js';
+
 export const rolesRouter=Router();
+rolesRouter.use(requireAdmin);
 rolesRouter.get('/',asyncHandler(async(_req,res)=>{const result=await query(`SELECT r.id,r.name,r.description,r.is_system_admin AS "isSystemAdmin",r.active,COUNT(u.id)::int AS "userCount" FROM roles r LEFT JOIN users u ON u.role_id=r.id GROUP BY r.id ORDER BY r.is_system_admin DESC,r.name`);res.json({items:result.rows});}));
 rolesRouter.get('/:id',asyncHandler(async(req,res)=>{const role=await query('SELECT id,name,description,is_system_admin AS "isSystemAdmin",active FROM roles WHERE id=$1',[req.params.id]);if(!role.rowCount)throw new AppError(404,'ROLE_NOT_FOUND','Rol no encontrado');const permissions=await query('SELECT module,can_view,can_create,can_edit,can_delete FROM role_permissions WHERE role_id=$1',[req.params.id]);res.json({...role.rows[0],permissions:toMatrix(permissions.rows)});}));
 rolesRouter.post('/',asyncHandler(async(req,res)=>{const input=payload.parse(req.body);if(new Set(input.permissions.map(p=>p.module)).size!==input.permissions.length)throw new AppError(400,'DUPLICATE_PERMISSION_MODULE','No repitas módulos');const role=await transaction(async client=>{const created=await client.query('INSERT INTO roles(name,description) VALUES($1,$2) RETURNING id,name,description,is_system_admin AS "isSystemAdmin",active',[input.name,input.description]);await writePermissions(client,created.rows[0].id,input.permissions);return created.rows[0];});await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'ROLE_CREATED','role',role.id,JSON.stringify({name:role.name})]);res.status(201).json(role);}));
