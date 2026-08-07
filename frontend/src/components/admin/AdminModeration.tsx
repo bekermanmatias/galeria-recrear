@@ -41,9 +41,9 @@ export default function AdminModeration() {
 
   return <div className="moderation-container" style={{display:'flex',flex:1,overflow:'hidden',background:'#fff'}}>
     <style dangerouslySetInnerHTML={{__html: `
-      .media-article { position: relative; aspect-ratio: 1; background: #F8FAFC; border-radius: 8px; overflow: hidden; transition: all 0.2s ease; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-      .media-article:hover { transform: scale(1.02); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 10; }
-      .media-overlay { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+      .media-article { position: relative; aspect-ratio: 1; background: #F8FAFC; border-radius: 8px; overflow: hidden; transition: transform 0.15s ease-out, box-shadow 0.15s ease-out; box-shadow: 0 1px 3px rgba(0,0,0,0.05); transform: translateZ(0); content-visibility: auto; contain-intrinsic-size: 140px; }
+      .media-article:hover { transform: scale(1.02) translateZ(0); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 10; }
+      .media-overlay { position: absolute; inset: 0; opacity: 0; transition: opacity 0.15s ease-out; display: flex; align-items: center; justify-content: center; gap: 8px; will-change: opacity; }
       .media-article:hover .media-overlay { opacity: 1; }
       @media (max-width: 768px) {
         .moderation-aside { width: 100% !important; border-right: none !important; display: ${selected ? 'none' : 'flex'} !important; }
