@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminRequest, type CatalogItem } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -81,7 +81,7 @@ export default function AdminTurnos() {
       </div>
 
       <div style={{ background: '#FFFFFF' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <table className="responsive-card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #E4E4E7' }}>
               <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase', width: '20%' }}>Código</th>
@@ -99,9 +99,9 @@ export default function AdminTurnos() {
             ) : (
               filteredTurnos.map(t => (
               <tr key={t.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
-                <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{t.codigo}</td>
-                <td style={{ padding: '16px 24px', fontSize: '14px' }}>{t.nombre}</td>
-                <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                <td data-label="Código" style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{t.codigo}</td>
+                <td data-label="Nombre" style={{ padding: '16px 24px', fontSize: '14px' }}>{t.nombre}</td>
+                <td data-label="Acciones" style={{ padding: '16px 24px', textAlign: 'right' }}>
                   <button onClick={() => openModal(t)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
                   <button onClick={() => handleDelete(t.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
                   </td>
