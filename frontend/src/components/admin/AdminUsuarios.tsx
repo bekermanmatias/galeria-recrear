@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { adminRequest, type AdminUser, type School } from '../../lib/api';
 import { Plus, Edit2, Trash2, X, Search } from 'lucide-react';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -111,7 +111,7 @@ export default function AdminUsuarios() {
       </div>
 
       <div style={{ background: '#FFFFFF' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <table className="responsive-card-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
             <tr style={{ borderBottom: '1px solid #E4E4E7' }}>
               <th style={{ padding: '12px 24px', fontSize: '12px', fontWeight: 600, color: '#71717A', textTransform: 'uppercase' }}>Nombre</th>
@@ -130,9 +130,9 @@ export default function AdminUsuarios() {
             ) : (
               filteredUsuarios.map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid #E4E4E7' }}>
-                  <td style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{u.nombre}</td>
-                  <td style={{ padding: '16px 24px', fontSize: '14px', color: '#71717A' }}>{u.email}</td>
-                  <td style={{ padding: '16px 24px', fontSize: '14px' }}>
+                  <td data-label="Nombre" style={{ padding: '16px 24px', fontSize: '14px', fontWeight: 500 }}>{u.nombre}</td>
+                  <td data-label="Email" style={{ padding: '16px 24px', fontSize: '14px', color: '#71717A' }}>{u.email}</td>
+                  <td data-label="Rol" style={{ padding: '16px 24px', fontSize: '14px' }}>
                     <span style={{
                       padding: '4px 8px', borderRadius: '4px', fontSize: '12px', fontWeight: 500,
                       background: u.rol === 'admin' ? '#FEE2E2' : u.rol === 'coordinador' ? '#DBEAFE' : '#F3F4F6',
@@ -141,7 +141,7 @@ export default function AdminUsuarios() {
                       {roleLabel(u.rol)}
                     </span>
                   </td>
-                  <td style={{ padding: '16px 24px', textAlign: 'right' }}>
+                  <td data-label="Acciones" style={{ padding: '16px 24px', textAlign: 'right' }}>
                     <button onClick={() => openModal(u)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#71717A', marginRight: '16px' }}><Edit2 size={16} /></button>
                     <button onClick={() => handleDelete(u.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#EF4444' }}><Trash2 size={16} /></button>
                   </td>
