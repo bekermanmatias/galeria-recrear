@@ -26,6 +26,7 @@ jobs:
           command_timeout: 15m
           envs: ENV_BACKEND,ENV_FRONTEND
           script: |
+            set -eu
             cd ${{ secrets.PROJECT_PATH }}
             
             echo "1. Pulling latest code..."
@@ -35,7 +36,18 @@ jobs:
             echo "$ENV_BACKEND" > backend/.env
             echo "$ENV_FRONTEND" > frontend/.env
             
-            echo "3. Reiniciando contenedores con Docker Compose..."
-            docker-compose -f docker-compose.prod.yml up -d --build
+            echo "3. Reconstruyendo y reiniciando contenedores con Docker Compose..."
+            ATTEMPT=1
+            MAX_ATTEMPTS=3
+            until docker-compose -f docker-compose.prod.yml up -d --build; do
+              if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
+                echo "El despliegue falló luego de $MAX_ATTEMPTS intentos."
+                exit 1
+              fi
+
+              echo "Falló el intento $ATTEMPT/$MAX_ATTEMPTS. Reintentando en 10 segundos..."
+              ATTEMPT=$((ATTEMPT + 1))
+              sleep 10
+            done
             
             echo "¡Deploy completado exitosamente!"
