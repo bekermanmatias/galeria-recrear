@@ -553,7 +553,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
               </div>
 
               <div className="lot-actions">
-                {lot.status === 'PENDING' && (user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.create) && (
+                {(lot.status === 'DRAFT' || lot.status === 'PENDING') && (user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.create) && (
                   <button className="lot-action lot-action-add" onClick={()=>setAddingToLot(lot)}>
                     <Upload size={14}/> Añadir fotos
                   </button>
@@ -600,7 +600,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
           <ArrowLeft size={16}/> Volver a la lista
         </button>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
-          {currentLot.lot.status==='PENDING'&&(user?.isAdmin||user?.role==='ADMIN'||!!(user?.permissions as any)?.lots?.create)&&<button onClick={()=>setAddingToLot(currentLot.lot)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#fff',color:'#1A4B77',border:'1px solid #B9CAE0',borderRadius:7,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}><Upload size={14}/> Añadir fotos</button>}
+          {(currentLot.lot.status==='DRAFT'||currentLot.lot.status==='PENDING')&&(user?.isAdmin||user?.role==='ADMIN'||!!(user?.permissions as any)?.lots?.create)&&<button onClick={()=>setAddingToLot(currentLot.lot)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#fff',color:'#1A4B77',border:'1px solid #B9CAE0',borderRadius:7,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}><Upload size={14}/> Añadir fotos</button>}
           <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             <Download size={14}/> Descargar lote
           </button>
