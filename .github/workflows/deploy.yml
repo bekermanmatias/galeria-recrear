@@ -17,6 +17,7 @@ jobs:
         env:
           ENV_BACKEND: ${{ secrets.PROD_ENV_BACKEND }}
           ENV_FRONTEND: ${{ secrets.PROD_ENV_FRONTEND }}
+          PROJECT_PATH: ${{ secrets.PROJECT_PATH }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
@@ -24,10 +25,15 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           timeout: 60s
           command_timeout: 15m
-          envs: ENV_BACKEND,ENV_FRONTEND
+          envs: ENV_BACKEND,ENV_FRONTEND,PROJECT_PATH
           script: |
             set -eu
-            cd ${{ secrets.PROJECT_PATH }}
+            : "${PROJECT_PATH:?Configurá el secreto PROJECT_PATH con la ruta absoluta del proyecto en el VPS.}"
+            if [ ! -d "$PROJECT_PATH" ]; then
+              echo "PROJECT_PATH no existe en el VPS. Actualizá ese secreto con la ruta absoluta del proyecto."
+              exit 1
+            fi
+            cd "$PROJECT_PATH"
             
             echo "1. Pulling latest code..."
             git pull origin main

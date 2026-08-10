@@ -20,7 +20,7 @@ const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
 const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional(), status: z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).optional() });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
-const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
+const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['image/x-adobe-dng','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
 const delay = (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
 async function retryStorage<T>(operation: () => Promise<T>): Promise<T> {
@@ -165,7 +165,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const detected=await fileTypeFromFile(file.path);
     const mimeType=detected?.mime??file.mimetype;
     const kind=accepted.get(mimeType);
-    if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Se permiten JPEG, PNG, HEIC, MP4 y MOV');
+    if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Se permiten JPEG, PNG, HEIC, ProRAW (DNG), MP4 y MOV');
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
     console.time(`Upload and process ${file.originalname}`);
     let rendered;
