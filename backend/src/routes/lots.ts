@@ -22,6 +22,20 @@ const updateSchema = z.object({ albumName: albumNameSchema.optional(), departure
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
 const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
+const delay = (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
+async function retryStorage<T>(operation: () => Promise<T>): Promise<T> {
+  let failure: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try { return await operation(); }
+    catch (error) {
+      failure = error;
+      if (error instanceof AppError && error.status < 500) throw error;
+      if (attempt < 2) await delay(1000 * 2 ** attempt);
+    }
+  }
+  console.error('Media storage failed after retries', failure);
+  throw new AppError(503, 'MEDIA_STORAGE_UNAVAILABLE', 'El almacenamiento está temporalmente ocupado. Intentá subir este archivo nuevamente.');
+}
 
 export type Lot = { id: string; departure_id: string; event_date: string; title: string | null; album_name: string; departure_name: string; departure_destination: string; departure_type: 'MICRO'|'AEREO'; departure_public_code: string | null; shift_code: string | null; activity_code: string | null; activity_name: string | null; latest_version_id: string | null; latest_status: string | null; current_published_version_id: string | null; created_by_name: string | null; created_by_id: string | null; };
 const driveFolderName = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[\\/:*?"<>|]+/g,'-').replace(/\s+/g,' ').trim().slice(0,120);
@@ -157,8 +171,9 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const rendered = await processLocalMedia(file.path, kind, file.originalname, mimeType);
     renderedPath = rendered.path;
     const stat=await fs.stat(rendered.path);
-    const folder=await getStorage().createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'marcados');
-    const driveFileId=await getStorage().uploadOriginal({path:rendered.path,filename:rendered.name,mimeType:rendered.mimeType,parentId:folder});
+    const storage=getStorage();
+    const folder=await retryStorage(()=>storage.createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'marcados'));
+    const driveFileId=await retryStorage(()=>storage.uploadOriginal({path:rendered.path,filename:rendered.name,mimeType:rendered.mimeType,parentId:folder}));
     const asset=await transaction(async client=>{
       const locked=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE id=$1 AND lot_id=$2 FOR UPDATE',[version.id,lot.id]);
       const current=locked.rows[0];

@@ -32,6 +32,23 @@ export class ApiError extends Error {
   }
 }
 
+const wait = (milliseconds: number) => new Promise<void>(resolve => window.setTimeout(resolve, milliseconds));
+
+async function retryTransientUpload<T>(operation: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const retryable = !(error instanceof ApiError) || error.status >= 500 || error.status === 429;
+      if (!retryable || attempt === 2) throw error;
+      await wait(1000 * 2 ** attempt);
+    }
+  }
+  throw lastError;
+}
+
 function readApiError(data: unknown): { code?: string; message: string } {
   const payload = data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
   const nested = payload.error && typeof payload.error === 'object'
@@ -104,7 +121,7 @@ export const api = {
   lots: (status?: string, pageSize = 100) => request<{ items: LotSummary[] }>(`/lots?pageSize=${pageSize}${status ? `&status=${status}` : ''}`),
   lot: (id: string) => request<{ lot: LotSummary; version: { id: string; status: string; version_number: number }; media: Media[] }>(`/lots/${id}`),
   createLot: (body: { departureId?: string; schoolId?: string; activityId?: string | null; eventDate: string; albumName?: string }) => request<{ lotId: string; versionId: string; existing: boolean }>('/lots', { method: 'POST', body: JSON.stringify(body) }),
-  uploadMedia: (lotId: string, file: File) => { const body = new FormData(); body.append('file', file); return request<{ id: string; status: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); },
+  uploadMedia: (lotId: string, file: File) => retryTransientUpload(() => { const body = new FormData(); body.append('file', file); return request<{ id: string; status: string }>(`/lots/${lotId}/media`, { method: 'POST', body }); }),
   retryWatermark: (lotId: string, mediaId: string) => request<void>(`/lots/${lotId}/media/${mediaId}/watermark/retry`, { method: 'POST' }),
   submitLot: (lotId: string) => request<void>(`/lots/${lotId}/submit`, { method: 'POST' }),
   reopenLot: (lotId: string) => request<void>(`/lots/${lotId}/reopen`, { method: 'POST' }),
