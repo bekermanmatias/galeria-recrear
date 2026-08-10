@@ -14,11 +14,12 @@ DECLARE
   published_version_id UUID;
 BEGIN
   FOR group_row IN
-    SELECT departure_id, activity_id FROM lots WHERE deleted_at IS NULL
-    GROUP BY departure_id, activity_id HAVING COUNT(*) > 1
+    SELECT l.departure_id, l.activity_id, lower(COALESCE(NULLIF(trim(l.title),''), a.name, 'General')) AS album_key
+    FROM lots l LEFT JOIN activities a ON a.id=l.activity_id WHERE l.deleted_at IS NULL
+    GROUP BY l.departure_id, l.activity_id, lower(COALESCE(NULLIF(trim(l.title),''), a.name, 'General')) HAVING COUNT(*) > 1
   LOOP
-    SELECT id INTO canonical_id FROM lots
-    WHERE departure_id = group_row.departure_id AND activity_id IS NOT DISTINCT FROM group_row.activity_id AND deleted_at IS NULL
+    SELECT l.id INTO canonical_id FROM lots l LEFT JOIN activities a ON a.id=l.activity_id
+    WHERE l.departure_id = group_row.departure_id AND l.activity_id IS NOT DISTINCT FROM group_row.activity_id AND lower(COALESCE(NULLIF(trim(l.title),''), a.name, 'General')) = lower(group_row.album_key) AND l.deleted_at IS NULL
     ORDER BY event_date DESC, created_at DESC, id DESC LIMIT 1;
 
     INSERT INTO lot_consolidation_backups (snapshot)
@@ -27,16 +28,16 @@ BEGIN
         SELECT jsonb_agg(jsonb_build_object('version', to_jsonb(v), 'media', COALESCE((SELECT jsonb_agg(to_jsonb(m)) FROM media_assets m WHERE m.lot_version_id = v.id), '[]'::jsonb)) ORDER BY v.created_at, v.id)
         FROM lot_versions v WHERE v.lot_id = l.id), '[]'::jsonb))))
     FROM lots l
-    WHERE l.departure_id = group_row.departure_id AND l.activity_id IS NOT DISTINCT FROM group_row.activity_id AND l.deleted_at IS NULL;
+    WHERE l.departure_id = group_row.departure_id AND l.activity_id IS NOT DISTINCT FROM group_row.activity_id AND lower(COALESCE(NULLIF(trim(l.title),''), (SELECT name FROM activities WHERE id=l.activity_id), 'General')) = lower(group_row.album_key) AND l.deleted_at IS NULL;
 
     WITH temporary_numbers AS (
       SELECT v.id, 1000000 + row_number() OVER (ORDER BY v.created_at, v.id)::int AS next_number
       FROM lot_versions v
-      WHERE v.lot_id IN (SELECT id FROM lots WHERE departure_id = group_row.departure_id AND activity_id IS NOT DISTINCT FROM group_row.activity_id AND deleted_at IS NULL)
+      WHERE v.lot_id IN (SELECT l.id FROM lots l WHERE l.departure_id = group_row.departure_id AND l.activity_id IS NOT DISTINCT FROM group_row.activity_id AND lower(COALESCE(NULLIF(trim(l.title),''), (SELECT name FROM activities WHERE id=l.activity_id), 'General')) = lower(group_row.album_key) AND l.deleted_at IS NULL)
     )
     UPDATE lot_versions v SET version_number = temporary_numbers.next_number FROM temporary_numbers WHERE v.id = temporary_numbers.id;
     UPDATE lot_versions SET lot_id = canonical_id
-    WHERE lot_id IN (SELECT id FROM lots WHERE departure_id = group_row.departure_id AND activity_id IS NOT DISTINCT FROM group_row.activity_id AND deleted_at IS NULL AND id <> canonical_id);
+    WHERE lot_id IN (SELECT l.id FROM lots l WHERE l.departure_id = group_row.departure_id AND l.activity_id IS NOT DISTINCT FROM group_row.activity_id AND lower(COALESCE(NULLIF(trim(l.title),''), (SELECT name FROM activities WHERE id=l.activity_id), 'General')) = lower(group_row.album_key) AND l.deleted_at IS NULL AND l.id <> canonical_id);
 
     SELECT id INTO target_version_id FROM lot_versions
     WHERE lot_id = canonical_id AND status IN ('PENDING', 'DRAFT', 'UPLOADING') ORDER BY created_at DESC, id DESC LIMIT 1;
@@ -53,11 +54,15 @@ BEGIN
     ORDER BY reviewed_at DESC NULLS LAST, created_at DESC, id DESC LIMIT 1;
     UPDATE lots SET current_published_version_id = published_version_id WHERE id = canonical_id;
     UPDATE lots SET deleted_at = now(), deleted_by = created_by, current_published_version_id = NULL
-    WHERE departure_id = group_row.departure_id AND activity_id IS NOT DISTINCT FROM group_row.activity_id AND deleted_at IS NULL AND id <> canonical_id;
+    WHERE departure_id = group_row.departure_id AND activity_id IS NOT DISTINCT FROM group_row.activity_id AND lower(COALESCE(NULLIF(trim(title),''), (SELECT name FROM activities WHERE id=activity_id), 'General')) = lower(group_row.album_key) AND deleted_at IS NULL AND id <> canonical_id;
   END LOOP;
 END $$;
 
+UPDATE lots l SET title = COALESCE(NULLIF(trim(l.title),''), a.name, 'General') FROM activities a
+WHERE a.id=l.activity_id AND l.deleted_at IS NULL;
+UPDATE lots SET title = 'General' WHERE (title IS NULL OR trim(title)='') AND deleted_at IS NULL;
 DROP INDEX IF EXISTS lots_departure_unique_idx;
-CREATE UNIQUE INDEX IF NOT EXISTS lots_departure_activity_unique_idx ON lots (
-  departure_id, COALESCE(activity_id, '00000000-0000-0000-0000-000000000000'::uuid)
+DROP INDEX IF EXISTS lots_departure_activity_unique_idx;
+CREATE UNIQUE INDEX IF NOT EXISTS lots_departure_activity_name_unique_idx ON lots (
+  departure_id, COALESCE(activity_id, '00000000-0000-0000-0000-000000000000'::uuid), lower(trim(COALESCE(title,'General')))
 ) WHERE deleted_at IS NULL;
