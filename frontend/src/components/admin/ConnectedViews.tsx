@@ -4,6 +4,7 @@ import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, t
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
 import ConfirmDialog from '../ui/ConfirmDialog';
+import PendingLotUploadModal from './PendingLotUploadModal';
 const page: React.CSSProperties = { flex: 1, padding: 32, overflowY: 'auto', background: '#fff' };
 const title: React.CSSProperties = { margin: '0 0 4px', fontSize: 24, color: '#1A4B77' };
 const muted: React.CSSProperties = { margin: 0, fontSize: 14, color: '#71717A' };
@@ -368,6 +369,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   const [copiedCode,setCopiedCode]=useState<string|null>(null);
   const [copiedOnlyCode,setCopiedOnlyCode]=useState<string|null>(null);
   const [editingLot,setEditingLot]=useState<LotSummary|null>(null);
+  const [addingToLot,setAddingToLot]=useState<LotSummary|null>(null);
   const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:'',status:''});
   const [editBusy,setEditBusy]=useState(false);
   const [departuresList,setDeparturesList]=useState<Array<{id:string;name:string;type:string}>>([]);
@@ -435,7 +437,10 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   },[lots,departure,activity,from,to]);
   const groups=useMemo(()=>filteredLots.map(lot=>({lot,files:media.filter(file=>file.lot.id===lot.id)})),[filteredLots,media]);
   const displayedGroups=useMemo(()=>openedLot?groups.filter(group=>group.lot.id===openedLot):groups,[groups,openedLot]);
-  const filesForDisplay=(group:typeof groups[number])=>openedLot&&showRejected?group.files.filter(file=>file.status==='APPROVED'||file.status==='REJECTED'):group.files.filter(file=>file.status==='APPROVED');
+  const filesForDisplay=(group:typeof groups[number])=>{
+    if(group.lot.status==='PENDING') return group.files.filter(file=>file.status==='READY'||(showRejected&&file.status==='REJECTED'));
+    return showRejected?group.files.filter(file=>file.status==='APPROVED'||file.status==='REJECTED'):group.files.filter(file=>file.status==='APPROVED');
+  };
   const visible=useMemo(()=>displayedGroups.flatMap(filesForDisplay),[displayedGroups,openedLot,showRejected]);
   const selectedItem=selected===null?null:visible[selected]??null;
   const currentLot=groups.find(group=>group.lot.id===activeLot)??groups.find(group=>group.lot.id===openedLot)??groups[0];
@@ -466,7 +471,23 @@ export function GalleryView({ user }: { user?: SessionUser }) {
         .gallery-table-row > div:nth-child(5)::before { content: "Estado"; }
         .gallery-table-row > div:nth-child(6) { flex-direction: row !important; justify-content: space-between !important; margin-top: 8px; padding-top: 12px; border-top: 1px solid #F1F5F9; }
         .gallery-table-row > div:nth-child(6) > div { justify-content: flex-end; }
+        .lot-actions { width: auto !important; flex-direction: row !important; flex-wrap: wrap; justify-content: flex-start !important; }
       }
+      .lot-actions { display:flex; align-items:center; justify-content:flex-end; gap:6px; min-width:0; }
+      .lot-action { height:36px; box-sizing:border-box; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 10px; border-radius:7px; font-size:12px; font-weight:700; white-space:nowrap; cursor:pointer; }
+      .lot-action-view { background:#1A4B77; color:#fff; border:1px solid #1A4B77; }
+      .lot-action-add { background:#fff; color:#1A4B77; border:1px solid #B9CAE0; }
+      .lot-action-icon { width:36px; padding:0; background:#F8FAFC; color:#1A4B77; border:1px solid #D7E0EA; }
+      .lot-action-view-icon { width:36px; padding:0; background:#1A4B77; color:#fff; border:1px solid #1A4B77; }
+      .gallery-table-header, .gallery-table-row { grid-template-columns:minmax(250px,1.65fr) minmax(155px,1.05fr) 110px minmax(230px,1.25fr) 112px 250px !important; }
+      .gallery-table-header { min-height:44px; box-sizing:border-box; align-items:center; padding:10px 16px !important; }
+      .gallery-table-row { min-height:76px; box-sizing:border-box; padding:12px 16px !important; box-shadow:0 1px 2px rgba(15,23,42,.025); }
+      .gallery-table-row:hover { border-color:#C9D8E8 !important; box-shadow:0 5px 16px rgba(15,23,42,.055); }
+      .lot-creator { display:flex; flex-direction:column; gap:4px; min-width:0; }
+      .lot-creator-main { display:flex; align-items:center; gap:5px; min-width:0; color:#475569; }
+      .lot-creator-main strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; color:#334155; }
+      .lot-creator-role { color:#94A3B8; font-size:12px; white-space:nowrap; }
+      .lot-uploaders { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#1A4B77; font-size:11px; font-weight:600; }
     `}} />
     {!openedLot&&<div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:24}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16}}>
@@ -482,11 +503,11 @@ export function GalleryView({ user }: { user?: SessionUser }) {
 
     {!openedLot&&(
       <div style={{display:'flex',flexDirection:'column',gap:8}}>
-        <div className="gallery-table-header" style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',padding:'12px 16px',background:'#F8FAFC',borderRadius:'8px',fontSize:'12px',fontWeight:600,color:'#64748B',textTransform:'uppercase',letterSpacing:'0.04em'}}>
+        <div className="gallery-table-header" style={{display:'grid',gap:'16px',padding:'12px 16px',background:'#F8FAFC',borderRadius:'8px',fontSize:'12px',fontWeight:600,color:'#64748B',textTransform:'uppercase',letterSpacing:'0.04em'}}>
           <div>Salida / Código</div>
           <div>Álbum / Actividad</div>
           <div>Fecha</div>
-          <div>Creador</div>
+          <div>Creador / cargas</div>
           <div>Estado</div>
           <div style={{textAlign:'right'}}>Acciones</div>
         </div>
@@ -496,9 +517,10 @@ export function GalleryView({ user }: { user?: SessionUser }) {
           const filesCount=lot.approved_count??group?.files.length??0;
           const menuOpen=openLotMenu===lot.id;
           const publicCode=lot.departure_public_code;
+          const uploaders=Array.from(new Set((group?.files ?? []).map(file=>file.uploaded_by_name).filter(Boolean)));
 
           return (
-            <div className="gallery-table-row" key={lot.id} style={{display:'grid',gridTemplateColumns:'2fr 1.8fr 1fr 1.2fr 1fr 180px',gap:'12px',alignItems:'center',padding:'14px 16px',background:'#FFFFFF',border:'1px solid #E2E8F0',borderRadius:'8px',transition:'all 0.2s ease'}}>
+            <div className="gallery-table-row" key={lot.id} style={{display:'grid',gap:'16px',alignItems:'center',padding:'14px 16px',background:'#FFFFFF',border:'1px solid #E2E8F0',borderRadius:'8px',transition:'all 0.2s ease'}}>
               <div>
                 <div style={{fontWeight:600,color:'#1A4B77',fontSize:'14px'}}>
                   {departureLabel(lot)}
@@ -521,29 +543,33 @@ export function GalleryView({ user }: { user?: SessionUser }) {
                 {formatDate(lot.event_date)}
               </div>
 
-              <div style={{color:'#64748B',fontSize:13}}>
-                {lot.created_by_name??'Coordinador'}
+              <div className="lot-creator">
+                <div className="lot-creator-main"><strong>{lot.created_by_name??'Coordinador'}</strong><span className="lot-creator-role">creó el álbum</span></div>
+                {uploaders.length>0&&<span className="lot-uploaders" title={uploaders.join(', ')}>Subieron: {uploaders.join(', ')}</span>}
               </div>
 
               <div>
                 <StatusBadge status={lot.status}/>
               </div>
 
-              <div style={{display:'flex',gap:6,justifyContent:'flex-end',alignItems:'center'}}>
-                {lot.status !== 'PENDING' && (
-                  <button onClick={()=>{setOpenedLot(lot.id);setActiveLot(lot.id);}} style={{display:'inline-flex',alignItems:'center',gap:5,padding:'7px 10px',background:'#1A4B77',color:'#fff',border:0,borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
-                    <Eye size={14}/> Ver lote ({filesCount})
+              <div className="lot-actions">
+                {lot.status === 'PENDING' && (user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.create) && (
+                  <button className="lot-action lot-action-add" onClick={()=>setAddingToLot(lot)}>
+                    <Upload size={14}/> Añadir fotos
                   </button>
                 )}
                 {group&&(
-                  <button onClick={()=>downloadLot(group)} title="Descargar lote" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',padding:'7px 9px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer'}}>
+                  <button className="lot-action lot-action-icon" onClick={()=>downloadLot(group)} title="Descargar lote" aria-label="Descargar lote">
                     <Download size={14}/>
                   </button>
                 )}
+                <button className="lot-action lot-action-view-icon" onClick={()=>{setOpenedLot(lot.id);setActiveLot(lot.id);}} title={`Ver lote (${filesCount})`} aria-label={`Ver lote (${filesCount})`}>
+                  <Eye size={16}/>
+                </button>
 
                 {canManage && (
                   <div style={{position:'relative'}}>
-                    <button onClick={(e)=>{e.stopPropagation();setOpenLotMenu(menuOpen?null:lot.id);}} title="Más opciones" style={{width:32,height:32,display:'grid',placeItems:'center',border:'1px solid #DCE3EB',borderRadius:6,background:'#fff',color:'#475569',cursor:'pointer'}}>
+                    <button onClick={(e)=>{e.stopPropagation();setOpenLotMenu(menuOpen?null:lot.id);}} title="Más opciones" style={{width:36,height:36,display:'grid',placeItems:'center',border:'1px solid #DCE3EB',borderRadius:7,background:'#fff',color:'#475569',cursor:'pointer'}}>
                       <MoreVertical size={16}/>
                     </button>
 
@@ -573,9 +599,12 @@ export function GalleryView({ user }: { user?: SessionUser }) {
         <button onClick={()=>{setOpenedLot(null);setSelected(null);setShowRejected(false);}} className="lot-back-btn" style={{border:0,background:'none',padding:0,color:'#1A4B77',fontSize:13,fontWeight:600,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:6}}>
           <ArrowLeft size={16}/> Volver a la lista
         </button>
-        <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',gap:6,padding:'7px 13px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
-          <Download size={14}/> Descargar lote
-        </button>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+          {currentLot.lot.status==='PENDING'&&(user?.isAdmin||user?.role==='ADMIN'||!!(user?.permissions as any)?.lots?.create)&&<button onClick={()=>setAddingToLot(currentLot.lot)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#fff',color:'#1A4B77',border:'1px solid #B9CAE0',borderRadius:7,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}><Upload size={14}/> Añadir fotos</button>}
+          <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
+            <Download size={14}/> Descargar lote
+          </button>
+        </div>
       </div>
 
       <div className="lot-main-info" style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -618,6 +647,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
             {item.kind==='VIDEO'?<video src={api.contentUrl(item.id)} muted style={{width:'100%',height:'100%',objectFit:'cover'}}/>:previewable?<img src={api.thumbnailUrl(item.id)} alt={item.original_name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{display:'grid',placeItems:'center',gap:5,color:'#64748B'}}><strong style={{fontSize:18}}>{item.mime_type.toLowerCase().includes('heic')?'HEIC':'Archivo'}</strong><span title={item.original_name} style={{maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{item.original_name}</span></div>}
           </div>
           {!isRejected&&<span style={{position:'absolute',left:8,bottom:8,padding:'3px 7px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:11,fontWeight:600,zIndex:3}}>{formatBytes(item.size_bytes)}</span>}
+          {item.uploaded_by_name&&<span style={{position:'absolute',left:8,top:8,maxWidth:'calc(100% - 16px)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',padding:'3px 7px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:11,zIndex:3}}>Subido por {item.uploaded_by_name}{item.uploaded_at?` · ${new Date(item.uploaded_at).toLocaleDateString('es-AR')}`:''}</span>}
           {isRejected&&<><span style={{position:'absolute',left:8,top:8,padding:'4px 8px',borderRadius:6,background:'#DC2626',color:'#fff',fontSize:10,fontWeight:800,letterSpacing:'.03em',zIndex:3}}>DESCARTADA</span><div style={{position:'absolute',left:0,right:0,bottom:0,height:58,boxSizing:'border-box',padding:'9px 10px',background:'#fff',borderTop:'1px solid #FECACA',zIndex:2}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:11}}><span style={{color:'#475569',fontWeight:600}}>{formatBytes(item.size_bytes)}</span><span style={{color:'#B91C1C',fontWeight:700}}>{daysLeft===0?'Se elimina hoy':`${daysLeft} ${daysLeft===1?'día':'días'} restantes`}</span></div><div title={item.original_name} style={{marginTop:5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10,color:'#64748B'}}>{item.original_name}</div></div></>}
           {!isRejected&&<div className="gallery-overlay" style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',opacity:0,transition:'opacity .2s',display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:12,pointerEvents:'none'}}><span style={{color:'#fff',fontSize:11,fontWeight:600}}>{departureLabel(group.lot)}</span><span style={{color:'#E4E4E7',fontSize:11}}>{group.lot.activity_name}</span></div>}
           <button aria-label="Acciones de imagen" aria-expanded={menuOpen} onClick={event=>{event.stopPropagation();setOpenMediaMenu(menuOpen?null:item.id);}} style={{position:'absolute',right:8,top:8,zIndex:7,width:32,height:32,display:'grid',placeItems:'center',border:'1px solid rgba(148,163,184,.35)',borderRadius:'50%',background:'rgba(255,255,255,.94)',color:'#334155',cursor:'pointer',boxShadow:'0 2px 6px rgba(15,23,42,.16)'}}><MoreVertical size={18}/></button>
@@ -629,6 +659,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
     {selectedItem&&<Lightbox src={api.contentUrl(selectedItem.id)} mediaType={selectedItem.kind} downloadUrl={api.downloadUrl(selectedItem.id)} downloadName={selectedItem.original_name} info={formatBytes(selectedItem.size_bytes)} onClose={()=>setSelected(null)} onNext={selected!==null&&selected<visible.length-1?()=>setSelected(selected+1):undefined} onPrev={selected!==null&&selected>0?()=>setSelected(selected-1):undefined}/>}
     <ConfirmDialog open={pendingDiscard!==null} title="¿Descartar imagen?" description="La imagen dejará de mostrarse a las familias, pero podrás recuperarla durante los próximos 30 días." confirmLabel="Descartar imagen" busy={pendingDiscard!==null&&recovering===pendingDiscard.id} onCancel={()=>!recovering&&setPendingDiscard(null)} onConfirm={()=>{if(pendingDiscard)return moderateGalleryMedia(pendingDiscard,true);}}/>
     <ConfirmDialog open={deletingLot!==null} title="¿Eliminar lote permanentemente?" description={`Se eliminará por completo el lote "${deletingLot?.album_name||deletingLot?.activity_name}" de la salida "${deletingLot?departureLabel(deletingLot):''}". Se borrarán todas sus fotos, videos e historial del sistema. Esta acción no se puede deshacer.`} confirmLabel="Eliminar lote por completo" tone="danger" busy={deleteBusyId!==null} onCancel={()=>!deleteBusyId&&setDeletingLot(null)} onConfirm={async()=>{if(!deletingLot)return;setDeleteBusyId(deletingLot.id);try{await api.deleteLot(deletingLot.id);setLots(current=>current.filter(item=>item.id!==deletingLot.id));setDeletingLot(null);}catch(err:any){setError(err.message||'No se pudo eliminar el lote');}finally{setDeleteBusyId(null);}}}/>
+    {addingToLot&&<PendingLotUploadModal lot={addingToLot} onClose={()=>setAddingToLot(null)} onComplete={async()=>{const data=await api.lots();setLots(data.items);}}/>}
 
     {editingLot&&(
       <Modal title="Modificar Lote" onClose={()=>setEditingLot(null)} onSave={handleSaveLotEdit}>

@@ -8,7 +8,9 @@ type UploadStatus = 'queued' | 'uploading' | 'processing' | 'uploaded' | 'failed
 type UploadFile = { id:string; file:File; preview:string; isVideo:boolean; isHeic:boolean; status:UploadStatus; mediaId?:string; error?:string };
 const validName=/\.(jpe?g|jpe|jfif|png|heic|heif|mp4|mov)$/i;
 const validTypes=new Set(['image/jpeg','image/pjpeg','image/png','image/heic','image/heif','video/mp4','video/quicktime']);
-const MAX_PARALLEL_UPLOADS=3;
+// Cada archivo se procesa con marca de agua y se envía al almacenamiento remoto.
+// Serializar evita saturar el procesamiento cuando se selecciona un lote grande.
+const MAX_PARALLEL_UPLOADS=1;
 const dateInput:React.CSSProperties={width:'100%',minWidth:0,height:44,padding:'0 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:16,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6,WebkitAppearance:'none',appearance:'none'};
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
 const CUSTOM_ACTIVITY = '__personalizada__';
