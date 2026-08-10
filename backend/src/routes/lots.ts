@@ -168,7 +168,12 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Se permiten JPEG, PNG, HEIC, MP4 y MOV');
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
     console.time(`Upload and process ${file.originalname}`);
-    const rendered = await processLocalMedia(file.path, kind, file.originalname, mimeType);
+    let rendered;
+    try { rendered = await processLocalMedia(file.path, kind, file.originalname, mimeType); }
+    catch (error) {
+      console.error('Media processing failed', { name: file.originalname, mimeType, error });
+      throw new AppError(422, 'MEDIA_PROCESSING_FAILED', 'No se pudo procesar este archivo. Verificá que no esté dañado e intentá nuevamente.');
+    }
     renderedPath = rendered.path;
     const stat=await fs.stat(rendered.path);
     const storage=getStorage();

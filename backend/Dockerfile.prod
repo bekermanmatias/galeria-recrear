@@ -1,6 +1,6 @@
 FROM node:20-alpine
 
-RUN apk add --no-cache ffmpeg
+RUN apk add --no-cache ffmpeg imagemagick libheif
 
 WORKDIR /app
 
