@@ -6,6 +6,7 @@ import { query } from '../db.js';
 import { AppError } from '../errors.js';
 import { asyncHandler } from '../http.js';
 import { getStorage } from '../storage.js';
+<<<<<<< Updated upstream
 const require = createRequire(import.meta.url);
 const createArchive = require('archiver') as (format:string,options:{zlib:{level:number}})=>{on(event:string,callback:(error:Error)=>void):void;pipe(destination:NodeJS.WritableStream):void;append(source:NodeJS.ReadableStream,options:{name:string}):void;finalize():Promise<void>;};
 interface MediaRecord{id:string;drive_file_id:string;delivery_drive_file_id:string|null;original_name:string;delivery_name:string|null;mime_type:string;delivery_mime_type:string|null;size_bytes:number;delivery_size_bytes:number|null;status:string;watermark_status:string|null;departure_id:string;current_published_version_id:string|null;lot_version_id:string;}
@@ -17,6 +18,27 @@ const name=(media:MediaRecord)=>media.delivery_name??media.original_name;
 async function getMedia(id:string){const result=await query<MediaRecord>('SELECT m.id,m.drive_file_id,m.delivery_drive_file_id,m.original_name,m.delivery_name,m.mime_type,m.delivery_mime_type,m.size_bytes,m.delivery_size_bytes,m.status,m.watermark_status,l.departure_id,l.current_published_version_id,m.lot_version_id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[id]);if(!result.rowCount||!fileId(result.rows[0]))throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');if(result.rows[0].watermark_status&&result.rows[0].watermark_status!=='READY')throw new AppError(409,'MEDIA_PROCESSING','El archivo todavia se esta procesando');return result.rows[0];}
 async function assertMediaAccess(user:NonNullable<Express.Request['user']>,media:MediaRecord){await assertDepartureAccess(user,media.departure_id,['COORDINATOR','PARENT']);if(user.role==='PARENT'&&(media.status!=='APPROVED'||media.current_published_version_id!==media.lot_version_id))throw new AppError(403,'FORBIDDEN_MEDIA','El archivo no esta publicado');}
 async function stream(res:Response,media:MediaRecord,range?:string,download=false){const remote=await getStorage().stream(fileId(media),range);res.status(remote.status).setHeader('Content-Type',remote.mimeType||mime(media));if(remote.status===206&&remote.size)res.setHeader('Content-Length',String(remote.size));res.setHeader('Cache-Control',download?'private, no-store':'private, max-age=300');res.setHeader('Accept-Ranges','bytes');if(remote.contentRange)res.setHeader('Content-Range',remote.contentRange);if(download)res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(name(media)));remote.stream.pipe(res);}
+=======
+const require=createRequire(import.meta.url); const createArchive=require('archiver') as (format:string,options:{zlib:{level:number}})=>{on(event:string,callback:(error:Error)=>void):void;pipe(destination:NodeJS.WritableStream):void;append(source:NodeJS.ReadableStream,options:{name:string}):void;finalize():Promise<void>;};
+interface MediaRecord{id:string;drive_file_id:string;delivery_drive_file_id:string|null;original_name:string;delivery_name:string|null;mime_type:string;delivery_mime_type:string|null;size_bytes:number;delivery_size_bytes:number|null;status:string;watermark_status:string|null;departure_id:string;lot_version_status:string;}
+const param=(value:string|string[])=>Array.isArray(value)?value[0]:value; const fileId=(media:MediaRecord)=>media.delivery_drive_file_id??media.drive_file_id; const mime=(media:MediaRecord)=>media.delivery_mime_type??media.mime_type; const name=(media:MediaRecord)=>media.delivery_name??media.original_name;
+async function getMedia(id:string){const result=await query<MediaRecord>('SELECT m.id,m.drive_file_id,m.delivery_drive_file_id,m.original_name,m.delivery_name,m.mime_type,m.delivery_mime_type,m.size_bytes,m.delivery_size_bytes,m.status,m.watermark_status,l.departure_id,v.status lot_version_status FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[id]);if(!result.rowCount||!fileId(result.rows[0]))throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');if(result.rows[0].watermark_status&&result.rows[0].watermark_status!=='READY')throw new AppError(409,'MEDIA_PROCESSING','El archivo todavía se está procesando');return result.rows[0];}
+async function assertMediaAccess(user:NonNullable<Express.Request['user']>,media:MediaRecord){await assertDepartureAccess(user,media.departure_id,['COORDINATOR','PARENT']);if(user.role==='PARENT'&&(media.status!=='APPROVED'||media.lot_version_status!=='PUBLISHED'))throw new AppError(403,'FORBIDDEN_MEDIA','El archivo no está publicado');}
+async function stream(res:Response,media:MediaRecord,range?:string,download=false){const remote=await getStorage().stream(fileId(media),range);res.status(remote.status).setHeader('Content-Type',remote.mimeType||mime(media));if(remote.status===206&&remote.size)res.setHeader('Content-Length',String(remote.size));res.setHeader('Cache-Control',download?'private, no-store':'private, max-age=300').setHeader('Accept-Ranges','bytes');if(remote.contentRange)res.setHeader('Content-Range',remote.contentRange);if(download)res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(name(media)));
+  // Si el usuario navega o cancela la carga, Express cierra la respuesta pero
+  // el stream de R2 sigue abierto a menos que lo cancelemos explícitamente.
+  // Sin esta limpieza se agota el pool HTTP del SDK y todas las fotos quedan
+  // esperando en cola.
+  const abortRemote=()=>{
+    const destroyable=remote.stream as NodeJS.ReadableStream & {destroy?:()=>void};
+    destroyable.destroy?.();
+  };
+  res.once('close',abortRemote);
+  res.once('finish',()=>res.off('close',abortRemote));
+  remote.stream.once('error',error=>res.destroy(error));
+  remote.stream.pipe(res);
+}
+>>>>>>> Stashed changes
 export const mediaRouter=Router();
 mediaRouter.get('/:id/content',requirePermission('lots','view'),asyncHandler(async(req,res)=>{const media=await getMedia(param(req.params.id));await assertMediaAccess(req.user!,media);await stream(res,media,req.headers.range);}));
 mediaRouter.get('/:id/thumbnail',requirePermission('lots','view'),asyncHandler(async(req,res)=>{const media=await getMedia(param(req.params.id));await assertMediaAccess(req.user!,media);await stream(res,media);}));
