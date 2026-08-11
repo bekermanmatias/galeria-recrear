@@ -19,6 +19,13 @@ export interface MediaStorage {
   trash(fileId: string): Promise<void>;
 }
 const ensureDirectory = (directory: string) => fs.mkdir(directory, { recursive: true });
+// R2 streams are long-lived while an image is being sent to the browser. Keep
+// a bounded queue so a large album cannot exhaust the SDK's HTTP socket pool.
+const MAX_CONCURRENT_S3_STREAMS = 16;
+let activeS3Streams = 0;
+const waitingS3Streams: Array<() => void> = [];
+async function acquireS3Stream() { if (activeS3Streams < MAX_CONCURRENT_S3_STREAMS) { activeS3Streams += 1; return; } await new Promise<void>(resolve => waitingS3Streams.push(resolve)); activeS3Streams += 1; }
+function releaseS3Stream() { activeS3Streams = Math.max(0, activeS3Streams - 1); waitingS3Streams.shift()?.(); }
 function safeLocalPath(fileId: string) { const file = path.resolve(paths.localMedia, fileId); if (!file.startsWith(path.resolve(paths.localMedia))) throw new AppError(400,'INVALID_FILE','Archivo invalido'); return file; }
 function parseRange(header: string | undefined, total: number) { if (!header) return null; const match = /^bytes=(\d*)-(\d*)$/i.exec(header); if (!match) return null; const start = match[1] ? Number(match[1]) : 0; const end = match[2] ? Math.min(Number(match[2]), total - 1) : total - 1; if (!Number.isInteger(start) || !Number.isInteger(end) || start > end || start >= total) throw new AppError(416,'RANGE_NOT_SATISFIABLE','Rango de video invalido'); return { start, end }; }
 
@@ -105,6 +112,9 @@ class S3Storage implements MediaStorage {
   }
 
   async stream(fileId: string, range?: string): Promise<RemoteStream> {
+    await acquireS3Stream();
+    let released = false;
+    const release = () => { if (!released) { released = true; releaseS3Stream(); } };
     try {
       const response = await this.client.send(new GetObjectCommand({
         Bucket: this.bucket,
@@ -125,8 +135,12 @@ class S3Storage implements MediaStorage {
         if (match) totalSize = Number(match[1]);
       }
 
+      const stream = response.Body as NodeJS.ReadableStream;
+      stream.once('end', release);
+      stream.once('close', release);
+      stream.once('error', release);
       return {
-        stream: response.Body as NodeJS.ReadableStream,
+        stream,
         mimeType: response.ContentType,
         size,
         totalSize,
@@ -134,6 +148,7 @@ class S3Storage implements MediaStorage {
         contentRange: response.ContentRange
       };
     } catch (error: any) {
+      release();
       if (error.name === 'NoSuchKey') {
         throw new AppError(404, 'MEDIA_NOT_FOUND', 'Archivo no encontrado');
       }
