@@ -11,6 +11,7 @@ type PendingThumbnail = {
   delivery_source_id: string | null;
   original_source_id: string;
   original_name: string;
+  kind: 'IMAGE' | 'VIDEO';
   drive_folder_id: string | null;
 };
 
@@ -20,10 +21,11 @@ const pending = await query<PendingThumbnail>(`
          m.delivery_drive_file_id delivery_source_id,
          m.drive_file_id original_source_id,
          COALESCE(m.delivery_name,m.original_name) original_name,
+         m.kind,
          v.drive_folder_id
   FROM media_assets m
   JOIN lot_versions v ON v.id=m.lot_version_id
-  WHERE m.kind='IMAGE'
+  WHERE m.kind IN ('IMAGE','VIDEO')
     AND m.status <> 'DELETED'
     AND m.thumbnail_drive_file_id IS NULL
     AND COALESCE(m.delivery_drive_file_id,m.drive_file_id) IS NOT NULL
@@ -53,7 +55,7 @@ for (const item of pending.rows) {
       }
     }
     if (!sourceId) throw downloadError ?? new Error('No source object is available');
-    const thumbnail = await createThumbnail(input, 'IMAGE', item.original_name);
+    const thumbnail = await createThumbnail(input, item.kind, item.original_name);
     if (!thumbnail) continue;
     output = thumbnail.path;
     const parentId = item.drive_folder_id ?? path.posix.dirname(sourceId.replace(/\\/g, '/'));

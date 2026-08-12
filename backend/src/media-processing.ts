@@ -51,7 +51,11 @@ export async function processLocalMedia(input: string, kind: 'IMAGE'|'VIDEO', or
 }
 
 export async function createThumbnail(input: string, kind: 'IMAGE'|'VIDEO', originalName: string) {
-  if (kind !== 'IMAGE') return undefined;
+  if (kind === 'VIDEO') {
+    const target = tempFile('.jpg');
+    await new Promise<void>((resolve,reject)=>{const child=spawn('ffmpeg',['-y','-ss','0.5','-i',input,'-frames:v','1','-vf','scale=640:-2',target],{stdio:['ignore','ignore','pipe']});let error='';child.stderr.on('data',chunk=>{error+=String(chunk);});child.on('error',err=>reject(new Error('No se pudo iniciar FFmpeg para la miniatura ('+(err.message||'no instalado')+')')));child.on('close',code=>code===0?resolve():reject(new Error('FFmpeg no pudo extraer la miniatura del video ('+code+'): '+error.slice(-500))));});
+    return { path: target, mimeType: 'image/jpeg', name: outputName(originalName, 'jpg') };
+  }
   const target = tempFile('.webp');
   await sharp(input).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 72 }).toFile(target);
   return { path: target, mimeType: 'image/webp', name: outputName(originalName, 'webp') };
@@ -84,6 +88,7 @@ async function claimVideoJob(): Promise<VideoJob | undefined> {
 async function processVideoJob(job: VideoJob) {
   let input = '';
   let output = '';
+  let thumbnailPath = '';
   try {
     await fs.mkdir(paths.uploads, { recursive: true });
     input = processingFile(path.extname(job.original_name) || '.video');
@@ -95,8 +100,12 @@ async function processVideoJob(job: VideoJob) {
     const folder = await storage.createVersionFolder({ departureFolder: job.departure_folder, lotFolder: job.lot_folder, version: job.version_number }, 'marcados');
     const name = outputName(job.original_name, 'mp4');
     const deliveryId = await storage.uploadOriginal({ path: output, filename: name, mimeType: 'video/mp4', parentId: folder });
+    const thumbnail = await createThumbnail(output, 'VIDEO', job.original_name);
+    thumbnailPath = thumbnail?.path ?? '';
+    const thumbnailId = thumbnail ? await storage.uploadOriginal({ path: thumbnail.path, filename: thumbnail.name, mimeType: thumbnail.mimeType, parentId: folder }) : null;
+    const thumbnailSize = thumbnail ? await fs.stat(thumbnail.path) : null;
     await transaction(async client => {
-      await client.query(`UPDATE media_assets SET delivery_drive_file_id=$1,delivery_mime_type='video/mp4',delivery_size_bytes=$2,delivery_name=$3,watermark_status='READY',watermark_error=NULL,updated_at=now() WHERE id=$4`, [deliveryId, stat.size, name, job.media_asset_id]);
+      await client.query(`UPDATE media_assets SET delivery_drive_file_id=$1,delivery_mime_type='video/mp4',delivery_size_bytes=$2,delivery_name=$3,thumbnail_drive_file_id=COALESCE($4,thumbnail_drive_file_id),thumbnail_mime_type=COALESCE($5,thumbnail_mime_type),thumbnail_size_bytes=COALESCE($6,thumbnail_size_bytes),watermark_status='READY',watermark_error=NULL,updated_at=now() WHERE id=$7`, [deliveryId, stat.size, name, thumbnailId, thumbnail?.mimeType ?? null, thumbnailSize?.size ?? null, job.media_asset_id]);
       await client.query(`UPDATE media_watermark_jobs SET status='DONE',completed_at=now(),error=NULL,updated_at=now() WHERE id=$1`, [job.id]);
     });
   } catch (error) {
@@ -110,6 +119,7 @@ async function processVideoJob(job: VideoJob) {
   } finally {
     if (input) await fs.rm(input, { force: true }).catch(() => undefined);
     if (output) await fs.rm(output, { force: true }).catch(() => undefined);
+    if (thumbnailPath) await fs.rm(thumbnailPath, { force: true }).catch(() => undefined);
   }
 }
 
@@ -122,4 +132,10 @@ async function drainVideoJobs() {
 }
 
 export function queueVideoProcessing() { void drainVideoJobs(); }
-export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => void drainVideoJobs(), 15_000); queueVideoProcessing(); }
+async function enqueueVideosMissingThumbnails() {
+  await query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at)
+    SELECT m.id,'QUEUED',now() FROM media_assets m
+    WHERE m.kind='VIDEO' AND m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL AND m.thumbnail_drive_file_id IS NULL
+    ON CONFLICT(media_asset_id) DO UPDATE SET status=CASE WHEN media_watermark_jobs.status='DONE' THEN 'QUEUED' ELSE media_watermark_jobs.status END,available_at=CASE WHEN media_watermark_jobs.status='DONE' THEN now() ELSE media_watermark_jobs.available_at END,updated_at=now()`);
+}
+export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => void drainVideoJobs(), 15_000); void enqueueVideosMissingThumbnails().then(queueVideoProcessing).catch(error => console.error('Could not queue video thumbnails', error)); queueVideoProcessing(); }

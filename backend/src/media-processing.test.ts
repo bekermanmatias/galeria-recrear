@@ -30,7 +30,4 @@ describe('createThumbnail', () => {
     await expect(fs.stat(source)).resolves.toBeDefined();
   });
 
-  it('does not generate image thumbnails for videos', async () => {
-    await expect(createThumbnail('unused', 'VIDEO', 'clip.mp4')).resolves.toBeUndefined();
-  });
 });

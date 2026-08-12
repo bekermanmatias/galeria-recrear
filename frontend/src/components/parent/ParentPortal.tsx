@@ -133,7 +133,7 @@ function AlbumCover({ media }: { media: Media[] }) {
 }
 function Thumb({ item }: { item?: Media }) {
   if (!item) return <div style={{ width: '100%', height: '100%', background: '#F1F5F9' }}/>;
-  return item.kind === 'VIDEO' ? <video src={api.contentUrl(item.id)} muted preload="metadata" style={mediaStyle}/> : <img src={api.thumbnailUrl(item.id)} loading="lazy" decoding="async" onError={({ currentTarget }) => { currentTarget.onerror = null; currentTarget.src = api.contentUrl(item.id); }} alt={item.original_name} style={mediaStyle}/>;
+  return <img src={api.thumbnailUrl(item.id)} loading="lazy" decoding="async" onError={({ currentTarget }) => { if(item.kind==='VIDEO'){currentTarget.style.opacity='0';return;} currentTarget.onerror = null; currentTarget.src = api.contentUrl(item.id); }} alt={item.original_name} style={mediaStyle}/>;
 }
 
 function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
