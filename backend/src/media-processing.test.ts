@@ -2,11 +2,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
-import { paths } from './config.js';
-import { createThumbnail } from './media-processing.js';
+
+process.env.DATABASE_URL ??= 'postgres://test:test@localhost:5432/test';
+const { paths } = await import('./config.js');
+const { createThumbnail } = await import('./media-processing.js');
 
 const files: string[] = [];
-afterEach(async () => { await Promise.all(files.splice(0).map(file => fs.rm(file, { force: true }))); });
+afterEach(async () => {
+  await Promise.all(files.splice(0).map(file => fs.rm(file, { force: true }).catch(() => undefined)));
+});
 
 describe('createThumbnail', () => {
   it('creates a bounded WebP preview without modifying the source', async () => {
