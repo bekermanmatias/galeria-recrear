@@ -5,6 +5,7 @@ import { pipeline } from 'node:stream/promises';
 import path from 'node:path';
 import { google } from 'googleapis';
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { config, paths } from './config.js';
 import { AppError } from './errors.js';
 
@@ -17,6 +18,7 @@ export interface MediaStorage {
   download(fileId: string, target: string): Promise<void>;
   stream(fileId: string, range?: string): Promise<RemoteStream>;
   trash(fileId: string): Promise<void>;
+  signedUrl?(fileId: string, download?: boolean): Promise<string>;
 }
 const ensureDirectory = (directory: string) => fs.mkdir(directory, { recursive: true });
 // R2 streams are long-lived while an image is being sent to the browser. Keep
@@ -109,6 +111,10 @@ class S3Storage implements MediaStorage {
     
     if (!response.Body) throw new Error('Cuerpo de respuesta vacío desde S3');
     await pipeline(response.Body as NodeJS.ReadableStream, createWriteStream(target));
+  }
+
+  async signedUrl(fileId: string, download = false) {
+    return getSignedUrl(this.client, new GetObjectCommand({ Bucket: this.bucket, Key: fileId, ...(download ? { ResponseContentDisposition: 'attachment' } : {}) }), { expiresIn: 300 });
   }
 
   async stream(fileId: string, range?: string): Promise<RemoteStream> {
