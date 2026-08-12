@@ -68,6 +68,29 @@ type VideoJob = {
 
 const processingFile = (suffix: string) => path.join(paths.uploads, `video-process-${crypto.randomUUID()}${suffix}`);
 
+export async function ensureVideoThumbnail(media: { id: string; drive_file_id: string; delivery_drive_file_id: string | null; original_name: string; drive_folder_id?: string | null }) {
+  const sourceId = media.delivery_drive_file_id ?? media.drive_file_id;
+  const input = processingFile(path.extname(media.original_name) || '.mp4');
+  let output = '';
+  try {
+    await fs.mkdir(paths.uploads, { recursive: true });
+    const storage = getStorage();
+    await storage.download(sourceId, input);
+    const thumbnail = await createThumbnail(input, 'VIDEO', media.original_name);
+    if (!thumbnail) return null;
+    output = thumbnail.path;
+    const parentId = media.drive_folder_id ?? path.posix.dirname(sourceId.replace(/\\/g, '/'));
+    const thumbnailId = await storage.uploadOriginal({ path: thumbnail.path, filename: thumbnail.name, mimeType: thumbnail.mimeType, parentId });
+    const stat = await fs.stat(thumbnail.path);
+    await query(`UPDATE media_assets SET thumbnail_drive_file_id=COALESCE(thumbnail_drive_file_id,$1),thumbnail_mime_type=COALESCE(thumbnail_mime_type,$2),thumbnail_size_bytes=COALESCE(thumbnail_size_bytes,$3),updated_at=now() WHERE id=$4`, [thumbnailId, thumbnail.mimeType, stat.size, media.id]);
+    const stored = await query<{thumbnail_drive_file_id:string|null}>('SELECT thumbnail_drive_file_id FROM media_assets WHERE id=$1',[media.id]);
+    return stored.rows[0]?.thumbnail_drive_file_id ?? thumbnailId;
+  } finally {
+    await fs.rm(input, { force: true }).catch(() => undefined);
+    if (output) await fs.rm(output, { force: true }).catch(() => undefined);
+  }
+}
+
 async function claimVideoJob(): Promise<VideoJob | undefined> {
   return transaction(async client => {
     const claimed = await client.query<VideoJob>(`SELECT j.id,j.attempts,j.media_asset_id,m.drive_file_id,m.original_name,m.mime_type,v.version_number,
