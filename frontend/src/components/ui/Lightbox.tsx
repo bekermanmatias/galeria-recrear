@@ -170,6 +170,7 @@ export default function Lightbox({
             playsInline
             preload="metadata"
             onClick={event => event.stopPropagation()}
+            onError={() => setMessage('Este navegador no puede reproducir el video. Podés descargarlo con el botón de abajo.')}
             style={{ display: 'block', width: 'auto', maxWidth: compact ? '100%' : '76vw', height: 'auto', maxHeight: compact ? '100%' : '72vh', borderRadius: compact ? 8 : 12, background: '#000', boxShadow: '0 18px 52px rgba(0,0,0,.38)', opacity: isDeleted ? .55 : 1 }}
           />
         ) : (

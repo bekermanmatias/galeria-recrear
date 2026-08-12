@@ -409,15 +409,12 @@ export function GalleryView({ user }: { user?: SessionUser }) {
     setEditBusy(true);
     setError('');
     try {
-      await adminRequest(`/lots/${editingLot.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          departureId: editForm.departureId,
-          activityId: editForm.activityId || null,
-          albumName: editForm.albumName,
-          eventDate: editForm.eventDate,
-          status: editForm.status,
-        }),
+      await api.updateLot(editingLot.id, {
+        departureId: editForm.departureId,
+        activityId: editForm.activityId || null,
+        albumName: editForm.albumName,
+        eventDate: editForm.eventDate,
+        status: editForm.status,
       });
       const data = await api.lots();
       setLots(data.items);

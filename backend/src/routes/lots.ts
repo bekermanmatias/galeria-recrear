@@ -11,7 +11,7 @@ import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
 import { asyncHandler, parsePagination } from '../http.js';
 import { getStorage } from '../storage.js';
-import { createThumbnail, processLocalMedia } from '../media-processing.js';
+import { createThumbnail, processLocalMedia, queueVideoProcessing } from '../media-processing.js';
 
 const destination = async (done: (error: Error | null, destination: string) => void) => { try { await fs.mkdir(paths.uploads, { recursive: true }); done(null, paths.uploads); } catch (error) { done(error as Error, paths.uploads); } };
 const disk = multer.diskStorage({ destination: (_req, _file, done) => { void destination(done); }, filename: (_req, file, done) => done(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`) });
@@ -153,7 +153,7 @@ lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('
   res.status(204).end();
 }));
 lotsRouter.get('/:id/processing',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','view'),asyncHandler(async(req,res)=>{res.json({items:[]});}));
-lotsRouter.post('/:id/media/:mediaId/watermark/retry',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{res.status(204).end();}));
+lotsRouter.post('/:id/media/:mediaId/watermark/retry',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);const media=await query<{id:string}>('SELECT m.id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id WHERE m.id=$1 AND v.lot_id=$2 AND m.kind=\'VIDEO\' AND m.drive_file_id IS NOT NULL',[param(req.params.mediaId),lot.id]);if(!media.rowCount)throw new AppError(404,'VIDEO_NOT_FOUND','Video original no encontrado');await transaction(async client=>{await client.query(`UPDATE media_assets SET watermark_status='QUEUED',watermark_error=NULL,updated_at=now() WHERE id=$1`,[media.rows[0].id]);await client.query(`INSERT INTO media_watermark_jobs(media_asset_id,status,attempts,available_at,error,updated_at) VALUES($1,'QUEUED',0,now(),NULL,now()) ON CONFLICT(media_asset_id) DO UPDATE SET status='QUEUED',attempts=0,available_at=now(),error=NULL,updated_at=now()`,[media.rows[0].id]);});queueVideoProcessing();res.status(204).end();}));
 lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','create'),upload.single('file'),asyncHandler(async(req,res)=>{
   const file=req.file;
   if(!file)throw new AppError(400,'FILE_REQUIRED','Selecciona un archivo');
@@ -169,6 +169,25 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const kind=accepted.get(mimeType);
     if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Se permiten JPEG, PNG, HEIC, ProRAW (DNG), MP4 y MOV');
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
+    if (kind === 'VIDEO') {
+      const storage=getStorage();
+      const originals=await retryStorage(()=>storage.createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'originales'));
+      const originalId=await retryStorage(()=>storage.uploadOriginal({path:file.path,filename:file.originalname,mimeType,parentId:originals}));
+      const asset=await transaction(async client=>{
+        const locked=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE id=$1 AND lot_id=$2 FOR UPDATE',[version.id,lot.id]);
+        const current=locked.rows[0];
+        if(!current || !['DRAFT','UPLOADING','PENDING'].includes(current.status)) throw new AppError(409,'LOT_NOT_EDITABLE','El lote cambió de estado antes de finalizar la carga');
+        const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,size_bytes,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id)
+          VALUES($1,'VIDEO',$2,$3,$4,$5,$6,'READY','QUEUED',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$7) RETURNING id`,[version.id,file.originalname,mimeType,file.size,checksum,req.user!.id,originalId]);
+        await client.query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at) VALUES($1,'QUEUED',now()) ON CONFLICT(media_asset_id) DO UPDATE SET status='QUEUED',available_at=now(),error=NULL,updated_at=now()`,[created.rows[0].id]);
+        await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[originals,version.id]);
+        await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'VIDEO_UPLOADED_ORIGINAL','media_asset',created.rows[0].id,JSON.stringify({lotId:lot.id,lotVersionId:version.id,originalName:file.originalname,sizeBytes:file.size})]);
+        return created.rows[0];
+      });
+      queueVideoProcessing();
+      res.status(202).json({id:asset.id,kind,status:'READY'});
+      return;
+    }
     console.time(`Upload and process ${file.originalname}`);
     let rendered;
     try { rendered = await processLocalMedia(file.path, kind, file.originalname, mimeType); }

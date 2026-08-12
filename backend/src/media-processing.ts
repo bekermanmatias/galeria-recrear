@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
 import { transaction } from './db.js';
+import { query } from './db.js';
 import { paths } from './config.js';
 import { getStorage } from './storage.js';
 
@@ -55,3 +56,70 @@ export async function createThumbnail(input: string, kind: 'IMAGE'|'VIDEO', orig
   await sharp(input).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 72 }).toFile(target);
   return { path: target, mimeType: 'image/webp', name: outputName(originalName, 'webp') };
 }
+
+type VideoJob = {
+  id: string; attempts: number; media_asset_id: string; drive_file_id: string; original_name: string;
+  mime_type: string; version_number: number; departure_folder: string; lot_folder: string;
+};
+
+const processingFile = (suffix: string) => path.join(paths.uploads, `video-process-${crypto.randomUUID()}${suffix}`);
+
+async function claimVideoJob(): Promise<VideoJob | undefined> {
+  return transaction(async client => {
+    const claimed = await client.query<VideoJob>(`SELECT j.id,j.attempts,j.media_asset_id,m.drive_file_id,m.original_name,m.mime_type,v.version_number,
+      regexp_replace(d.public_code || '-' || d.name || '-' || COALESCE(d.destination,''),'[\\\\/:*?"<>|]+','-','g') departure_folder,
+      regexp_replace(l.event_date::text || '-' || COALESCE(NULLIF(l.title,''),a.name,'General') || '-' || left(l.id::text,8),'[\\\\/:*?"<>|]+','-','g') lot_folder
+      FROM media_watermark_jobs j JOIN media_assets m ON m.id=j.media_asset_id JOIN lot_versions v ON v.id=m.lot_version_id
+      JOIN lots l ON l.id=v.lot_id JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id
+      WHERE j.status='QUEUED' AND j.available_at <= now() AND m.kind='VIDEO' AND m.drive_file_id IS NOT NULL
+      ORDER BY j.available_at,j.created_at FOR UPDATE SKIP LOCKED LIMIT 1`);
+    const job = claimed.rows[0];
+    if (!job) return undefined;
+    await client.query(`UPDATE media_watermark_jobs SET status='PROCESSING',attempts=attempts+1,started_at=now(),updated_at=now() WHERE id=$1`, [job.id]);
+    await client.query(`UPDATE media_assets SET watermark_status='PROCESSING',watermark_attempts=watermark_attempts+1,watermark_error=NULL,updated_at=now() WHERE id=$1`, [job.media_asset_id]);
+    return { ...job, attempts: job.attempts + 1 };
+  });
+}
+
+async function processVideoJob(job: VideoJob) {
+  let input = '';
+  let output = '';
+  try {
+    await fs.mkdir(paths.uploads, { recursive: true });
+    input = processingFile(path.extname(job.original_name) || '.video');
+    output = processingFile('.mp4');
+    const storage = getStorage();
+    await storage.download(job.drive_file_id, input);
+    await runFfmpeg(input, output);
+    const stat = await fs.stat(output);
+    const folder = await storage.createVersionFolder({ departureFolder: job.departure_folder, lotFolder: job.lot_folder, version: job.version_number }, 'marcados');
+    const name = outputName(job.original_name, 'mp4');
+    const deliveryId = await storage.uploadOriginal({ path: output, filename: name, mimeType: 'video/mp4', parentId: folder });
+    await transaction(async client => {
+      await client.query(`UPDATE media_assets SET delivery_drive_file_id=$1,delivery_mime_type='video/mp4',delivery_size_bytes=$2,delivery_name=$3,watermark_status='READY',watermark_error=NULL,updated_at=now() WHERE id=$4`, [deliveryId, stat.size, name, job.media_asset_id]);
+      await client.query(`UPDATE media_watermark_jobs SET status='DONE',completed_at=now(),error=NULL,updated_at=now() WHERE id=$1`, [job.id]);
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message.slice(0, 1000) : 'No se pudo procesar el video';
+    const retry = job.attempts < MAX_ATTEMPTS;
+    await transaction(async client => {
+      await client.query(`UPDATE media_assets SET watermark_status=$1,watermark_error=$2,updated_at=now() WHERE id=$3`, [retry ? 'QUEUED' : 'FAILED', message, job.media_asset_id]);
+      await client.query(`UPDATE media_watermark_jobs SET status=$1,error=$2,available_at=CASE WHEN $1='QUEUED' THEN now()+($3::text || ' seconds')::interval ELSE available_at END,completed_at=CASE WHEN $1='FAILED' THEN now() ELSE NULL END,updated_at=now() WHERE id=$4`, [retry ? 'QUEUED' : 'FAILED', message, Math.min(300, 15 * 2 ** Math.max(0, job.attempts - 1)), job.id]);
+    });
+    console.error('Video processing failed; original remains available', { mediaAssetId: job.media_asset_id, message });
+  } finally {
+    if (input) await fs.rm(input, { force: true }).catch(() => undefined);
+    if (output) await fs.rm(output, { force: true }).catch(() => undefined);
+  }
+}
+
+async function drainVideoJobs() {
+  if (running) return;
+  running = true;
+  try { for (;;) { const job = await claimVideoJob(); if (!job) break; await processVideoJob(job); } }
+  catch (error) { console.error('Video processing worker failed', error); }
+  finally { running = false; }
+}
+
+export function queueVideoProcessing() { void drainVideoJobs(); }
+export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => void drainVideoJobs(), 15_000); queueVideoProcessing(); }

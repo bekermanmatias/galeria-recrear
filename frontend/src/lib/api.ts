@@ -126,6 +126,7 @@ export const api = {
   submitLot: (lotId: string) => request<void>(`/lots/${lotId}/submit`, { method: 'POST' }),
   reopenLot: (lotId: string) => request<void>(`/lots/${lotId}/reopen`, { method: 'POST' }),
   renameLot: (lotId: string, albumName: string) => request<{ id: string; title: string }>(`/lots/${lotId}`, { method: 'PATCH', body: JSON.stringify({ albumName }) }),
+  updateLot: (lotId: string, body: { departureId?: string; activityId?: string | null; albumName?: string; eventDate?: string; status?: string }) => request<{ success: boolean }>(`/lots/${lotId}`, { method: 'PATCH', body: JSON.stringify(body) }),
   deleteLot: (lotId: string) => request<void>(`/lots/${lotId}`, { method: 'DELETE' }),
   approveLot: (lotId: string) => request<void>(`/lots/${lotId}/approve`, { method: 'POST' }),
   rejectLot: (lotId: string) => request<void>(`/lots/${lotId}/reject`, { method: 'POST' }),
