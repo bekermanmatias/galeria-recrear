@@ -48,3 +48,10 @@ export async function processLocalMedia(input: string, kind: 'IMAGE'|'VIDEO', or
     console.timeEnd(`Watermark ${originalName}`);
   }
 }
+
+export async function createThumbnail(input: string, kind: 'IMAGE'|'VIDEO', originalName: string) {
+  if (kind !== 'IMAGE') return undefined;
+  const target = tempFile('.webp');
+  await sharp(input).rotate().resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true }).webp({ quality: 72 }).toFile(target);
+  return { path: target, mimeType: 'image/webp', name: outputName(originalName, 'webp') };
+}

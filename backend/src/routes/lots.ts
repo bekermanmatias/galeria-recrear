@@ -11,7 +11,7 @@ import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
 import { asyncHandler, parsePagination } from '../http.js';
 import { getStorage } from '../storage.js';
-import { processLocalMedia } from '../media-processing.js';
+import { createThumbnail, processLocalMedia } from '../media-processing.js';
 
 const destination = async (done: (error: Error | null, destination: string) => void) => { try { await fs.mkdir(paths.uploads, { recursive: true }); done(null, paths.uploads); } catch (error) { done(error as Error, paths.uploads); } };
 const disk = multer.diskStorage({ destination: (_req, _file, done) => { void destination(done); }, filename: (_req, file, done) => done(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`) });
@@ -158,6 +158,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
   const file=req.file;
   if(!file)throw new AppError(400,'FILE_REQUIRED','Selecciona un archivo');
   let renderedPath = '';
+  let thumbnailPath = '';
   try{
     const lot=await loadLot(param(req.params.id));
     await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
@@ -180,11 +181,15 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const storage=getStorage();
     const folder=await retryStorage(()=>storage.createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'marcados'));
     const driveFileId=await retryStorage(()=>storage.uploadOriginal({path:rendered.path,filename:rendered.name,mimeType:rendered.mimeType,parentId:folder}));
+    const thumbnail=await createThumbnail(rendered.path,kind,rendered.name);
+    thumbnailPath=thumbnail?.path??'';
+    const thumbnailId=thumbnail?await retryStorage(()=>storage.uploadOriginal({path:thumbnail.path,filename:thumbnail.name,mimeType:thumbnail.mimeType,parentId:folder})):null;
+    const thumbnailSize=thumbnail?await fs.stat(thumbnail.path):null;
     const asset=await transaction(async client=>{
       const locked=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE id=$1 AND lot_id=$2 FOR UPDATE',[version.id,lot.id]);
       const current=locked.rows[0];
       if(!current || !['DRAFT','UPLOADING','PENDING'].includes(current.status)) throw new AppError(409,'LOT_NOT_EDITABLE','El lote cambió de estado antes de finalizar la carga');
-      const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,delivery_mime_type,size_bytes,delivery_size_bytes,delivery_name,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id,delivery_drive_file_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'READY','READY',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$11,$11) RETURNING id`,[version.id,kind,file.originalname,mimeType,rendered.mimeType,file.size,stat.size,rendered.name,checksum,req.user!.id,driveFileId]);
+      const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,delivery_mime_type,size_bytes,delivery_size_bytes,delivery_name,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id,delivery_drive_file_id,thumbnail_drive_file_id,thumbnail_mime_type,thumbnail_size_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'READY','READY',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$11,$11,$12,$13,$14) RETURNING id`,[version.id,kind,file.originalname,mimeType,rendered.mimeType,file.size,stat.size,rendered.name,checksum,req.user!.id,driveFileId,thumbnailId,thumbnail?.mimeType??null,thumbnailSize?.size??null]);
       await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[folder,version.id]);
       await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'MEDIA_UPLOADED','media_asset',created.rows[0].id,JSON.stringify({lotId:lot.id,lotVersionId:version.id,originalName:file.originalname,kind,sizeBytes:file.size,addedWhilePending:current.status==='PENDING'})]);
       return created.rows[0];
@@ -194,6 +199,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
   }finally{
     await fs.rm(file.path,{force:true}).catch(()=>undefined);
     if(renderedPath) await fs.rm(renderedPath,{force:true}).catch(()=>undefined);
+    if(thumbnailPath) await fs.rm(thumbnailPath,{force:true}).catch(()=>undefined);
   }
 }));
 lotsRouter.post('/:id/submit',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);if(lot.latest_status==='PENDING')return res.status(204).end();const version=await editableVersion(lot.id);const pending=await query(`SELECT count(*)::int total,COUNT(*) FILTER(WHERE status='READY')::int ready,COUNT(*) FILTER(WHERE status='UPLOADING')::int processing FROM media_assets WHERE lot_version_id=$1`,[version.id]);const state=pending.rows[0] as {total:number;ready:number;processing:number};if(!state.total)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos');if(state.processing){await query(`UPDATE lot_versions SET submitted_at=now() WHERE id=$1`,[version.id]);return res.status(204).end();}if(!state.ready)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos listos');await query(`UPDATE lot_versions SET status='PENDING',submitted_at=now() WHERE id=$1`,[version.id]);res.status(204).end();}));
