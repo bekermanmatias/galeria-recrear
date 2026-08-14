@@ -13,7 +13,7 @@ const thumbStyle: React.CSSProperties = { width: '100%', height: '100%', objectF
 const selectStyle: React.CSSProperties = { flex: '1 1 160px', minWidth: 0, height: 40, padding: '0 10px', border: '1px solid #E2E8F0', borderRadius: 7, background: '#fff' };
 
 function linkToken() { const path = window.location.pathname.split('/').filter(Boolean); const index = path.lastIndexOf('colegio'); return index >= 0 ? decodeURIComponent(path[index + 1] || '') : ''; }
-function Thumb({ token, item }: { token: string; item: Media }) { const src = publicGalleryApi.thumbnailUrl(token, item.id); return <img src={src} loading="lazy" decoding="async" onError={({ currentTarget }) => { if(item.kind==='VIDEO'){currentTarget.style.opacity='0';return;} currentTarget.onerror = null; currentTarget.src = publicGalleryApi.contentUrl(token, item.id); }} alt={item.original_name} style={thumbStyle}/>; }
+function Thumb({ token, item }: { token: string; item: Media }) { const src = publicGalleryApi.thumbnailUrl(token, item.id); return <img src={src} loading="lazy" decoding="async" onError={({ currentTarget }) => { if(item.kind==='VIDEO'||currentTarget.dataset.fallbackTried==='true'){currentTarget.style.opacity='0';return;} currentTarget.dataset.fallbackTried='true'; currentTarget.src = publicGalleryApi.contentUrl(token, item.id); }} alt={item.original_name} style={thumbStyle}/>; }
 function Empty({ children }: { children: React.ReactNode }) { return <div style={{ minHeight: 300, display: 'grid', placeItems: 'center', color: '#94A3B8', textAlign: 'center' }}><div><ImageIcon size={46}/><p>{children}</p></div></div>; }
 
 export default function PublicSchoolPortal() {
