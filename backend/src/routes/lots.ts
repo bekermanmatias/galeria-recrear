@@ -15,7 +15,9 @@ import { createThumbnail, processLocalMedia, queueVideoProcessing } from '../med
 
 const destination = async (done: (error: Error | null, destination: string) => void) => { try { await fs.mkdir(paths.uploads, { recursive: true }); done(null, paths.uploads); } catch (error) { done(error as Error, paths.uploads); } };
 const disk = multer.diskStorage({ destination: (_req, _file, done) => { void destination(done); }, filename: (_req, file, done) => done(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`) });
-const upload = multer({ storage: disk, limits: { fileSize: config.MAX_FILE_SIZE_MB * 1024 * 1024, files: 1 } });
+// Multer debe admitir el máximo de ambos tipos; el límite específico se valida
+// luego de detectar el formato real del archivo.
+const upload = multer({ storage: disk, limits: { fileSize: Math.max(config.MAX_FILE_SIZE_MB, config.MAX_VIDEO_FILE_SIZE_MB) * 1024 * 1024, files: 1 } });
 const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
 const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional(), status: z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).optional() });
@@ -174,6 +176,8 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const mimeType=detected?.mime??file.mimetype;
     const kind=accepted.get(mimeType);
     if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Formato no compatible. Se permiten JPG/JFIF, PNG, HEIC/HEIF, ProRAW (DNG), TIFF, GIF, WebP, AVIF, MP4, MOV, M4V, WebM, AVI, 3GP y MKV.');
+    const maxSizeMb=kind==='VIDEO'?config.MAX_VIDEO_FILE_SIZE_MB:config.MAX_FILE_SIZE_MB;
+    if(file.size>maxSizeMb*1024*1024)throw new AppError(413,'FILE_TOO_LARGE',`El ${kind==='VIDEO'?'video':'archivo'} supera el límite de ${maxSizeMb} MB.`);
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
     if (kind === 'VIDEO') {
       const storage=getStorage();
