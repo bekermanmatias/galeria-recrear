@@ -158,7 +158,10 @@ export function queueVideoProcessing() { void drainVideoJobs(); }
 async function enqueueVideosMissingThumbnails() {
   await query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at)
     SELECT m.id,'QUEUED',now() FROM media_assets m
-    WHERE m.kind='VIDEO' AND m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL AND m.thumbnail_drive_file_id IS NULL
+    -- También recupera videos que ya tienen miniatura pero nunca terminaron
+    -- de generar su MP4 H.264 reproducible en el navegador.
+    WHERE m.kind='VIDEO' AND m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL
+      AND (m.thumbnail_drive_file_id IS NULL OR m.delivery_drive_file_id IS NULL)
     ON CONFLICT(media_asset_id) DO UPDATE SET status=CASE WHEN media_watermark_jobs.status='DONE' THEN 'QUEUED' ELSE media_watermark_jobs.status END,available_at=CASE WHEN media_watermark_jobs.status='DONE' THEN now() ELSE media_watermark_jobs.available_at END,updated_at=now()`);
 }
 export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => void drainVideoJobs(), 15_000); void enqueueVideosMissingThumbnails().then(queueVideoProcessing).catch(error => console.error('Could not queue video thumbnails', error)); queueVideoProcessing(); }

@@ -20,7 +20,13 @@ const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
 const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional(), status: z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).optional() });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
-const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([['image/jpeg','IMAGE'],['image/png','IMAGE'],['image/heic','IMAGE'],['image/heif','IMAGE'],['image/x-adobe-dng','IMAGE'],['video/mp4','VIDEO'],['video/quicktime','VIDEO'],['video/webm','VIDEO'],['video/avi','VIDEO'],['video/x-msvideo','VIDEO'],['video/3gpp','VIDEO'],['video/x-matroska','VIDEO']]);
+// Se valida por la firma real del archivo (file-type), no por su extensión.
+const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([
+  ['image/jpeg','IMAGE'], ['image/png','IMAGE'], ['image/heic','IMAGE'], ['image/heif','IMAGE'],
+  ['image/x-adobe-dng','IMAGE'], ['image/tiff','IMAGE'], ['image/gif','IMAGE'], ['image/webp','IMAGE'], ['image/avif','IMAGE'],
+  ['video/mp4','VIDEO'], ['video/quicktime','VIDEO'], ['video/x-m4v','VIDEO'], ['video/webm','VIDEO'],
+  ['video/avi','VIDEO'], ['video/x-msvideo','VIDEO'], ['video/3gpp','VIDEO'], ['video/x-matroska','VIDEO'],
+]);
 const param = (value: string | string[]) => Array.isArray(value) ? value[0] : value;
 const delay = (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds));
 async function retryStorage<T>(operation: () => Promise<T>): Promise<T> {
@@ -167,7 +173,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const detected=await fileTypeFromFile(file.path);
     const mimeType=detected?.mime??file.mimetype;
     const kind=accepted.get(mimeType);
-    if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Se permiten JPEG, PNG, HEIC, ProRAW (DNG), MP4 y MOV');
+    if(!kind)throw new AppError(400,'UNSUPPORTED_MEDIA','Formato no compatible. Se permiten JPG/JFIF, PNG, HEIC/HEIF, ProRAW (DNG), TIFF, GIF, WebP, AVIF, MP4, MOV, M4V, WebM, AVI, 3GP y MKV.');
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
     if (kind === 'VIDEO') {
       const storage=getStorage();
