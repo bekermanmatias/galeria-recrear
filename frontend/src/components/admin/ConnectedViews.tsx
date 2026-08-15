@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronDown, ContactRound, Copy, Download, Edit2, Eye, MoreVertical, Plus, RotateCcw, Search, Trash2, Upload, X } from 'lucide-react';
-import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction, type SessionUser } from '../../lib/api';
+import { adminRequest, api, type AdminUser, type CatalogItem, type LotSummary, type LotUploadAudit, type Media, type School, type Departure, type UserPermissions, type PermissionModule, type PermissionAction, type SessionUser } from '../../lib/api';
 import Lightbox from '../ui/Lightbox';
 import SearchableSelect from '../ui/SearchableSelect';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -12,6 +12,7 @@ const primary: React.CSSProperties = { display: 'inline-flex', alignItems: 'cent
 const secondary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '10px 16px', background: '#fff', color: '#1A4B77', border: '1px solid #D7E0EA', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' };
 const formatBytes = (bytes:number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 const daysUntilPurge = (date?: string | null) => date ? Math.max(0, Math.ceil((new Date(date).getTime() - Date.now()) / 86400000)) : 0;
+const formatAuditDateTime = (value?: string | null) => value ? new Intl.DateTimeFormat('es-AR',{timeZone:'America/Argentina/Buenos_Aires',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(new Date(value)) : 'Sin registro';
 const input: React.CSSProperties = { padding: '10px 12px', border: '1px solid #E4E4E7', borderRadius: 6, font: 'inherit', fontSize: 13 };
 const departureDateRange = (item: { event_date?: string; start_date?: string; end_date?: string }) => { const start=(item.start_date??item.event_date??'').slice(0,10); const end=(item.end_date??start).slice(0,10); const fmt=(value:string)=>value?value.split('-').reverse().join('/'):''; const a=fmt(start); const b=fmt(end); return a===b?a:a+' - '+b; };
 
@@ -335,6 +336,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export function GalleryView({ user }: { user?: SessionUser }) {
   const canManage = user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.update;
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'ADMIN');
   const [lots,setLots]=useState<LotSummary[]>([]);
   const [media,setMedia]=useState<Array<Media&{lot:LotSummary}>>([]);
   const [departure,setDeparture]=useState(() => {
@@ -373,6 +375,8 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:''});
   const [editBusy,setEditBusy]=useState(false);
   const [submissionBusyId,setSubmissionBusyId]=useState<string|null>(null);
+  const [uploadAudit,setUploadAudit]=useState<LotUploadAudit|null>(null);
+  const [uploadAuditError,setUploadAuditError]=useState('');
   const [departuresList,setDeparturesList]=useState<Array<{id:string;name:string;type:string}>>([]);
   const [activitiesList,setActivitiesList]=useState<Array<{id:string;name:string}>>([]);
 
@@ -444,6 +448,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   const currentRejected=currentLot?.files.filter(file=>file.status==='REJECTED')??[];
   const currentErrors=currentLot?.files.filter(file=>file.status==='ERROR')??[];
   const nextPurgeDays=currentRejected.length?Math.min(...currentRejected.map(file=>daysUntilPurge(file.purge_after))):0;
+  const uploadTimes=useMemo(()=>new Map((uploadAudit?.items??[]).map(item=>[item.mediaId,item.uploadedAt])),[uploadAudit]);
 
   const submitForModeration = async (lot: LotSummary) => {
     setSubmissionBusyId(lot.id); setError('');
@@ -457,6 +462,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   };
 
   useEffect(()=>{const close=()=>{setOpenMediaMenu(null);setOpenLotMenu(null);};document.addEventListener('click',close);return()=>document.removeEventListener('click',close);},[]);
+  useEffect(()=>{let mounted=true;if(!openedLot||!isAdmin){setUploadAudit(null);setUploadAuditError('');return()=>{mounted=false;};}setUploadAudit(null);setUploadAuditError('');api.lotUploadAudit(openedLot).then(data=>mounted&&setUploadAudit(data)).catch(reason=>mounted&&setUploadAuditError(reason instanceof Error?reason.message:'No se pudo cargar la auditoría de carga.'));return()=>{mounted=false;};},[openedLot,isAdmin]);
 
   const moderateGalleryMedia=async (item:Media&{lot:LotSummary},confirmed=false)=>{const restore=item.status==='REJECTED';if(!restore&&!confirmed){setOpenMediaMenu(null);setPendingDiscard(item);return;}try{setRecovering(item.id);setOpenMediaMenu(null);setError('');await api.moderateMedia(item.id,restore?'restore':'reject');setMedia(current=>current.map(file=>file.id===item.id?{...file,status:restore?'APPROVED':'REJECTED',purge_after:restore?null:new Date(Date.now()+30*86400000).toISOString()}:file));setPendingDiscard(null);}catch(reason:any){setError(reason.message||(restore?'No se pudo recuperar la foto':'No se pudo descartar la foto'));}finally{setRecovering(null);}};
 
@@ -645,6 +651,8 @@ export function GalleryView({ user }: { user?: SessionUser }) {
         </p>
       </div>
     </section>}
+    {openedLot&&isAdmin&&uploadAudit&&<section style={{margin:'0 0 20px',padding:'14px 16px',background:'#F8FAFC',border:'1px solid #DCE3EB',borderRadius:10}}><strong style={{display:'block',color:'#1A4B77',fontSize:14}}>Auditoría de carga</strong><div style={{display:'flex',flexWrap:'wrap',gap:'7px 18px',marginTop:8,color:'#475569',fontSize:12,lineHeight:1.45}}><span><b>Versión creada:</b> {formatAuditDateTime(uploadAudit.summary.versionCreatedAt)}</span><span><b>Primera carga:</b> {formatAuditDateTime(uploadAudit.summary.firstUploadedAt)}</span><span><b>Última carga:</b> {formatAuditDateTime(uploadAudit.summary.lastUploadedAt)}</span><span><b>Enviado a moderación:</b> {formatAuditDateTime(uploadAudit.summary.submittedAt)}</span></div></section>}
+    {openedLot&&isAdmin&&uploadAuditError&&<div role="alert" style={{margin:'0 0 20px',color:'#B91C1C',fontSize:13}}>{uploadAuditError}</div>}
     {openedLot&&currentLot&&currentLot.lot.status==='UPLOADING'&&<div style={{margin:'0 0 20px',padding:'14px 16px',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,color:'#1E40AF',fontSize:13,lineHeight:1.45}}><strong>Este lote todavía no fue enviado a moderación.</strong> Los archivos listos se muestran abajo. Usá “Enviar a moderación” cuando no queden cargas ni errores.{currentErrors.length>0&&<div style={{marginTop:7,color:'#B91C1C'}}>{currentErrors.length} {currentErrors.length===1?'archivo tiene':'archivos tienen'} error: {currentErrors.slice(0,5).map(file=>file.original_name).join(', ')}{currentErrors.length>5?` y ${currentErrors.length-5} más`:''}.</div>}</div>}
     {openedLot&&currentLot&&currentRejected.length>0&&<div className="lot-rejected-banner" style={{display:'flex',flexDirection:'column',gap:12,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
       <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
@@ -658,12 +666,12 @@ export function GalleryView({ user }: { user?: SessionUser }) {
     </div>}
     {openedLot&&displayedGroups.map(group=><section key={group.lot.id} style={{marginBottom:34}}>
       <div className="lot-media-grid" style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:24}}>
-        {filesForDisplay(group).map(item=>{const index=visible.findIndex(file=>file.id===item.id);const previewable=!item.mime_type.toLowerCase().includes('heic');const isRejected=item.status==='REJECTED';const daysLeft=daysUntilPurge(item.purge_after);const menuOpen=openMediaMenu===item.id;return <article key={item.id} onClick={()=>!isRejected&&previewable&&setSelected(index)} style={{position:'relative',aspectRatio:'1',background:'#F8FAFC',cursor:!isRejected&&previewable?'pointer':'default',borderRadius:10,overflow:'hidden',transition:'transform .2s, box-shadow .2s',border:isRejected?'2px solid #EF4444':'2px solid transparent',boxShadow:isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none'}} onMouseEnter={event=>{event.currentTarget.style.transform='translateY(-3px)';event.currentTarget.style.boxShadow=isRejected?'0 10px 22px rgba(185,28,28,.16)':'0 10px 20px rgba(15,23,42,.16)';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='1');}}} onMouseLeave={event=>{event.currentTarget.style.transform='none';event.currentTarget.style.boxShadow=isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='0');}}}>
+        {filesForDisplay(group).map(item=>{const index=visible.findIndex(file=>file.id===item.id);const previewable=!item.mime_type.toLowerCase().includes('heic');const isRejected=item.status==='REJECTED';const daysLeft=daysUntilPurge(item.purge_after);const menuOpen=openMediaMenu===item.id;const uploadedAt=uploadTimes.get(item.id);return <article key={item.id} onClick={()=>!isRejected&&previewable&&setSelected(index)} style={{position:'relative',aspectRatio:'1',background:'#F8FAFC',cursor:!isRejected&&previewable?'pointer':'default',borderRadius:10,overflow:'hidden',transition:'transform .2s, box-shadow .2s',border:isRejected?'2px solid #EF4444':'2px solid transparent',boxShadow:isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none'}} onMouseEnter={event=>{event.currentTarget.style.transform='translateY(-3px)';event.currentTarget.style.boxShadow=isRejected?'0 10px 22px rgba(185,28,28,.16)':'0 10px 20px rgba(15,23,42,.16)';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='1');}}} onMouseLeave={event=>{event.currentTarget.style.transform='none';event.currentTarget.style.boxShadow=isRejected?'0 0 0 3px rgba(239,68,68,.08)':'none';if(!isRejected){const overlay=event.currentTarget.querySelector('.gallery-overlay') as HTMLElement;overlay&&(overlay.style.opacity='0');}}}>
           <div style={{width:'100%',height:isRejected?'calc(100% - 58px)':'100%',display:'grid',placeItems:'center',overflow:'hidden',background:isRejected?'#FFF7F7':'#F4F4F5'}}>
             {previewable?<img src={api.thumbnailUrl(item.id)} onError={({currentTarget})=>{if(item.kind==='VIDEO'||currentTarget.dataset.fallbackTried==='true'){currentTarget.style.opacity='0';return;}currentTarget.dataset.fallbackTried='true';currentTarget.src=api.contentUrl(item.id);}} alt={item.original_name} style={{width:'100%',height:'100%',objectFit:'cover'}}/>:<div style={{display:'grid',placeItems:'center',gap:5,color:'#64748B'}}><strong style={{fontSize:18}}>{item.mime_type.toLowerCase().includes('heic')?'HEIC':'Archivo'}</strong><span title={item.original_name} style={{maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:11}}>{item.original_name}</span></div>}
           </div>
           {!isRejected&&<span style={{position:'absolute',left:8,bottom:8,padding:'3px 7px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:11,fontWeight:600,zIndex:3}}>{formatBytes(item.size_bytes)}</span>}
-          {item.uploaded_by_name&&<span style={{position:'absolute',left:8,top:8,maxWidth:'calc(100% - 16px)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',padding:'3px 7px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:11,zIndex:3}}>Subido por {item.uploaded_by_name}{item.uploaded_at?` · ${new Date(item.uploaded_at).toLocaleDateString('es-AR')}`:''}</span>}
+          {item.uploaded_by_name&&<span style={{position:'absolute',left:8,top:8,maxWidth:'calc(100% - 16px)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',padding:'3px 7px',borderRadius:5,background:'rgba(15,23,42,.72)',color:'#fff',fontSize:11,zIndex:3}}>Subido por {item.uploaded_by_name}{isAdmin&&uploadedAt?` · ${formatAuditDateTime(uploadedAt)}`:''}</span>}
           {isRejected&&<><span style={{position:'absolute',left:8,top:8,padding:'4px 8px',borderRadius:6,background:'#DC2626',color:'#fff',fontSize:10,fontWeight:800,letterSpacing:'.03em',zIndex:3}}>DESCARTADA</span><div style={{position:'absolute',left:0,right:0,bottom:0,height:58,boxSizing:'border-box',padding:'9px 10px',background:'#fff',borderTop:'1px solid #FECACA',zIndex:2}}><div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,fontSize:11}}><span style={{color:'#475569',fontWeight:600}}>{formatBytes(item.size_bytes)}</span><span style={{color:'#B91C1C',fontWeight:700}}>{daysLeft===0?'Se elimina hoy':`${daysLeft} ${daysLeft===1?'día':'días'} restantes`}</span></div><div title={item.original_name} style={{marginTop:5,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontSize:10,color:'#64748B'}}>{item.original_name}</div></div></>}
           {!isRejected&&<div className="gallery-overlay" style={{position:'absolute',inset:0,background:'rgba(0,0,0,.6)',opacity:0,transition:'opacity .2s',display:'flex',flexDirection:'column',justifyContent:'flex-end',padding:12,pointerEvents:'none'}}><span style={{color:'#fff',fontSize:11,fontWeight:600}}>{departureLabel(group.lot)}</span><span style={{color:'#E4E4E7',fontSize:11}}>{group.lot.activity_name}</span></div>}
           <button aria-label="Acciones de imagen" aria-expanded={menuOpen} onClick={event=>{event.stopPropagation();setOpenMediaMenu(menuOpen?null:item.id);}} style={{position:'absolute',right:8,top:8,zIndex:7,width:32,height:32,display:'grid',placeItems:'center',border:'1px solid rgba(148,163,184,.35)',borderRadius:'50%',background:'rgba(255,255,255,.94)',color:'#334155',cursor:'pointer',boxShadow:'0 2px 6px rgba(15,23,42,.16)'}}><MoreVertical size={18}/></button>

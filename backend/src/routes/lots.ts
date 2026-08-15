@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { fileTypeFromFile } from 'file-type';
 import type { PoolClient } from 'pg';
-import { assertDepartureAccess, requireRoles, requirePermission } from '../auth.js';
+import { assertDepartureAccess, requireAdmin, requireRoles, requirePermission } from '../auth.js';
 import { config, paths } from '../config.js';
 import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
@@ -129,11 +129,12 @@ lotsRouter.get('/', requirePermission('lots','view'), asyncHandler(async (req, r
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
   if(req.query.status && req.user!.role!=='PARENT'){values.push(z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).parse(req.query.status));where+=` AND v.status=$${values.length}`;}
   const visible=req.user!.role==='PARENT'?'l.current_published_version_id':'(SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1)';
+  const auditSummary=req.user!.isAdmin?'v.submitted_at,v.created_at version_created_at':'NULL::timestamptz submitted_at,NULL::timestamptz version_created_at';
   const orderBy=req.query.status==='PENDING'?'COALESCE(v.submitted_at,v.created_at) ASC':'l.event_date DESC,v.created_at DESC';
   values.push(pageSize,(page-1)*pageSize); const limit=values.length-1,offset=values.length;
   const result=await query(`SELECT l.id,l.event_date,l.activity_id,d.id departure_id,d.name departure_name,d.destination departure_destination,d.type departure_type,d.public_code departure_public_code,
     d.name school_name,NULL::uuid school_id,COALESCE(a.name,'General') activity_name,COALESCE(NULLIF(l.title,''),a.name,'General') album_name,''::text shift_name,
-    v.id version_id,v.version_number,v.status,v.submitted_at,v.created_at version_created_at,
+    v.id version_id,v.version_number,v.status,${auditSummary},
     COUNT(DISTINCT m.id) FILTER (WHERE m.status <> 'UPLOADING')::int approved_count,
     COALESCE(array_agg(DISTINCT s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names,
     u.name created_by_name,l.created_by created_by_id
@@ -144,10 +145,20 @@ lotsRouter.get('/', requirePermission('lots','view'), asyncHandler(async (req, r
     ${where} GROUP BY l.id,l.activity_id,d.id,a.id,v.id,u.id ORDER BY ${orderBy} LIMIT $${limit} OFFSET $${offset}`,values);
   res.json({items:result.rows,page,pageSize});
 }));
+lotsRouter.get('/:id/upload-audit', requireAdmin, asyncHandler(async(req,res)=>{
+  const lot=await loadLot(param(req.params.id));
+  const version=await query<{versionId:string;versionCreatedAt:Date;submittedAt:Date|null;firstUploadedAt:Date|null;lastUploadedAt:Date|null}>(`SELECT v.id AS "versionId",v.created_at AS "versionCreatedAt",v.submitted_at AS "submittedAt",
+    MIN(m.created_at) FILTER (WHERE m.status <> 'UPLOADING') AS "firstUploadedAt",
+    MAX(m.created_at) FILTER (WHERE m.status <> 'UPLOADING') AS "lastUploadedAt"
+    FROM lot_versions v LEFT JOIN media_assets m ON m.lot_version_id=v.id WHERE v.id=$1 GROUP BY v.id`,[lot.latest_version_id]);
+  if(!version.rowCount) throw new AppError(404,'LOT_VERSION_NOT_FOUND','Versión de lote no encontrada');
+  const items=await query<{mediaId:string;uploadedAt:Date}>(`SELECT id AS "mediaId",created_at AS "uploadedAt" FROM media_assets WHERE lot_version_id=$1 AND status <> 'UPLOADING' ORDER BY created_at,id`,[version.rows[0].versionId]);
+  res.json({summary:version.rows[0],items:items.rows});
+}));
 lotsRouter.get('/:id', requirePermission('lots','view'), asyncHandler(async(req,res)=>{
   const lot=await loadLot(param(req.params.id)); await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR','PARENT']);
   const versionId=req.user!.role==='PARENT'?lot.current_published_version_id:lot.latest_version_id; if(!versionId) throw new AppError(404,'LOT_NOT_PUBLISHED','No hay una versión publicada');
-  const [version,media]=await Promise.all([query('SELECT * FROM lot_versions WHERE id=$1',[versionId]),query(`SELECT m.id,m.kind,m.status,m.original_name,COALESCE(m.delivery_mime_type,m.mime_type) mime_type,COALESCE(m.delivery_size_bytes,m.size_bytes) size_bytes,m.width,m.height,m.duration_seconds,m.sort_order,m.created_at,m.created_at AS uploaded_at,m.purge_after,m.watermark_status,m.watermark_error,u.name AS uploaded_by_name FROM media_assets m LEFT JOIN users u ON u.id=m.uploaded_by WHERE m.lot_version_id=$1 AND m.status <> 'UPLOADING' AND ($2 <> 'PARENT' OR m.status='APPROVED') ORDER BY m.sort_order,m.created_at`,[versionId,req.user!.role])]);
+  const [version,media]=await Promise.all([query('SELECT id,version_number,status FROM lot_versions WHERE id=$1',[versionId]),query(`SELECT m.id,m.kind,m.status,m.original_name,COALESCE(m.delivery_mime_type,m.mime_type) mime_type,COALESCE(m.delivery_size_bytes,m.size_bytes) size_bytes,m.width,m.height,m.duration_seconds,m.sort_order,m.purge_after,m.watermark_status,m.watermark_error,u.name AS uploaded_by_name FROM media_assets m LEFT JOIN users u ON u.id=m.uploaded_by WHERE m.lot_version_id=$1 AND m.status <> 'UPLOADING' AND ($2 <> 'PARENT' OR m.status='APPROVED') ORDER BY m.sort_order,m.created_at`,[versionId,req.user!.role])]);
   res.json({lot,version:version.rows[0],media:media.rows});
 }));
 lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','create'),asyncHandler(async(req,res)=>{
