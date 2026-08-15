@@ -370,8 +370,9 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   const [copiedOnlyCode,setCopiedOnlyCode]=useState<string|null>(null);
   const [editingLot,setEditingLot]=useState<LotSummary|null>(null);
   const [addingToLot,setAddingToLot]=useState<LotSummary|null>(null);
-  const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:'',status:''});
+  const [editForm,setEditForm]=useState({departureId:'',activityId:'',albumName:'',eventDate:''});
   const [editBusy,setEditBusy]=useState(false);
+  const [submissionBusyId,setSubmissionBusyId]=useState<string|null>(null);
   const [departuresList,setDeparturesList]=useState<Array<{id:string;name:string;type:string}>>([]);
   const [activitiesList,setActivitiesList]=useState<Array<{id:string;name:string}>>([]);
 
@@ -400,7 +401,6 @@ export function GalleryView({ user }: { user?: SessionUser }) {
       activityId: lot.activity_id ?? '',
       albumName: lot.album_name || lot.activity_name,
       eventDate: lot.event_date.slice(0, 10),
-      status: lot.status,
     });
   };
 
@@ -414,7 +414,6 @@ export function GalleryView({ user }: { user?: SessionUser }) {
         activityId: editForm.activityId || null,
         albumName: editForm.albumName,
         eventDate: editForm.eventDate,
-        status: editForm.status,
       });
       const data = await api.lots();
       setLots(data.items);
@@ -436,13 +435,26 @@ export function GalleryView({ user }: { user?: SessionUser }) {
   const displayedGroups=useMemo(()=>openedLot?groups.filter(group=>group.lot.id===openedLot):groups,[groups,openedLot]);
   const filesForDisplay=(group:typeof groups[number])=>{
     if(group.lot.status==='PENDING') return group.files.filter(file=>file.status==='READY'||(showRejected&&file.status==='REJECTED'));
+    if(group.lot.status==='UPLOADING') return group.files.filter(file=>file.status==='READY'||(showRejected&&file.status==='REJECTED'));
     return showRejected?group.files.filter(file=>file.status==='APPROVED'||file.status==='REJECTED'):group.files.filter(file=>file.status==='APPROVED');
   };
   const visible=useMemo(()=>displayedGroups.flatMap(filesForDisplay),[displayedGroups,openedLot,showRejected]);
   const selectedItem=selected===null?null:visible[selected]??null;
   const currentLot=groups.find(group=>group.lot.id===activeLot)??groups.find(group=>group.lot.id===openedLot)??groups[0];
   const currentRejected=currentLot?.files.filter(file=>file.status==='REJECTED')??[];
+  const currentErrors=currentLot?.files.filter(file=>file.status==='ERROR')??[];
   const nextPurgeDays=currentRejected.length?Math.min(...currentRejected.map(file=>daysUntilPurge(file.purge_after))):0;
+
+  const submitForModeration = async (lot: LotSummary) => {
+    setSubmissionBusyId(lot.id); setError('');
+    try {
+      await api.submitLot(lot.id);
+      const data=await api.lots();
+      setLots(data.items);
+    } catch (reason: any) {
+      setError(reason.message || 'No se pudo enviar el lote a moderación.');
+    } finally { setSubmissionBusyId(null); }
+  };
 
   useEffect(()=>{const close=()=>{setOpenMediaMenu(null);setOpenLotMenu(null);};document.addEventListener('click',close);return()=>document.removeEventListener('click',close);},[]);
 
@@ -550,6 +562,11 @@ export function GalleryView({ user }: { user?: SessionUser }) {
               </div>
 
               <div className="lot-actions">
+                {lot.status === 'UPLOADING' && canManage && (
+                  <button className="lot-action lot-action-add" disabled={submissionBusyId===lot.id} onClick={()=>void submitForModeration(lot)}>
+                    <Check size={14}/> {submissionBusyId===lot.id?'Enviando…':'Enviar a moderación'}
+                  </button>
+                )}
                 {(lot.status === 'DRAFT' || lot.status === 'PENDING') && (user?.isAdmin || user?.role === 'ADMIN' || !!(user?.permissions as any)?.lots?.create) && (
                   <button className="lot-action lot-action-add" onClick={()=>setAddingToLot(lot)}>
                     <Upload size={14}/> Añadir fotos
@@ -597,6 +614,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
           <ArrowLeft size={16}/> Volver a la lista
         </button>
         <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap',justifyContent:'flex-end'}}>
+          {currentLot.lot.status==='UPLOADING'&&canManage&&<button disabled={submissionBusyId===currentLot.lot.id} onClick={()=>void submitForModeration(currentLot.lot)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#1A4B77',color:'#fff',border:0,borderRadius:7,fontSize:12,fontWeight:700,cursor:submissionBusyId===currentLot.lot.id?'wait':'pointer',whiteSpace:'nowrap',opacity:submissionBusyId===currentLot.lot.id ? .7 : 1}}><Check size={14}/>{submissionBusyId===currentLot.lot.id?'Enviando…':'Enviar a moderación'}</button>}
           {(currentLot.lot.status==='DRAFT'||currentLot.lot.status==='PENDING')&&(user?.isAdmin||user?.role==='ADMIN'||!!(user?.permissions as any)?.lots?.create)&&<button onClick={()=>setAddingToLot(currentLot.lot)} style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#fff',color:'#1A4B77',border:'1px solid #B9CAE0',borderRadius:7,fontSize:12,fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}}><Upload size={14}/> Añadir fotos</button>}
           <button onClick={()=>downloadLot(currentLot)} className="lot-download-btn" style={{display:'inline-flex',alignItems:'center',gap:6,padding:'8px 13px',background:'#F4F4F5',color:'#1A4B77',border:'1px solid #DCE3EB',borderRadius:7,fontSize:12,fontWeight:600,cursor:'pointer',whiteSpace:'nowrap'}}>
             <Download size={14}/> Descargar lote
@@ -627,6 +645,7 @@ export function GalleryView({ user }: { user?: SessionUser }) {
         </p>
       </div>
     </section>}
+    {openedLot&&currentLot&&currentLot.lot.status==='UPLOADING'&&<div style={{margin:'0 0 20px',padding:'14px 16px',background:'#EFF6FF',border:'1px solid #BFDBFE',borderRadius:10,color:'#1E40AF',fontSize:13,lineHeight:1.45}}><strong>Este lote todavía no fue enviado a moderación.</strong> Los archivos listos se muestran abajo. Usá “Enviar a moderación” cuando no queden cargas ni errores.{currentErrors.length>0&&<div style={{marginTop:7,color:'#B91C1C'}}>{currentErrors.length} {currentErrors.length===1?'archivo tiene':'archivos tienen'} error: {currentErrors.slice(0,5).map(file=>file.original_name).join(', ')}{currentErrors.length>5?` y ${currentErrors.length-5} más`:''}.</div>}</div>}
     {openedLot&&currentLot&&currentRejected.length>0&&<div className="lot-rejected-banner" style={{display:'flex',flexDirection:'column',gap:12,margin:'0 0 20px',padding:'14px 16px',background:'#FFF7ED',border:'1px solid #FDBA74',borderRadius:10}}>
       <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
         <div style={{width:32,height:32,borderRadius:'50%',display:'grid',placeItems:'center',background:'#FEE2E2',color:'#DC2626',fontWeight:800,flexShrink:0,marginTop:2}}>!</div>
@@ -675,15 +694,6 @@ export function GalleryView({ user }: { user?: SessionUser }) {
           </select>
         </label>
         <Field label="Fecha del evento" type="date" value={editForm.eventDate} onChange={val=>setEditForm({...editForm,eventDate:val})}/>
-        <label style={{display:'grid',gap:7,fontSize:13,fontWeight:600}}>
-          Estado del lote
-          <select value={editForm.status} onChange={e=>setEditForm({...editForm,status:e.target.value})} style={input}>
-            <option value="PUBLISHED">Publicado</option>
-            <option value="PENDING">Pendiente de moderación</option>
-            <option value="DRAFT">Borrador</option>
-            <option value="REJECTED">Descartado</option>
-          </select>
-        </label>
       </Modal>
     )}
   </div>;

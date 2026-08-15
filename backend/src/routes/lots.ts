@@ -5,6 +5,7 @@ import multer from 'multer';
 import { Router } from 'express';
 import { z } from 'zod';
 import { fileTypeFromFile } from 'file-type';
+import type { PoolClient } from 'pg';
 import { assertDepartureAccess, requireRoles, requirePermission } from '../auth.js';
 import { config, paths } from '../config.js';
 import { query, transaction } from '../db.js';
@@ -20,7 +21,7 @@ const disk = multer.diskStorage({ destination: (_req, _file, done) => { void des
 const upload = multer({ storage: disk, limits: { fileSize: Math.max(config.MAX_FILE_SIZE_MB, config.MAX_VIDEO_FILE_SIZE_MB) * 1024 * 1024, files: 1 } });
 const albumNameSchema = z.string().trim().min(1).max(160);
 const createSchema = z.object({ departureId: z.string().uuid(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date(), albumName: albumNameSchema.optional() });
-const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional(), status: z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).optional() });
+const updateSchema = z.object({ albumName: albumNameSchema.optional(), departureId: z.string().uuid().optional(), activityId: z.string().uuid().optional().nullable(), eventDate: z.string().date().optional() });
 const moderationSchema = z.object({ action: z.enum(['reject', 'restore']) });
 // Se valida por la firma real del archivo (file-type), no por su extensión.
 const accepted = new Map<string, 'IMAGE' | 'VIDEO'>([
@@ -69,6 +70,40 @@ async function uploadableVersion(lotId: string) {
   return version;
 }
 async function assertDepartureActive(id: string) { const result=await query('SELECT 1 FROM departures WHERE id=$1 AND active', [id]); if(!result.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida est? archivada o no existe'); }
+
+type SubmissionState = { total: number; ready: number; uploading: number; errors: number; blocked_names: string[] };
+async function submissionState(client: PoolClient, versionId: string): Promise<SubmissionState> {
+  const result = await client.query<SubmissionState>(`SELECT
+    count(*)::int AS total,
+    count(*) FILTER (WHERE status='READY')::int AS ready,
+    count(*) FILTER (WHERE status='UPLOADING')::int AS uploading,
+    count(*) FILTER (WHERE status='ERROR')::int AS errors,
+    COALESCE(array_agg(original_name ORDER BY created_at) FILTER (WHERE status IN ('UPLOADING','ERROR')), ARRAY[]::varchar[]) AS blocked_names
+    FROM media_assets WHERE lot_version_id=$1`, [versionId]);
+  return result.rows[0];
+}
+
+async function submitVersion(client: PoolClient, versionId: string, actorId: string, source: 'REQUESTED'|'AUTO'): Promise<SubmissionState> {
+  const version = await client.query<{ status: string; submitted_at: Date | null }>('SELECT status,submitted_at FROM lot_versions WHERE id=$1 FOR UPDATE', [versionId]);
+  if (!version.rowCount) throw new AppError(404, 'LOT_VERSION_NOT_FOUND', 'Versión de lote no encontrada');
+  if (version.rows[0].status === 'PENDING') return submissionState(client, versionId);
+  const state = await submissionState(client, versionId);
+  if (!state.total) throw new AppError(400, 'EMPTY_LOT', 'El lote no tiene archivos');
+  if (source === 'REQUESTED') await client.query('UPDATE lot_versions SET submitted_at=now(),updated_at=now() WHERE id=$1', [versionId]);
+  if (state.uploading || state.errors) return state;
+  if (!state.ready) throw new AppError(400, 'EMPTY_LOT', 'El lote no tiene archivos listos');
+  if (source === 'AUTO' && !version.rows[0].submitted_at) return state;
+  await client.query(`UPDATE lot_versions SET status='PENDING',submitted_at=COALESCE(submitted_at,now()),updated_at=now() WHERE id=$1`, [versionId]);
+  await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,\'lot_version\',$3,$4)', [actorId, source === 'AUTO' ? 'LOT_SUBMISSION_AUTO_COMPLETED' : 'LOT_SUBMITTED_FOR_MODERATION', versionId, JSON.stringify({ ...state, source })]);
+  return state;
+}
+
+function blockedSubmissionError(state: SubmissionState) {
+  const labels = state.blocked_names.slice(0, 5).join(', ');
+  const more = state.blocked_names.length > 5 ? ` y ${state.blocked_names.length - 5} más` : '';
+  const details = [state.uploading ? `${state.uploading} cargando` : '', state.errors ? `${state.errors} con error` : ''].filter(Boolean).join(' y ');
+  return new AppError(409, 'LOT_SUBMISSION_BLOCKED', `El lote no puede enviarse a moderación: hay ${details}${labels ? ` (${labels}${more})` : ''}.`);
+}
 
 export const lotsRouter = Router();
 lotsRouter.get('/my-schools', asyncHandler(async (req, res) => {
@@ -135,14 +170,6 @@ lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('l
     if(input.departureId!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET departure_id=$1,updated_at=now() WHERE id=$2',[input.departureId,lot.id]);
     if(input.activityId!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET activity_id=$1,updated_at=now() WHERE id=$2',[input.activityId||null,lot.id]);
     if(input.eventDate!==undefined && req.user!.role==='ADMIN') await client.query('UPDATE lots SET event_date=$1,updated_at=now() WHERE id=$2',[input.eventDate,lot.id]);
-    if(input.status!==undefined && req.user!.role==='ADMIN'){
-      const version=await client.query<{id:string}>('SELECT id FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
-      if(version.rowCount){
-        await client.query('UPDATE lot_versions SET status=$1,updated_at=now() WHERE id=$2',[input.status,version.rows[0].id]);
-        if(input.status==='PUBLISHED') await client.query('UPDATE lots SET current_published_version_id=$1 WHERE id=$2',[version.rows[0].id,lot.id]);
-        else await client.query('UPDATE lots SET current_published_version_id=NULL WHERE id=$2',[lot.id]);
-      }
-    }
   });
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_UPDATED','lot',lot.id,JSON.stringify(input)]);
   res.json({success:true});
@@ -191,6 +218,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
           VALUES($1,'VIDEO',$2,$3,$4,$5,$6,'READY','QUEUED',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$7) RETURNING id`,[version.id,file.originalname,mimeType,file.size,checksum,req.user!.id,originalId]);
         await client.query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at) VALUES($1,'QUEUED',now()) ON CONFLICT(media_asset_id) DO UPDATE SET status='QUEUED',available_at=now(),error=NULL,updated_at=now()`,[created.rows[0].id]);
         await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[originals,version.id]);
+        await submitVersion(client, version.id, req.user!.id, 'AUTO');
         await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'VIDEO_UPLOADED_ORIGINAL','media_asset',created.rows[0].id,JSON.stringify({lotId:lot.id,lotVersionId:version.id,originalName:file.originalname,sizeBytes:file.size})]);
         return created.rows[0];
       });
@@ -220,6 +248,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
       if(!current || !['DRAFT','UPLOADING','PENDING'].includes(current.status)) throw new AppError(409,'LOT_NOT_EDITABLE','El lote cambió de estado antes de finalizar la carga');
       const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,delivery_mime_type,size_bytes,delivery_size_bytes,delivery_name,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id,delivery_drive_file_id,thumbnail_drive_file_id,thumbnail_mime_type,thumbnail_size_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'READY','READY',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$11,$11,$12,$13,$14) RETURNING id`,[version.id,kind,file.originalname,mimeType,rendered.mimeType,file.size,stat.size,rendered.name,checksum,req.user!.id,driveFileId,thumbnailId,thumbnail?.mimeType??null,thumbnailSize?.size??null]);
       await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[folder,version.id]);
+      await submitVersion(client, version.id, req.user!.id, 'AUTO');
       await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'MEDIA_UPLOADED','media_asset',created.rows[0].id,JSON.stringify({lotId:lot.id,lotVersionId:version.id,originalName:file.originalname,kind,sizeBytes:file.size,addedWhilePending:current.status==='PENDING'})]);
       return created.rows[0];
     });
@@ -231,7 +260,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     if(thumbnailPath) await fs.rm(thumbnailPath,{force:true}).catch(()=>undefined);
   }
 }));
-lotsRouter.post('/:id/submit',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);if(lot.latest_status==='PENDING')return res.status(204).end();const version=await editableVersion(lot.id);const pending=await query(`SELECT count(*)::int total,COUNT(*) FILTER(WHERE status='READY')::int ready,COUNT(*) FILTER(WHERE status='UPLOADING')::int processing FROM media_assets WHERE lot_version_id=$1`,[version.id]);const state=pending.rows[0] as {total:number;ready:number;processing:number};if(!state.total)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos');if(state.processing){await query(`UPDATE lot_versions SET submitted_at=now() WHERE id=$1`,[version.id]);return res.status(204).end();}if(!state.ready)throw new AppError(400,'EMPTY_LOT','El lote no tiene archivos listos');await query(`UPDATE lot_versions SET status='PENDING',submitted_at=now() WHERE id=$1`,[version.id]);res.status(204).end();}));
+lotsRouter.post('/:id/submit',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);if(lot.latest_status==='PENDING')return res.status(204).end();const version=await editableVersion(lot.id);const state=await transaction(client=>submitVersion(client,version.id,req.user!.id,'REQUESTED'));if(state.uploading||state.errors){await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,\'LOT_SUBMISSION_BLOCKED\',\'lot_version\',$2,$3)',[req.user!.id,version.id,JSON.stringify(state)]);throw blockedSubmissionError(state);}res.status(204).end();}));
 lotsRouter.post('/:id/approve',requireRoles('ADMIN','COORDINATOR'),requirePermission('moderation','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));if(req.user!.role==='COORDINATOR') await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);await transaction(async client=>{const version=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1 FOR UPDATE',[lot.id]);if(!version.rows[0]||version.rows[0].status!=='PENDING')throw new AppError(409,'LOT_NOT_PENDING','El lote no está pendiente de moderación');const ready=await client.query(`SELECT 1 FROM media_assets WHERE lot_version_id=$1 AND status='READY' LIMIT 1`,[version.rows[0].id]);if(ready.rowCount){await client.query(`UPDATE media_assets SET status='APPROVED',moderated_by=$1,moderated_at=now() WHERE lot_version_id=$2 AND status='READY'`,[req.user!.id,version.rows[0].id]);await client.query(`UPDATE lot_versions SET status='PUBLISHED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);await client.query('UPDATE lots SET current_published_version_id=$1 WHERE id=$2',[version.rows[0].id,lot.id]);}else await client.query(`UPDATE lot_versions SET status='REJECTED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);});res.status(204).end();}));
 lotsRouter.post('/:id/reject',requireRoles('ADMIN','COORDINATOR'),requirePermission('moderation','edit'),asyncHandler(async(req,res)=>{const lot=await loadLot(param(req.params.id));if(req.user!.role==='COORDINATOR') await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);const version=await query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);if(!version.rows[0]||version.rows[0].status!=='PENDING')throw new AppError(409,'LOT_NOT_PENDING','El lote no está pendiente de moderación');await transaction(async client=>{await client.query(`UPDATE media_assets SET status='REJECTED',moderated_by=$1,moderated_at=now(),purge_after=now()+interval '30 days' WHERE lot_version_id=$2 AND status='READY'`,[req.user!.id,version.rows[0].id]);await client.query(`UPDATE lot_versions SET status='REJECTED',reviewed_by=$1,reviewed_at=now() WHERE id=$2`,[req.user!.id,version.rows[0].id]);});res.status(204).end();}));
 lotsRouter.patch('/media/:mediaId/moderation',requireRoles('ADMIN','COORDINATOR'),requirePermission('moderation','edit'),asyncHandler(async(req,res)=>{const input=moderationSchema.parse(req.body); if(req.user!.role==='COORDINATOR'){const access=await query('SELECT l.departure_id FROM media_assets m JOIN lot_versions v ON v.id=m.lot_version_id JOIN lots l ON l.id=v.lot_id WHERE m.id=$1',[param(req.params.mediaId)]); if(!access.rowCount) throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado'); await assertDepartureAccess(req.user!,access.rows[0].departure_id,['COORDINATOR']);}const status=input.action==='reject'?'REJECTED':'READY';const result=await query(`UPDATE media_assets m SET status=CASE WHEN $1::media_status='REJECTED'::media_status THEN 'REJECTED'::media_status WHEN EXISTS(SELECT 1 FROM lot_versions v WHERE v.id=m.lot_version_id AND v.status='PUBLISHED') THEN 'APPROVED'::media_status ELSE 'READY'::media_status END,moderated_by=$2,moderated_at=now(),purge_after=CASE WHEN $1::media_status='REJECTED'::media_status THEN now()+interval '30 days' ELSE NULL END WHERE m.id=$3 RETURNING id,status`,[status,req.user!.id,param(req.params.mediaId)]);if(!result.rowCount)throw new AppError(404,'MEDIA_NOT_FOUND','Archivo no encontrado');res.status(204).end();}));
