@@ -38,6 +38,22 @@ staging o producción.
 La API guarda IDs de Drive, no enlaces públicos. Todo preview, reproducción y
 descarga pasa por autorización de la API.
 
+## Producción: proxy y cargas de video
+
+El Nginx público del VPS, si existe delante del contenedor en el puerto 8888,
+también debe permitir el mismo tamaño y tiempo de carga que la aplicación. En
+el bloque `server` del sitio configurá:
+
+```nginx
+client_max_body_size 1g;
+proxy_send_timeout 30m;
+proxy_read_timeout 30m;
+send_timeout 30m;
+```
+
+Sin ese ajuste el proxy público rechaza los videos antes de que lleguen a la
+API (normalmente con HTTP 413), aunque el backend permita el archivo.
+
 ## Comandos de backend
 
 ```bash
