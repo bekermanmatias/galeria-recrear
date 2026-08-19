@@ -682,18 +682,13 @@ function Album({
     setDownloading(true);
     setDownloadError('');
     try {
-      const blob = await publicDepartureApi.downloadZip(code, ids);
-      const url = URL.createObjectURL(blob);
+      const url = publicDepartureApi.downloadZipUrl(code, ids);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${album.activity}.zip`;
-      document.body.appendChild(a);
       a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      window.setTimeout(() => setDownloading(false), 800);
     } catch (error) {
       setDownloadError(error instanceof Error ? error.message : 'No se pudo preparar la descarga.');
-    } finally {
       setDownloading(false);
     }
   };

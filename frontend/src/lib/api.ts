@@ -168,6 +168,7 @@ export const publicDepartureApi = {
   departure: (code: string) => publicRequest<{ departure: PublicDeparture; items: LotSummary[] }>(`/public/departures/${encodeURIComponent(code)}`),
   lot: (code: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/departures/${encodeURIComponent(code)}/lots/${lotId}`),
   downloadZip: (code: string, mediaIds: string[]) => publicRequest<Blob>(`/public/departures/${encodeURIComponent(code)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  downloadZipUrl: (code: string, mediaIds: string[]) => `${API_URL}/public/departures/${encodeURIComponent(code)}/downloads/zip?mediaIds=${encodeURIComponent(mediaIds.join(','))}`,
   contentUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/content`,
   thumbnailUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/thumbnail`,
   downloadUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/download`,
