@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, Download, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, LoaderCircle, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
+import { downloadFile, fetchDownload } from '../../lib/download';
 
 interface LightboxProps {
   src: string;
@@ -49,16 +50,7 @@ export default function Lightbox({
     try {
       setDownloading(true);
       setMessage('');
-      const response = await fetch(downloadUrl || src, { credentials: 'include' });
-      if (!response.ok) throw new Error();
-      const objectUrl = URL.createObjectURL(await response.blob());
-      const link = document.createElement('a');
-      link.href = objectUrl;
-      link.download = downloadName || alt || `recrear-${Date.now()}`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+      await downloadFile(downloadUrl || src, downloadName || alt || `recrear-${Date.now()}`);
     } catch {
       setMessage('No se pudo descargar');
     } finally {
@@ -71,9 +63,7 @@ export default function Lightbox({
     try {
       setSharing(true);
       setMessage('');
-      const response = await fetch(downloadUrl || src, { credentials: 'include' });
-      if (!response.ok) throw new Error();
-      const blob = await response.blob();
+      const blob = await fetchDownload(downloadUrl || src);
       const file = new File([blob], downloadName || alt || `recrear-${Date.now()}`, { type: blob.type });
       const shareData = { files: [file], title: isVideo ? 'Video de Recrear' : 'Foto de Recrear' };
       if (navigator.share && (!navigator.canShare || navigator.canShare(shareData))) {
@@ -196,7 +186,7 @@ export default function Lightbox({
       <div onClick={event => event.stopPropagation()} style={{ position: 'absolute', bottom: compact ? 12 : 28, left: '50%', transform: 'translateX(-50%)', maxWidth: 'calc(100% - 24px)', display: 'flex', alignItems: 'center', gap: compact ? 3 : 6, padding: compact ? 6 : 8, borderRadius: 12, background: 'rgba(24,24,27,.88)', backdropFilter: 'blur(10px)', boxShadow: '0 10px 26px rgba(0,0,0,.26)', color: '#fff', whiteSpace: 'nowrap' }}>
         {!isVideo && <><button onClick={() => setZoom(value => Math.max(.5, value - .25))} aria-label="Alejar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none' }}><ZoomOut size={18}/></button><span style={{ fontSize: 12, minWidth: 42, textAlign: 'center', fontWeight: 700 }}>{Math.round(zoom * 100)}%</span><button onClick={() => setZoom(value => Math.min(4, value + .25))} aria-label="Acercar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none' }}><ZoomIn size={18}/></button></>}
         {info && <span style={{ borderLeft: !isVideo ? '1px solid rgba(255,255,255,.18)' : 0, padding: compact ? '0 5px' : '0 8px', fontSize: 12, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis' }}>{info}</span>}
-        {<><button onClick={share} disabled={sharing} title="Compartir" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: sharing ? .6 : 1 }}><Share2 size={18}/></button><button onClick={download} disabled={downloading} title="Descargar" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: downloading ? .6 : 1 }}><Download size={18}/></button></>}
+        {<><button onClick={share} disabled={sharing} title="Compartir" style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: sharing ? .6 : 1 }}><Share2 size={18}/></button><button onClick={download} disabled={downloading} title={downloading ? 'Preparando descarga…' : 'Descargar'} aria-busy={downloading} style={{ ...iconButton, width: 34, height: 34, background: 'transparent', boxShadow: 'none', opacity: downloading ? .6 : 1, cursor: downloading ? 'wait' : 'pointer' }}>{downloading ? <LoaderCircle size={18} className="download-spinner"/> : <Download size={18}/>}</button></>}
         {actions}
       </div>
       {message && <div role="status" style={{ position: 'absolute', bottom: compact ? 66 : 84, left: '50%', transform: 'translateX(-50%)', padding: '7px 10px', borderRadius: 7, background: 'rgba(15,23,42,.9)', color: '#fff', fontSize: 12 }}>{message}</div>}
