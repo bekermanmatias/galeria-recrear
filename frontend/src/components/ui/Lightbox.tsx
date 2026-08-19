@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Download, LoaderCircle, Share2, X, ZoomIn, ZoomOut } from 'lucide-react';
-import { downloadFile, fetchDownload } from '../../lib/download';
+import { downloadFile, fetchDownload, installDownloadFeedback } from '../../lib/download';
+
+installDownloadFeedback();
 
 interface LightboxProps {
   src: string;
