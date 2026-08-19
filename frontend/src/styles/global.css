@@ -51,6 +51,13 @@ h1, h2, h3, h4 {
   animation: download-spin .8s linear infinite;
 }
 
+button[aria-busy='true']::before {
+  content: '◌';
+  display: inline-block;
+  margin-right: 6px;
+  animation: download-spin .8s linear infinite;
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
