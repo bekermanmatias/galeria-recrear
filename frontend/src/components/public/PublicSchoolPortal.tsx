@@ -530,13 +530,12 @@ function AlbumView({
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [sharing, setSharing] = useState<string | null>(null);
   const zip = async (ids: string[]) => {
-    const blob = await publicGalleryApi.downloadZip(token, ids);
-    const url = URL.createObjectURL(blob);
+    const url = publicGalleryApi.downloadZipUrl(token, ids);
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = `${album.activity}.zip`;
+    document.body.appendChild(anchor);
     anchor.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    anchor.remove();
   };
   const share = async (item: Media) => {
     try {

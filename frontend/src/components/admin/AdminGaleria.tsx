@@ -560,13 +560,12 @@ function AlbumView({ album, onBack }: { album: Album; onBack: () => void }) {
     });
   const download = async (ids: string[]) => {
     if (!ids.length) return;
-    const blob = await api.downloadZip(ids);
-    const url = URL.createObjectURL(blob);
+    const url = api.downloadZipUrl(ids);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${album.activity}.zip`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
   };
   const share = async (item: Media) => {
     if (sharingId) return;

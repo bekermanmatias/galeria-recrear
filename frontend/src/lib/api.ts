@@ -159,6 +159,7 @@ export const publicGalleryApi = {
   school: (token: string) => publicRequest<{ school: { id: string; name: string }; items: LotSummary[] }>(`/public/${encodeURIComponent(token)}`),
   lot: (token: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/${encodeURIComponent(token)}/lots/${lotId}`),
   downloadZip: (token: string, mediaIds: string[]) => publicRequest<Blob>(`/public/${encodeURIComponent(token)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
+  downloadZipUrl: (token: string, mediaIds: string[]) => `${API_URL}/public/${encodeURIComponent(token)}/downloads/zip?mediaIds=${encodeURIComponent(mediaIds.join(','))}`,
   contentUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/content`,
   thumbnailUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/thumbnail`,
   downloadUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/download`,
