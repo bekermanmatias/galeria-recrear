@@ -1,5 +1,3 @@
-import { finishPendingDownloads } from './download';
-
 const API_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:3001/api/v1';
 
 export type Role = 'ADMIN' | 'COORDINATOR' | 'PARENT';
@@ -95,19 +93,12 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  try {
-    const response = await fetch(`${API_URL}${path}`, {
-      credentials: 'include',
-      headers: { ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init.headers },
-      ...init,
-    });
-    return await parseResponse<T>(response);
-  } catch (error) {
-    if (path.includes('/downloads/zip')) finishPendingDownloads(error instanceof Error ? error.message : undefined);
-    throw error;
-  } finally {
-    if (path.includes('/downloads/zip')) finishPendingDownloads();
-  }
+  const response = await fetch(`${API_URL}${path}`, {
+    credentials: 'include',
+    headers: { ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }), ...init.headers },
+    ...init,
+  });
+  return parseResponse<T>(response);
 }
 
 export async function publicRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -166,7 +157,7 @@ export const api = {
 export const publicGalleryApi = {
   school: (token: string) => publicRequest<{ school: { id: string; name: string }; items: LotSummary[] }>(`/public/${encodeURIComponent(token)}`),
   lot: (token: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/${encodeURIComponent(token)}/lots/${lotId}`),
-  downloadZip: async (token: string, mediaIds: string[]) => { try { return await publicRequest<Blob>(`/public/${encodeURIComponent(token)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }); } catch (error) { finishPendingDownloads(error instanceof Error ? error.message : undefined); throw error; } finally { finishPendingDownloads(); } },
+  downloadZip: (token: string, mediaIds: string[]) => publicRequest<Blob>(`/public/${encodeURIComponent(token)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
   contentUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/content`,
   thumbnailUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/thumbnail`,
   downloadUrl: (token: string, mediaId: string) => `${API_URL}/public/${encodeURIComponent(token)}/media/${mediaId}/download`,
@@ -176,7 +167,7 @@ export interface PublicDeparture { id: string; public_code: string; name: string
 export const publicDepartureApi = {
   departure: (code: string) => publicRequest<{ departure: PublicDeparture; items: LotSummary[] }>(`/public/departures/${encodeURIComponent(code)}`),
   lot: (code: string, lotId: string) => publicRequest<{ lot: LotSummary; media: Media[] }>(`/public/departures/${encodeURIComponent(code)}/lots/${lotId}`),
-  downloadZip: async (code: string, mediaIds: string[]) => { try { return await publicRequest<Blob>(`/public/departures/${encodeURIComponent(code)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }); } catch (error) { finishPendingDownloads(error instanceof Error ? error.message : undefined); throw error; } finally { finishPendingDownloads(); } },
+  downloadZip: (code: string, mediaIds: string[]) => publicRequest<Blob>(`/public/departures/${encodeURIComponent(code)}/downloads/zip`, { method: 'POST', body: JSON.stringify({ mediaIds }) }),
   contentUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/content`,
   thumbnailUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/thumbnail`,
   downloadUrl: (code: string, mediaId: string) => `${API_URL}/public/departures/${encodeURIComponent(code)}/media/${mediaId}/download`,
