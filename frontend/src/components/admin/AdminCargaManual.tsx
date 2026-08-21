@@ -8,9 +8,8 @@ type UploadStatus = 'queued' | 'uploading' | 'processing' | 'uploaded' | 'failed
 type UploadFile = { id:string; file:File; preview:string; isVideo:boolean; isHeic:boolean; status:UploadStatus; mediaId?:string; error?:string };
 const validName=/\.(jpe?g|jpe|jfif|png|heic|heif|dng|mp4|mov)$/i;
 const validTypes=new Set(['image/jpeg','image/pjpeg','image/png','image/heic','image/heif','image/x-adobe-dng','video/mp4','video/quicktime']);
-// Cada archivo se procesa con marca de agua y se envía al almacenamiento remoto.
-// Serializar evita saturar el procesamiento cuando se selecciona un lote grande.
-const MAX_PARALLEL_UPLOADS=1;
+// A small parallel window improves throughput while keeping the browser and storage stable.
+const MAX_PARALLEL_UPLOADS=3;
 const dateInput:React.CSSProperties={width:'100%',minWidth:0,height:44,padding:'0 16px',border:'1px solid #E4E4E7',background:'#fff',color:'#09090B',fontSize:16,fontFamily:'inherit',outline:'none',boxSizing:'border-box',borderRadius:6,WebkitAppearance:'none',appearance:'none'};
 const formatBytes=(bytes:number)=>bytes>=1024*1024?`${(bytes/(1024*1024)).toFixed(bytes>=10*1024*1024?0:1)} MB`:`${Math.max(1,Math.round(bytes/1024))} KB`;
 const CUSTOM_ACTIVITY = '__personalizada__';
@@ -50,7 +49,7 @@ export default function AdminCargaManual() {
     try {const lot=await api.createLot({departureId:departureItem.id,activityId:activityItem?.id ?? null,eventDate:date,albumName:albumName.trim()||undefined});
       if(failedFiles.length&&!pending.length){await Promise.all(failedFiles.map(async item=>{updateFile(item.id,{status:'processing',error:undefined});await api.retryWatermark(lot.lotId,item.mediaId!);}));}
       else {let cursor=0;let completed=0;let failed=0;const worker=async()=>{while(true){const item=pending[cursor++];if(!item)return;updateFile(item.id,{status:'uploading',error:undefined});try{const result=await api.uploadMedia(lot.lotId,item.file);updateFile(item.id,{status:'uploaded',mediaId:result.id});}catch(reason){failed+=1;updateFile(item.id,{status:'failed',error:reason instanceof Error?reason.message:'No se pudo subir'});}finally{completed+=1;setProgress({completed,total:pending.length});}}};await Promise.all(Array.from({length:Math.min(MAX_PARALLEL_UPLOADS,pending.length)},worker));if(failed){setMessage(failed+' archivo(s) no pudieron subirse. Revisá los archivos marcados en rojo y reintentá solo esos.');return;}}
-      await api.submitLot(lot.lotId);setFiles([]);setAlbumName('');setActivity('');setMessage('Carga completada y enviada a moderacion.');
+      await api.submitLot(lot.lotId);setFiles([]);setAlbumName('');setActivity('');setMessage('Carga recibida. El procesamiento y envío a moderación continúa en segundo plano.');
     }catch(reason){setMessage(reason instanceof Error?reason.message:'No se pudo cargar el lote.');}finally{setUploading(false);}
   };
   const current=files.find(item=>item.id===selected); const currentIndex=files.findIndex(item=>item.id===selected); const totalSize=files.reduce((sum,item)=>sum+item.file.size,0);

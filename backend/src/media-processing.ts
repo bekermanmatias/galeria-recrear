@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
+import type { PoolClient } from 'pg';
 import { transaction } from './db.js';
 import { query } from './db.js';
 import { paths } from './config.js';
@@ -24,8 +25,11 @@ function getWatermarkPath() {
 }
 
 const MAX_ATTEMPTS = 3;
-let running = false;
+let running = 0;
 let timer: NodeJS.Timeout | undefined;
+// Two workers keep the queue responsive without competing aggressively for CPU,
+// disk and remote storage.  The database lock makes this safe across instances.
+const WORKER_CONCURRENCY = 2;
 type Job = { id:string; attempts:number; media_asset_id:string; drive_file_id:string; mime_type:string; original_name:string; kind:'IMAGE'|'VIDEO'; version_number:number; departure_folder:string; lot_folder:string; };
 const safeName=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/-+/g,'-').replace(/^[-.]+|[-.]+$/g,'') || 'archivo';
 const outputName=(name:string,extension:string)=>safeName(name).replace(/\.[^.]+$/,'')+'-recrear.'+extension;
@@ -61,9 +65,9 @@ export async function createThumbnail(input: string, kind: 'IMAGE'|'VIDEO', orig
   return { path: target, mimeType: 'image/webp', name: outputName(originalName, 'webp') };
 }
 
-type VideoJob = {
+type MediaJob = {
   id: string; attempts: number; media_asset_id: string; drive_file_id: string; original_name: string;
-  mime_type: string; version_number: number; departure_folder: string; lot_folder: string;
+  mime_type: string; kind: 'IMAGE'|'VIDEO'; version_number: number; departure_folder: string; lot_folder: string;
 };
 
 const processingFile = (suffix: string) => path.join(paths.uploads, `video-process-${crypto.randomUUID()}${suffix}`);
@@ -91,14 +95,14 @@ export async function ensureVideoThumbnail(media: { id: string; drive_file_id: s
   }
 }
 
-async function claimVideoJob(): Promise<VideoJob | undefined> {
+async function claimMediaJob(): Promise<MediaJob | undefined> {
   return transaction(async client => {
-    const claimed = await client.query<VideoJob>(`SELECT j.id,j.attempts,j.media_asset_id,m.drive_file_id,m.original_name,m.mime_type,v.version_number,
+    const claimed = await client.query<MediaJob>(`SELECT j.id,j.attempts,j.media_asset_id,m.drive_file_id,m.original_name,m.mime_type,m.kind,v.version_number,
       regexp_replace(d.public_code || '-' || d.name || '-' || COALESCE(d.destination,''),'[\\\\/:*?"<>|]+','-','g') departure_folder,
       regexp_replace(l.event_date::text || '-' || COALESCE(NULLIF(l.title,''),a.name,'General') || '-' || left(l.id::text,8),'[\\\\/:*?"<>|]+','-','g') lot_folder
       FROM media_watermark_jobs j JOIN media_assets m ON m.id=j.media_asset_id JOIN lot_versions v ON v.id=m.lot_version_id
       JOIN lots l ON l.id=v.lot_id JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id
-      WHERE j.status='QUEUED' AND j.available_at <= now() AND m.kind='VIDEO' AND m.drive_file_id IS NOT NULL
+      WHERE j.status='QUEUED' AND j.available_at <= now() AND m.drive_file_id IS NOT NULL
       ORDER BY j.available_at,j.created_at FOR UPDATE SKIP LOCKED LIMIT 1`);
     const job = claimed.rows[0];
     if (!job) return undefined;
@@ -108,37 +112,47 @@ async function claimVideoJob(): Promise<VideoJob | undefined> {
   });
 }
 
-async function processVideoJob(job: VideoJob) {
+async function completeLotSubmission(client: PoolClient, mediaAssetId: string) {
+  await client.query(`UPDATE lot_versions v SET status='PENDING',submitted_at=COALESCE(v.submitted_at,now()),updated_at=now()
+    WHERE v.id=(SELECT lot_version_id FROM media_assets WHERE id=$1)
+      AND v.status IN ('DRAFT','UPLOADING') AND v.submitted_at IS NOT NULL
+      AND EXISTS (SELECT 1 FROM media_assets m WHERE m.lot_version_id=v.id AND m.status='READY')
+      AND NOT EXISTS (SELECT 1 FROM media_assets m WHERE m.lot_version_id=v.id AND m.status IN ('UPLOADING','ERROR'))`, [mediaAssetId]);
+}
+
+async function processMediaJob(job: MediaJob) {
   let input = '';
   let output = '';
   let thumbnailPath = '';
   try {
     await fs.mkdir(paths.uploads, { recursive: true });
     input = processingFile(path.extname(job.original_name) || '.video');
-    output = processingFile('.mp4');
     const storage = getStorage();
     await storage.download(job.drive_file_id, input);
-    await runFfmpeg(input, output);
-    const stat = await fs.stat(output);
     const folder = await storage.createVersionFolder({ departureFolder: job.departure_folder, lotFolder: job.lot_folder, version: job.version_number }, 'marcados');
-    const name = outputName(job.original_name, 'mp4');
-    const deliveryId = await storage.uploadOriginal({ path: output, filename: name, mimeType: 'video/mp4', parentId: folder });
-    const thumbnail = await createThumbnail(output, 'VIDEO', job.original_name);
+    const rendered = job.kind === 'VIDEO'
+      ? (output = processingFile('.mp4'), await runFfmpeg(input, output), { path: output, mimeType: 'video/mp4', name: outputName(job.original_name, 'mp4') })
+      : await processLocalMedia(input, 'IMAGE', job.original_name, job.mime_type);
+    if (job.kind === 'IMAGE') output = rendered.path;
+    const stat = await fs.stat(rendered.path);
+    const deliveryId = await storage.uploadOriginal({ path: rendered.path, filename: rendered.name, mimeType: rendered.mimeType, parentId: folder });
+    const thumbnail = await createThumbnail(rendered.path, job.kind, job.original_name);
     thumbnailPath = thumbnail?.path ?? '';
     const thumbnailId = thumbnail ? await storage.uploadOriginal({ path: thumbnail.path, filename: thumbnail.name, mimeType: thumbnail.mimeType, parentId: folder }) : null;
     const thumbnailSize = thumbnail ? await fs.stat(thumbnail.path) : null;
     await transaction(async client => {
-      await client.query(`UPDATE media_assets SET delivery_drive_file_id=$1,delivery_mime_type='video/mp4',delivery_size_bytes=$2,delivery_name=$3,thumbnail_drive_file_id=COALESCE($4,thumbnail_drive_file_id),thumbnail_mime_type=COALESCE($5,thumbnail_mime_type),thumbnail_size_bytes=COALESCE($6,thumbnail_size_bytes),watermark_status='READY',watermark_error=NULL,updated_at=now() WHERE id=$7`, [deliveryId, stat.size, name, thumbnailId, thumbnail?.mimeType ?? null, thumbnailSize?.size ?? null, job.media_asset_id]);
+      await client.query(`UPDATE media_assets SET status='READY',delivery_drive_file_id=$1,delivery_mime_type=$2,delivery_size_bytes=$3,delivery_name=$4,thumbnail_drive_file_id=COALESCE($5,thumbnail_drive_file_id),thumbnail_mime_type=COALESCE($6,thumbnail_mime_type),thumbnail_size_bytes=COALESCE($7,thumbnail_size_bytes),watermark_status='READY',watermark_error=NULL,updated_at=now() WHERE id=$8`, [deliveryId, rendered.mimeType, stat.size, rendered.name, thumbnailId, thumbnail?.mimeType ?? null, thumbnailSize?.size ?? null, job.media_asset_id]);
       await client.query(`UPDATE media_watermark_jobs SET status='DONE',completed_at=now(),error=NULL,updated_at=now() WHERE id=$1`, [job.id]);
+      await completeLotSubmission(client, job.media_asset_id);
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message.slice(0, 1000) : 'No se pudo procesar el video';
+    const message = error instanceof Error ? error.message.slice(0, 1000) : 'No se pudo procesar el archivo';
     const retry = job.attempts < MAX_ATTEMPTS;
     await transaction(async client => {
       await client.query(`UPDATE media_assets SET watermark_status=$1,watermark_error=$2,updated_at=now() WHERE id=$3`, [retry ? 'QUEUED' : 'FAILED', message, job.media_asset_id]);
       await client.query(`UPDATE media_watermark_jobs SET status=$1,error=$2,available_at=CASE WHEN $1='QUEUED' THEN now()+($3::text || ' seconds')::interval ELSE available_at END,completed_at=CASE WHEN $1='FAILED' THEN now() ELSE NULL END,updated_at=now() WHERE id=$4`, [retry ? 'QUEUED' : 'FAILED', message, Math.min(300, 15 * 2 ** Math.max(0, job.attempts - 1)), job.id]);
     });
-    console.error('Video processing failed; original remains available', { mediaAssetId: job.media_asset_id, message });
+    console.error('Media processing failed; original remains available', { mediaAssetId: job.media_asset_id, message });
   } finally {
     if (input) await fs.rm(input, { force: true }).catch(() => undefined);
     if (output) await fs.rm(output, { force: true }).catch(() => undefined);
@@ -146,22 +160,24 @@ async function processVideoJob(job: VideoJob) {
   }
 }
 
-async function drainVideoJobs() {
-  if (running) return;
-  running = true;
-  try { for (;;) { const job = await claimVideoJob(); if (!job) break; await processVideoJob(job); } }
-  catch (error) { console.error('Video processing worker failed', error); }
-  finally { running = false; }
+async function drainMediaJobs() {
+  if (running >= WORKER_CONCURRENCY) return;
+  running += 1;
+  try { for (;;) { const job = await claimMediaJob(); if (!job) break; await processMediaJob(job); } }
+  catch (error) { console.error('Media processing worker failed', error); }
+  finally { running -= 1; }
 }
 
-export function queueVideoProcessing() { void drainVideoJobs(); }
-async function enqueueVideosMissingThumbnails() {
+export function queueMediaProcessing() { for (let worker = 0; worker < WORKER_CONCURRENCY; worker += 1) void drainMediaJobs(); }
+// Kept as a compatibility alias for existing callers.
+export const queueVideoProcessing = queueMediaProcessing;
+async function enqueueIncompleteMedia() {
   await query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at)
     SELECT m.id,'QUEUED',now() FROM media_assets m
     -- También recupera videos que ya tienen miniatura pero nunca terminaron
     -- de generar su MP4 H.264 reproducible en el navegador.
-    WHERE m.kind='VIDEO' AND m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL
-      AND (m.thumbnail_drive_file_id IS NULL OR m.delivery_drive_file_id IS NULL)
+    WHERE m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL
+      AND (m.thumbnail_drive_file_id IS NULL OR m.delivery_drive_file_id IS NULL OR m.status='UPLOADING')
     ON CONFLICT(media_asset_id) DO UPDATE SET status=CASE WHEN media_watermark_jobs.status='DONE' THEN 'QUEUED' ELSE media_watermark_jobs.status END,available_at=CASE WHEN media_watermark_jobs.status='DONE' THEN now() ELSE media_watermark_jobs.available_at END,updated_at=now()`);
 }
-export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => void drainVideoJobs(), 15_000); void enqueueVideosMissingThumbnails().then(queueVideoProcessing).catch(error => console.error('Could not queue video thumbnails', error)); queueVideoProcessing(); }
+export function startMediaProcessingWorker() { if (!timer) timer = setInterval(() => queueMediaProcessing(), 15_000); void enqueueIncompleteMedia().then(queueMediaProcessing).catch(error => console.error('Could not queue incomplete media', error)); queueMediaProcessing(); }
