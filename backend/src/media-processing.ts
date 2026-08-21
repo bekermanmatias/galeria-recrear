@@ -102,7 +102,7 @@ async function claimMediaJob(): Promise<MediaJob | undefined> {
       regexp_replace(l.event_date::text || '-' || COALESCE(NULLIF(l.title,''),a.name,'General') || '-' || left(l.id::text,8),'[\\\\/:*?"<>|]+','-','g') lot_folder
       FROM media_watermark_jobs j JOIN media_assets m ON m.id=j.media_asset_id JOIN lot_versions v ON v.id=m.lot_version_id
       JOIN lots l ON l.id=v.lot_id JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id
-      WHERE j.status='QUEUED' AND j.available_at <= now() AND m.drive_file_id IS NOT NULL
+      WHERE j.status='QUEUED' AND j.available_at <= now() AND m.kind='VIDEO' AND m.drive_file_id IS NOT NULL
       ORDER BY j.available_at,j.created_at FOR UPDATE SKIP LOCKED LIMIT 1`);
     const job = claimed.rows[0];
     if (!job) return undefined;
@@ -174,15 +174,15 @@ export const queueVideoProcessing = queueMediaProcessing;
 async function enqueueIncompleteMedia() {
   // A deploy or process restart can interrupt a worker after it has claimed a
   // job. Those jobs have no active owner anymore, so make them eligible again.
-  await query(`UPDATE media_watermark_jobs SET status='QUEUED',available_at=now(),started_at=NULL,updated_at=now()
-    WHERE status='PROCESSING'`);
+  await query(`UPDATE media_watermark_jobs j SET status='QUEUED',available_at=now(),started_at=NULL,updated_at=now()
+    FROM media_assets m WHERE j.media_asset_id=m.id AND j.status='PROCESSING' AND m.kind='VIDEO'`);
   await query(`UPDATE media_assets SET watermark_status='QUEUED',watermark_error=NULL,updated_at=now()
-    WHERE watermark_status='PROCESSING' AND status='UPLOADING'`);
+    WHERE watermark_status='PROCESSING' AND status='UPLOADING' AND kind='VIDEO'`);
   await query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at)
     SELECT m.id,'QUEUED',now() FROM media_assets m
     -- También recupera videos que ya tienen miniatura pero nunca terminaron
     -- de generar su MP4 H.264 reproducible en el navegador.
-    WHERE m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL
+    WHERE m.kind='VIDEO' AND m.status <> 'DELETED' AND m.drive_file_id IS NOT NULL
       AND (m.thumbnail_drive_file_id IS NULL OR m.delivery_drive_file_id IS NULL OR m.status='UPLOADING')
     ON CONFLICT(media_asset_id) DO UPDATE SET status=CASE WHEN media_watermark_jobs.status='DONE' THEN 'QUEUED' ELSE media_watermark_jobs.status END,available_at=CASE WHEN media_watermark_jobs.status='DONE' THEN now() ELSE media_watermark_jobs.available_at END,updated_at=now()`);
 }

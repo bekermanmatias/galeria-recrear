@@ -217,26 +217,6 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
     const maxSizeMb=kind==='VIDEO'?config.MAX_VIDEO_FILE_SIZE_MB:config.MAX_FILE_SIZE_MB;
     if(file.size>maxSizeMb*1024*1024)throw new AppError(413,'FILE_TOO_LARGE',`El ${kind==='VIDEO'?'video':'archivo'} supera el límite de ${maxSizeMb} MB.`);
     const checksum=crypto.createHash('sha256').update(await fs.readFile(file.path)).digest('hex');
-    if (kind === 'IMAGE') {
-      // Persist the original first. The watermark and thumbnail are durable jobs,
-      // so a slow conversion never keeps the upload request waiting.
-      const storage=getStorage();
-      const originals=await retryStorage(()=>storage.createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'originales'));
-      const originalId=await retryStorage(()=>storage.uploadOriginal({path:file.path,filename:file.originalname,mimeType,parentId:originals}));
-      const asset=await transaction(async client=>{
-        const locked=await client.query<{id:string;status:string}>('SELECT id,status FROM lot_versions WHERE id=$1 AND lot_id=$2 FOR UPDATE',[version.id,lot.id]);
-        const current=locked.rows[0];
-        if(!current || !['DRAFT','UPLOADING','PENDING'].includes(current.status)) throw new AppError(409,'LOT_NOT_EDITABLE','El lote cambió de estado antes de finalizar la carga');
-        const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,size_bytes,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id) VALUES($1,'IMAGE',$2,$3,$4,$5,$6,'UPLOADING','QUEUED',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$7) RETURNING id`,[version.id,file.originalname,mimeType,file.size,checksum,req.user!.id,originalId]);
-        await client.query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at) VALUES($1,'QUEUED',now()) ON CONFLICT(media_asset_id) DO UPDATE SET status='QUEUED',available_at=now(),error=NULL,updated_at=now()`,[created.rows[0].id]);
-        await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[originals,version.id]);
-        await client.query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'IMAGE_UPLOAD_QUEUED','media_asset',created.rows[0].id,JSON.stringify({lotId:lot.id,lotVersionId:version.id,originalName:file.originalname,sizeBytes:file.size,addedWhilePending:current.status==='PENDING'})]);
-        return created.rows[0];
-      });
-      queueVideoProcessing();
-      res.status(202).json({id:asset.id,kind,status:'UPLOADING'});
-      return;
-    }
     if (kind === 'VIDEO') {
       const storage=getStorage();
       const originals=await retryStorage(()=>storage.createVersionFolder({departureFolder:departureFolder(lot),lotFolder:lotFolder(lot),version:version.version_number},'originales'));
@@ -246,7 +226,7 @@ lotsRouter.post('/:id/media',requireRoles('ADMIN','COORDINATOR'),requirePermissi
         const current=locked.rows[0];
         if(!current || !['DRAFT','UPLOADING','PENDING'].includes(current.status)) throw new AppError(409,'LOT_NOT_EDITABLE','El lote cambió de estado antes de finalizar la carga');
         const created=await client.query<{id:string}>(`INSERT INTO media_assets(lot_version_id,kind,original_name,mime_type,size_bytes,sha256,uploaded_by,status,watermark_status,sort_order,drive_file_id)
-          VALUES($1,'VIDEO',$2,$3,$4,$5,$6,'UPLOADING','QUEUED',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$7) RETURNING id`,[version.id,file.originalname,mimeType,file.size,checksum,req.user!.id,originalId]);
+          VALUES($1,'VIDEO',$2,$3,$4,$5,$6,'READY','QUEUED',(SELECT count(*) FROM media_assets WHERE lot_version_id=$1),$7) RETURNING id`,[version.id,file.originalname,mimeType,file.size,checksum,req.user!.id,originalId]);
         await client.query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at) VALUES($1,'QUEUED',now()) ON CONFLICT(media_asset_id) DO UPDATE SET status='QUEUED',available_at=now(),error=NULL,updated_at=now()`,[created.rows[0].id]);
         await client.query(`UPDATE lot_versions SET status=CASE WHEN status='DRAFT' THEN 'UPLOADING'::lot_version_status ELSE status END,drive_folder_id=$1 WHERE id=$2`,[originals,version.id]);
         await submitVersion(client, version.id, req.user!.id, 'AUTO');
