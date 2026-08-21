@@ -149,7 +149,7 @@ async function processMediaJob(job: MediaJob) {
     const message = error instanceof Error ? error.message.slice(0, 1000) : 'No se pudo procesar el archivo';
     const retry = job.attempts < MAX_ATTEMPTS;
     await transaction(async client => {
-      await client.query(`UPDATE media_assets SET watermark_status=$1,watermark_error=$2,updated_at=now() WHERE id=$3`, [retry ? 'QUEUED' : 'FAILED', message, job.media_asset_id]);
+      await client.query(`UPDATE media_assets SET status=$1,watermark_status=$2,watermark_error=$3,updated_at=now() WHERE id=$4`, [retry ? 'UPLOADING' : 'ERROR', retry ? 'QUEUED' : 'FAILED', message, job.media_asset_id]);
       await client.query(`UPDATE media_watermark_jobs SET status=$1,error=$2,available_at=CASE WHEN $1='QUEUED' THEN now()+($3::text || ' seconds')::interval ELSE available_at END,completed_at=CASE WHEN $1='FAILED' THEN now() ELSE NULL END,updated_at=now() WHERE id=$4`, [retry ? 'QUEUED' : 'FAILED', message, Math.min(300, 15 * 2 ** Math.max(0, job.attempts - 1)), job.id]);
     });
     console.error('Media processing failed; original remains available', { mediaAssetId: job.media_asset_id, message });
@@ -172,6 +172,12 @@ export function queueMediaProcessing() { for (let worker = 0; worker < WORKER_CO
 // Kept as a compatibility alias for existing callers.
 export const queueVideoProcessing = queueMediaProcessing;
 async function enqueueIncompleteMedia() {
+  // A deploy or process restart can interrupt a worker after it has claimed a
+  // job. Those jobs have no active owner anymore, so make them eligible again.
+  await query(`UPDATE media_watermark_jobs SET status='QUEUED',available_at=now(),started_at=NULL,updated_at=now()
+    WHERE status='PROCESSING'`);
+  await query(`UPDATE media_assets SET watermark_status='QUEUED',watermark_error=NULL,updated_at=now()
+    WHERE watermark_status='PROCESSING' AND status='UPLOADING'`);
   await query(`INSERT INTO media_watermark_jobs(media_asset_id,status,available_at)
     SELECT m.id,'QUEUED',now() FROM media_assets m
     -- También recupera videos que ya tienen miniatura pero nunca terminaron
