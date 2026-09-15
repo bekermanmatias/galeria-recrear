@@ -350,7 +350,7 @@ adminRouter.get('/passengers', requirePermission('passengers', 'view'), asyncHan
   const active = req.query.active === undefined || req.query.active === '' ? null : z.enum(['true','false']).transform(value=>value==='true').parse(req.query.active);
   const updatedFrom = req.query.updatedFrom ? z.string().date().parse(req.query.updatedFrom) : null;
   const updatedTo = req.query.updatedTo ? z.string().date().parse(req.query.updatedTo) : null;
-  const values: unknown[] = [`%${term}%`, schoolId, departureId, active, updatedFrom, updatedTo, pageSize, (page - 1) * pageSize, req.user!.role === 'ADMIN', req.user!.id];
+  const values: unknown[] = [`%${term}%`, schoolId, departureId, active, updatedFrom, updatedTo, pageSize, (page - 1) * pageSize, req.user!.isAdmin || req.user!.roleName === 'Filmmaker', req.user!.id];
   const result = await query(`
     SELECT p.id,p.external_number,p.full_name,p.document_type,p.document_number,p.birth_date::text,p.document_expires_at::text,p.country,p.passenger_status,p.bonus,p.phone,p.mobile,p.email,p.active,p.wristband_code,p.created_at,p.updated_at,p.deactivated_at,
       COALESCE((SELECT jsonb_agg(jsonb_build_object('id',s.id,'name',s.name,'code',s.code) ORDER BY s.name) FROM passenger_school_assignments psa JOIN schools s ON s.id=psa.school_id WHERE psa.passenger_id=p.id AND psa.unassigned_at IS NULL), '[]'::jsonb) AS schools,
@@ -366,7 +366,7 @@ adminRouter.get('/passengers', requirePermission('passengers', 'view'), asyncHan
     ORDER BY p.active DESC,p.full_name LIMIT $7 OFFSET $8`, values);
   const [schools,departures] = await Promise.all([
     query(`SELECT id,name,code FROM schools WHERE active AND deleted_at IS NULL ORDER BY name`),
-    query(`SELECT id,name,public_code AS code,type FROM departures WHERE active AND ($1::boolean OR id IN (SELECT departure_id FROM departure_coordinators WHERE user_id=$2)) ORDER BY start_date DESC,name`, [req.user!.role === 'ADMIN', req.user!.id])
+    query(`SELECT id,name,public_code AS code,type FROM departures WHERE active AND ($1::boolean OR id IN (SELECT departure_id FROM departure_coordinators WHERE user_id=$2)) ORDER BY start_date DESC,name`, [req.user!.isAdmin || req.user!.roleName === 'Filmmaker', req.user!.id])
   ]);
   res.set('Cache-Control', 'private, no-store').json({ items: result.rows, page, pageSize, filters: { schools: schools.rows, departures: departures.rows } });
 }));adminRouter.get('/passengers/imports', asyncHandler(async (_req, res) => {
@@ -451,7 +451,7 @@ adminRouter.delete('/passengers/:id/wristband', requirePermission('passengers', 
 
 adminRouter.get('/passengers/scan/:code', requirePermission('passengers', 'edit'), asyncHandler(async (req, res) => {
   const code = String(req.params.code).trim();
-  const isAdmin = req.user!.role === 'ADMIN';
+  const isAdmin = req.user!.isAdmin || req.user!.roleName === 'Filmmaker';
   const result = await query<{
     id: string; full_name: string; document_type: string; document_number: string;
     birth_date: string | null; document_expires_at: string | null; country: string | null;
@@ -558,7 +558,7 @@ adminRouter.get('/departures', requirePermission('departures', 'view'), asyncHan
       AND ($2::boolean OR d.id IN (SELECT departure_id FROM departure_coordinators WHERE user_id=$3))
     GROUP BY d.id
     ORDER BY d.start_date DESC,d.name
-  `, [includeInactive, req.user!.role === 'ADMIN', req.user!.id]);
+  `, [includeInactive, req.user!.isAdmin || req.user!.roleName === 'Filmmaker', req.user!.id]);
   res.json({ items: result.rows });
 }));
 adminRouter.post('/departures', requirePermission('departures', 'create'), asyncHandler(async (req,res) => {

@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { fileTypeFromFile } from 'file-type';
 import type { PoolClient } from 'pg';
-import { assertDepartureAccess, requireAdmin, requireRoles, requirePermission } from '../auth.js';
+import { assertDepartureAccess, hasGlobalDepartureAccess, requireAdmin, requireRoles, requirePermission } from '../auth.js';
 import { config, paths } from '../config.js';
 import { query, transaction } from '../db.js';
 import { AppError } from '../errors.js';
@@ -107,12 +107,12 @@ function blockedSubmissionError(state: SubmissionState) {
 
 export const lotsRouter = Router();
 lotsRouter.get('/my-schools', asyncHandler(async (req, res) => {
-  if (req.user!.role === 'ADMIN') { const all = await query('SELECT id,name,code,bot_code FROM schools WHERE active AND deleted_at IS NULL ORDER BY name'); return res.json({ items: all.rows }); }
+  if (hasGlobalDepartureAccess(req.user!)) { const all = await query('SELECT id,name,code,bot_code FROM schools WHERE active AND deleted_at IS NULL ORDER BY name'); return res.json({ items: all.rows }); }
   const result = await query('SELECT s.id,s.name,s.code,s.bot_code FROM schools s JOIN user_schools us ON us.school_id=s.id WHERE us.user_id=$1 AND us.membership_role=$2 AND us.active AND s.active AND s.deleted_at IS NULL ORDER BY s.name',[req.user!.id,req.user!.role]); res.json({ items: result.rows });
 }));
 lotsRouter.get('/my-departures', asyncHandler(async (req,res) => {
-  const where=req.user!.role==='ADMIN'?'':'WHERE dc.user_id=$1';
-  const values=req.user!.role==='ADMIN'?[]:[req.user!.id];
+  const where=hasGlobalDepartureAccess(req.user!)?'':'WHERE dc.user_id=$1';
+  const values=hasGlobalDepartureAccess(req.user!)?[]:[req.user!.id];
   const result=await query(`SELECT d.id,d.type,d.name,d.destination,d.event_date::text,d.start_date::text,d.end_date::text,d.active,
     COALESCE(array_agg(s.name) FILTER (WHERE s.id IS NOT NULL),ARRAY[]::text[]) school_names
     FROM departures d LEFT JOIN departure_coordinators dc ON dc.departure_id=d.id LEFT JOIN departure_schools ds ON ds.departure_id=d.id LEFT JOIN schools s ON s.id=ds.school_id
@@ -125,7 +125,7 @@ lotsRouter.get('/catalogs', asyncHandler(async (_req,res) => {
 }));
 lotsRouter.get('/', requirePermission('lots','view'), asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE l.deleted_at IS NULL';
-  if(!req.user!.isAdmin){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
+  if(!hasGlobalDepartureAccess(req.user!)){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
   if(req.query.status && req.user!.role!=='PARENT'){values.push(z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).parse(req.query.status));where+=` AND v.status=$${values.length}`;}
   const visible=req.user!.role==='PARENT'?'l.current_published_version_id':'(SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1)';
