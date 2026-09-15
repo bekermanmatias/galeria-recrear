@@ -1458,7 +1458,7 @@ export function UsersView() {
       role: item?.role ?? "COORDINATOR",
       departureIds: item?.departure_ids ?? [],
     });
-    if (item?.id && item.role === "COORDINATOR") {
+    if (item?.id && (item.role === "COORDINATOR" || item.role === "FILMMAKER")) {
       adminRequest<UserPermissions>("/users/" + item.id + "/permissions")
         .then((data) => {
           setPermissionData(data);
@@ -1501,9 +1501,9 @@ export function UsersView() {
         name: form.name,
         email: form.email,
         role: form.role,
-        departureIds: form.role === "COORDINATOR" ? form.departureIds : [],
+        departureIds: form.role === "COORDINATOR" || form.role === "FILMMAKER" ? form.departureIds : [],
       };
-      if (form.role === "COORDINATOR" && permissionTouched)
+      if ((form.role === "COORDINATOR" || form.role === "FILMMAKER") && permissionTouched)
         body.permissions = permissionReset
           ? []
           : permissionModules.map((module) => ({
@@ -1531,7 +1531,7 @@ export function UsersView() {
     }
   };
   const openPermissions = () => {
-    if (form.role !== "COORDINATOR") return;
+    if (form.role !== "COORDINATOR" && form.role !== "FILMMAKER") return;
     setPermissionTouched(true);
     setPermissionReset(false);
     if (!Object.keys(permissionDraft).length) {
@@ -1703,7 +1703,9 @@ export function UsersView() {
                 ? "Administrador"
                 : item.role === "COORDINATOR"
                   ? "Coordinador"
-                  : "Familia"}
+                  : item.role === "FILMMAKER"
+                    ? "Filmmaker"
+                    : "Familia"}
             </Td>
             <Td dataLabel="Permisos">
               {item.has_global_access || item.permission_mode === "GLOBAL"
@@ -1770,7 +1772,7 @@ export function UsersView() {
                   ...form,
                   role: event.target.value,
                   departureIds:
-                    event.target.value === "COORDINATOR"
+                    event.target.value === "COORDINATOR" || event.target.value === "FILMMAKER"
                       ? form.departureIds
                       : [],
                 })
@@ -1778,10 +1780,11 @@ export function UsersView() {
               style={input}
             >
               <option value="COORDINATOR">Coordinador</option>
+              <option value="FILMMAKER">Filmmaker</option>
               <option value="ADMIN">Administrador</option>
             </select>
           </label>
-          {form.role === "COORDINATOR" && (
+          {(form.role === "COORDINATOR" || form.role === "FILMMAKER") && (
             <div style={{ display: "grid", gap: 8 }}>
               <div
                 style={{
@@ -1889,7 +1892,7 @@ export function UsersView() {
               </span>
             </div>
           )}
-          {form.role === "COORDINATOR" && (
+          {(form.role === "COORDINATOR" || form.role === "FILMMAKER") && (
             <button
               type="button"
               onClick={openPermissions}

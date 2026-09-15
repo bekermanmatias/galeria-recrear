@@ -70,7 +70,7 @@ export default function AdminPanel() {
   // Effect to sync currentTab to state if we derived it
   if (currentTab !== activeTab) setActiveTab(currentTab);
 
-  const uiRole = user.role === 'ADMIN' ? 'admin' : user.role === 'COORDINATOR' ? 'coordinator' : 'parent';
+  const uiRole = user.role === 'ADMIN' ? 'admin' : user.role === 'COORDINATOR' || user.role === 'FILMMAKER' ? 'coordinator' : 'parent';
 
   let tabContent = null;
   switch (currentTab) {

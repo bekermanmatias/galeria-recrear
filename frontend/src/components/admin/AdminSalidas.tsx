@@ -25,7 +25,7 @@ export default function AdminSalidas(){
   ]).then(([departures,schoolData,userData])=>{
     setItems(departures.items);
     setSchools(schoolData.items.filter(item=>item.active));
-    setCoordinators(userData.items.filter(item=>item.role==='COORDINATOR'&&item.active));
+    setCoordinators(userData.items.filter(item=>(item.role==='COORDINATOR'||item.role==='FILMMAKER')&&item.active));
   });
   useEffect(()=>{
     void load();

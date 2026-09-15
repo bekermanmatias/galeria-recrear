@@ -125,7 +125,7 @@ lotsRouter.get('/catalogs', asyncHandler(async (_req,res) => {
 }));
 lotsRouter.get('/', requirePermission('lots','view'), asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query); const values: unknown[]=[]; let where='WHERE l.deleted_at IS NULL';
-  if(req.user!.role==='COORDINATOR'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
+  if(!req.user!.isAdmin){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_coordinators dc WHERE dc.departure_id=l.departure_id AND dc.user_id=$${values.length})`;}
   if(req.user!.role==='PARENT'){values.push(req.user!.id);where+=` AND EXISTS (SELECT 1 FROM departure_schools ds JOIN user_schools us ON us.school_id=ds.school_id WHERE ds.departure_id=l.departure_id AND us.user_id=$${values.length} AND us.membership_role='PARENT' AND us.active) AND l.current_published_version_id IS NOT NULL`;}
   if(req.query.status && req.user!.role!=='PARENT'){values.push(z.enum(['DRAFT','UPLOADING','PENDING','PUBLISHED','REJECTED','ERROR']).parse(req.query.status));where+=` AND v.status=$${values.length}`;}
   const visible=req.user!.role==='PARENT'?'l.current_published_version_id':'(SELECT id FROM lot_versions WHERE lot_id=l.id ORDER BY version_number DESC LIMIT 1)';
@@ -161,7 +161,7 @@ lotsRouter.get('/:id', requirePermission('lots','view'), asyncHandler(async(req,
   const [version,media]=await Promise.all([query('SELECT id,version_number,status FROM lot_versions WHERE id=$1',[versionId]),query(`SELECT m.id,m.kind,m.status,m.original_name,COALESCE(m.delivery_mime_type,m.mime_type) mime_type,COALESCE(m.delivery_size_bytes,m.size_bytes) size_bytes,m.width,m.height,m.duration_seconds,m.sort_order,m.purge_after,m.watermark_status,m.watermark_error,u.name AS uploaded_by_name FROM media_assets m LEFT JOIN users u ON u.id=m.uploaded_by WHERE m.lot_version_id=$1 AND m.status <> 'UPLOADING' AND ($2 <> 'PARENT' OR m.status='APPROVED') ORDER BY m.sort_order,m.created_at`,[versionId,req.user!.role])]);
   res.json({lot,version:version.rows[0],media:media.rows});
 }));
-lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','create'),asyncHandler(async(req,res)=>{
+lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR','FILMMAKER'),requirePermission('lots','create'),asyncHandler(async(req,res)=>{
   const input=createSchema.parse(req.body); await assertDepartureAccess(req.user!,input.departureId,['COORDINATOR']); await assertDepartureActive(input.departureId);
   const response=await transaction(async client=>{const activity= input.activityId ? await client.query<{name:string}>('SELECT name FROM activities WHERE id=$1',[input.activityId]) : {rows:[] as {name:string}[]};const albumTitle=(input.albumName?.trim()||activity.rows[0]?.name||'General').trim();const existing=await client.query<{id:string}>('SELECT l.id FROM lots l WHERE l.departure_id=$1 AND (l.activity_id=$2 OR ($2 IS NULL AND l.activity_id IS NULL)) AND lower(trim(COALESCE(l.title,(SELECT name FROM activities WHERE id=l.activity_id),\'General\'))) = lower(trim($3)) AND l.deleted_at IS NULL ORDER BY l.event_date DESC,l.created_at DESC LIMIT 1 FOR UPDATE',[input.departureId,input.activityId??null,albumTitle]);
     if(existing.rowCount){const version=await client.query<{id:string;status:string;version_number:number}>('SELECT id,status,version_number FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[existing.rows[0].id]);const latest=version.rows[0];if(latest&&['DRAFT','UPLOADING','PENDING'].includes(latest.status)){await client.query('UPDATE lots SET event_date=$1,title=$2,updated_at=now() WHERE id=$3',[input.eventDate,albumTitle,existing.rows[0].id]);return{lotId:existing.rows[0].id,versionId:latest.id,existing:true};}
@@ -169,9 +169,9 @@ lotsRouter.post('/',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots'
     const lot=await client.query<{id:string}>('INSERT INTO lots(departure_id,activity_id,shift_id,event_date,created_by,title) VALUES($1,$2,NULL,$3,$4,$5) RETURNING id',[input.departureId,input.activityId??null,input.eventDate,req.user!.id,albumTitle]);const version=await client.query<{id:string}>('INSERT INTO lot_versions(lot_id,version_number,created_by) VALUES($1,1,$2) RETURNING id',[lot.rows[0].id,req.user!.id]);return{lotId:lot.rows[0].id,versionId:version.rows[0].id,existing:false};});
   res.status(response.existing?200:201).json(response);
 }));
-lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{
+lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR','FILMMAKER'),requirePermission('lots','edit'),asyncHandler(async(req,res)=>{
   const input=updateSchema.parse(req.body);const lot=await loadLot(param(req.params.id));
-  if(req.user!.role==='COORDINATOR'){
+  if(!req.user!.isAdmin){
     await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
     const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
     if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_EDITABLE','Solo se pueden editar lotes que aún no fueron publicados');
@@ -185,10 +185,10 @@ lotsRouter.patch('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('l
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'LOT_UPDATED','lot',lot.id,JSON.stringify(input)]);
   res.json({success:true});
 }));
-lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR'),requirePermission('lots','delete'),asyncHandler(async(req,res)=>{
+lotsRouter.delete('/:id',requireRoles('ADMIN','COORDINATOR','FILMMAKER'),requirePermission('lots','delete'),asyncHandler(async(req,res)=>{
   const lot=await loadLot(param(req.params.id));
   await assertDepartureAccess(req.user!,lot.departure_id,['COORDINATOR']);
-  if(req.user!.role==='COORDINATOR'){
+  if(!req.user!.isAdmin){
     const version=await query<{status:string}>('SELECT status FROM lot_versions WHERE lot_id=$1 ORDER BY version_number DESC LIMIT 1',[lot.id]);
     if(version.rows[0]&&!['DRAFT','UPLOADING'].includes(version.rows[0].status))throw new AppError(403,'LOT_NOT_DELETABLE','Solo se pueden eliminar lotes que aún no fueron publicados');
   }

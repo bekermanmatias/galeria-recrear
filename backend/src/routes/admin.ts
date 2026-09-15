@@ -14,12 +14,14 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 
 const permissionModules = ['departures','lots','moderation','gallery','activities','schools','passengers','users','imports'] as const;
 const permissionActions = ['view','create','edit','delete'] as const;
 const permissionItemSchema = z.object({ module: z.enum(permissionModules), view: z.boolean(), create: z.boolean(), edit: z.boolean(), delete: z.boolean() });
-const userSchema = z.object({ name: z.string().min(2).max(160), email: z.string().email(), password: z.string().min(8).max(128), role: z.enum(['ADMIN', 'COORDINATOR']).default('COORDINATOR'), departureIds: z.array(z.string().uuid()).default([]), permissions: z.array(permissionItemSchema).optional(), active: z.boolean().optional() });
+const userSchema = z.object({ name: z.string().min(2).max(160), email: z.string().email(), password: z.string().min(8).max(128), role: z.enum(['ADMIN', 'COORDINATOR', 'FILMMAKER']).default('COORDINATOR'), departureIds: z.array(z.string().uuid()).default([]), permissions: z.array(permissionItemSchema).optional(), active: z.boolean().optional() });
+const operationalRoles = ['COORDINATOR', 'FILMMAKER'] as const;
+const isOperationalRole = (role: string) => operationalRoles.includes(role as typeof operationalRoles[number]);
 const schoolSchema = z.object({ name: z.string().min(2).max(160), code: z.string().min(2).max(32).transform(v => v.toUpperCase()), botCode: z.string().min(2).max(32).transform(v => v.toUpperCase()), startDate: z.string().date().optional().nullable(), endDate: z.string().date().optional().nullable(), active: z.boolean().optional() });
 const catalogSchema = z.object({ name: z.string().min(2).max(100), botCode: z.string().min(1).max(32).transform(v => v.toUpperCase()), active: z.boolean().optional(), sortOrder: z.number().int().optional() });
 
 export const adminRouter = Router();
-adminRouter.use(requireRoles('ADMIN', 'COORDINATOR'));
+adminRouter.use(requireRoles('ADMIN', 'COORDINATOR', 'FILMMAKER'));
 
 adminRouter.get('/users', requireAdmin, asyncHandler(async (req, res) => {
   const { page, pageSize } = parsePagination(req.query);
@@ -47,7 +49,7 @@ adminRouter.get('/users', requireAdmin, asyncHandler(async (req, res) => {
 }));
 adminRouter.get('/permissions/catalog', requireAdmin, asyncHandler(async (_req,res) => { const result=await query('SELECT module,label FROM permission_modules ORDER BY module'); res.json({items:result.rows,actions:permissionActions}); }));
 adminRouter.get('/users/:id/permissions', requireAdmin, asyncHandler(async (req,res) => {
-  const target=await query<{role:'ADMIN'|'COORDINATOR'|'PARENT'}>('SELECT role FROM users WHERE id=$1',[req.params.id]); if(!target.rowCount) throw new AppError(404,'USER_NOT_FOUND','Usuario no encontrado');
+  const target=await query<{role:'ADMIN'|'COORDINATOR'|'FILMMAKER'|'PARENT'}>('SELECT role FROM users WHERE id=$1',[req.params.id]); if(!target.rowCount) throw new AppError(404,'USER_NOT_FOUND','Usuario no encontrado');
   const rows=await query('SELECT module,can_view,can_create,can_edit,can_delete FROM user_permissions WHERE user_id=$1',[req.params.id]);
   const defaults = getDefaultPermissions(target.rows[0].role);
   const custom=Object.fromEntries(rows.rows.map(row=>[row.module,{view:row.can_view,create:row.can_create,edit:row.can_edit,delete:row.can_delete}]));
@@ -56,8 +58,8 @@ adminRouter.get('/users/:id/permissions', requireAdmin, asyncHandler(async (req,
 }));
 adminRouter.put('/users/:id/permissions', requireAdmin, asyncHandler(async (req,res) => {
   const input=z.object({permissions:z.array(z.object({module:z.enum(permissionModules),view:z.boolean(),create:z.boolean(),edit:z.boolean(),delete:z.boolean()}))}).parse(req.body);
-  const target=await query<{role:'ADMIN'|'COORDINATOR'|'PARENT'}>('SELECT role FROM users WHERE id=$1',[req.params.id]); if(!target.rowCount) throw new AppError(404,'USER_NOT_FOUND','Usuario no encontrado');
-  if(target.rows[0].role!=='COORDINATOR') throw new AppError(400,'PERMISSIONS_ROLE','Solo los coordinadores pueden tener permisos personalizados');
+  const target=await query<{role:'ADMIN'|'COORDINATOR'|'FILMMAKER'|'PARENT'}>('SELECT role FROM users WHERE id=$1',[req.params.id]); if(!target.rowCount) throw new AppError(404,'USER_NOT_FOUND','Usuario no encontrado');
+  if(!isOperationalRole(target.rows[0].role)) throw new AppError(400,'PERMISSIONS_ROLE','Solo los roles operativos pueden tener permisos personalizados');
   const unique=new Set(input.permissions.map(item=>item.module)); if(unique.size!==input.permissions.length) throw new AppError(400,'DUPLICATE_PERMISSION_MODULE','No repitas módulos');
   await transaction(async client=>{ await client.query('DELETE FROM user_permissions WHERE user_id=$1',[req.params.id]); for(const item of input.permissions) await client.query('INSERT INTO user_permissions(user_id,module,can_view,can_create,can_edit,can_delete) VALUES($1,$2,$3,$4,$5,$6)',[req.params.id,item.module,item.view,item.create,item.edit,item.delete]); });
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,input.permissions.length?'USER_PERMISSIONS_UPDATED':'USER_PERMISSIONS_RESET','user',req.params.id,JSON.stringify({modules:input.permissions.map(item=>item.module)})]);
@@ -66,7 +68,7 @@ adminRouter.put('/users/:id/permissions', requireAdmin, asyncHandler(async (req,
 adminRouter.post('/users', requireAdmin, asyncHandler(async (req, res) => {
   const input = userSchema.parse(req.body);
   const departureIds = [...new Set(input.departureIds)];
-  if (input.role !== 'COORDINATOR' && departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores');
+  if (!isOperationalRole(input.role) && departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores o filmmakers');
   const result = await transaction(async client => {
     if (departureIds.length) {
       const valid = await client.query('SELECT id FROM departures WHERE id = ANY($1::uuid[]) AND active', [departureIds]);
@@ -75,7 +77,7 @@ adminRouter.post('/users', requireAdmin, asyncHandler(async (req, res) => {
     const created = await client.query('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role, active', [input.name, input.email, await hashPassword(input.password), input.role]);
     for (const departureId of departureIds) await client.query('INSERT INTO departure_coordinators (departure_id, user_id) VALUES ($1, $2)', [departureId, created.rows[0].id]);
     if (input.permissions?.length) {
-      if (input.role !== 'COORDINATOR') throw new AppError(400, 'PERMISSIONS_ROLE', 'Solo los coordinadores pueden tener permisos personalizados');
+      if (!isOperationalRole(input.role)) throw new AppError(400, 'PERMISSIONS_ROLE', 'Solo los roles operativos pueden tener permisos personalizados');
       const unique = new Set(input.permissions.map(item => item.module));
       if (unique.size !== input.permissions.length) throw new AppError(400, 'DUPLICATE_PERMISSION_MODULE', 'No repitas módulos');
       for (const item of input.permissions) await client.query('INSERT INTO user_permissions(user_id,module,can_view,can_create,can_edit,can_delete) VALUES($1,$2,$3,$4,$5,$6)', [created.rows[0].id, item.module, item.view, item.create, item.edit, item.delete]);
@@ -90,10 +92,10 @@ adminRouter.patch('/users/:id', requireAdmin, asyncHandler(async (req, res) => {
   const targetId = String(req.params.id);
   if (input.active === false && targetId === req.user!.id) throw new AppError(400, 'CANNOT_DEACTIVATE_SELF', 'No podés desactivar tu propia cuenta');
   const result = await transaction(async client => {
-    const current = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [targetId]);
+    const current = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'FILMMAKER' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [targetId]);
     if (!current.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
     const nextRole = input.role ?? current.rows[0].role;
-    if (nextRole !== 'COORDINATOR' && departureIds?.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores');
+    if (!isOperationalRole(nextRole) && departureIds?.length) throw new AppError(400, 'INVALID_DEPARTURE_ASSIGNMENTS', 'Las salidas solo se asignan a coordinadores o filmmakers');
     if (departureIds && input.active !== false) {
       const valid = await client.query('SELECT id FROM departures WHERE id = ANY($1::uuid[]) AND active', [departureIds]);
       if (valid.rowCount !== departureIds.length) throw new AppError(400, 'INVALID_DEPARTURE', 'Una o mas salidas no existen o estan archivadas');
@@ -107,12 +109,12 @@ adminRouter.patch('/users/:id', requireAdmin, asyncHandler(async (req, res) => {
     if (departureIds) {
       await client.query('DELETE FROM departure_coordinators WHERE user_id=$1', [targetId]);
       for (const departureId of departureIds) await client.query('INSERT INTO departure_coordinators (departure_id, user_id) VALUES ($1, $2)', [departureId, targetId]);
-    } else if (nextRole !== 'COORDINATOR' || input.active === false) {
+    } else if (!isOperationalRole(nextRole) || input.active === false) {
       await client.query('DELETE FROM departure_coordinators WHERE user_id=$1', [targetId]);
     }
 
     if (input.permissions !== undefined) {
-      if (nextRole !== 'COORDINATOR') throw new AppError(400, 'PERMISSIONS_ROLE', 'Solo los coordinadores pueden tener permisos personalizados');
+      if (!isOperationalRole(nextRole)) throw new AppError(400, 'PERMISSIONS_ROLE', 'Solo los roles operativos pueden tener permisos personalizados');
       const unique = new Set(input.permissions.map(item => item.module));
       if (unique.size !== input.permissions.length) throw new AppError(400, 'DUPLICATE_PERMISSION_MODULE', 'No repitas módulos');
       await client.query('DELETE FROM user_permissions WHERE user_id=$1', [targetId]);
@@ -147,7 +149,7 @@ adminRouter.delete('/users/:id', requireAdmin, asyncHandler(async (req, res) => 
   const userId = String(req.params.id);
   if (userId === req.user!.id) throw new AppError(400, 'CANNOT_DELETE_SELF', 'No podés eliminar tu propia cuenta');
   await transaction(async client => {
-    const target = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [userId]);
+    const target = await client.query<{ role: 'ADMIN' | 'COORDINATOR' | 'FILMMAKER' | 'PARENT'; active: boolean }>('SELECT role, active FROM users WHERE id=$1 FOR UPDATE', [userId]);
     if (!target.rowCount) throw new AppError(404, 'USER_NOT_FOUND', 'Usuario no encontrado');
     if (target.rows[0].role === 'ADMIN' && target.rows[0].active) {
       const admins = await client.query("SELECT count(*)::int AS total FROM users WHERE role='ADMIN' AND active");
@@ -579,7 +581,7 @@ adminRouter.put('/departures/:id/schools', requirePermission('departures', 'edit
 }));
 adminRouter.put('/departures/:id/coordinators', requirePermission('departures', 'edit'), asyncHandler(async(req,res) => {
   const input=idsSchema.parse(req.body); await departureExists(String(req.params.id)); const activeDeparture=await query('SELECT 1 FROM departures WHERE id=$1 AND active',[String(req.params.id)]); if(!activeDeparture.rowCount) throw new AppError(409,'DEPARTURE_ARCHIVED','La salida está archivada o no existe');
-  await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role='COORDINATOR' AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador invalido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
+  await transaction(async client=>{await client.query('DELETE FROM departure_coordinators WHERE departure_id=$1',[String(req.params.id)]);for(const userId of input.ids){const coordinator=await client.query("SELECT 1 FROM users WHERE id=$1 AND role IN ('COORDINATOR','FILMMAKER') AND active",[userId]);if(!coordinator.rowCount)throw new AppError(400,'INVALID_COORDINATOR','Coordinador o filmmaker inválido');await client.query('INSERT INTO departure_coordinators(departure_id,user_id) VALUES($1,$2)',[req.params.id,userId]);}});
   await query('INSERT INTO audit_log(actor_id,action,entity_type,entity_id,metadata) VALUES($1,$2,$3,$4,$5)',[req.user!.id,'DEPARTURE_COORDINATORS_UPDATED','departure',String(req.params.id),JSON.stringify({coordinatorIds:input.ids})]);res.status(204).end();
 }));
 adminRouter.delete('/departures/:id', requirePermission('departures', 'delete'), asyncHandler(async(req,res) => {
