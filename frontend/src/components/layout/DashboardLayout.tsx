@@ -10,7 +10,7 @@ export interface TabItem {
 }
 
 interface DashboardLayoutProps {
-  role: 'admin' | 'coordinator' | 'parent';
+  role: 'admin' | 'coordinator' | 'filmmaker' | 'parent';
   tabs: TabItem[];
   activeTab: string;
   onTabChange: (tabId: string) => void;

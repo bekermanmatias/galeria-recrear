@@ -3,7 +3,7 @@ import { LogOut, Settings, User, ChevronDown, Menu } from 'lucide-react';
 import { api, type SessionUser } from '../../lib/api';
 
 interface NavbarProps {
-  role: 'parent' | 'coordinator' | 'admin';
+  role: 'parent' | 'coordinator' | 'filmmaker' | 'admin';
   onMenuToggle?: () => void;
 }
 
@@ -16,7 +16,7 @@ export default function Navbar({ role, onMenuToggle }: NavbarProps) {
   const [newPassword, setNewPassword] = useState('');
   const [passwordMessage, setPasswordMessage] = useState('');
   const [savingPassword, setSavingPassword] = useState(false);
-  const roleLabel = role === 'admin' ? 'Administrador' : role === 'coordinator' ? 'Coordinador' : 'Familia';
+  const roleLabel = role === 'admin' ? 'Administrador' : role === 'filmmaker' ? 'Filmmaker' : role === 'coordinator' ? 'Coordinador' : 'Familia';
   const logout = async () => {
     try { await api.logout(); } finally { window.location.href = '/login'; }
   };
