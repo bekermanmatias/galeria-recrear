@@ -14,6 +14,8 @@ const schema = z.object({
   UPLOAD_TEMP_DIR: z.string().default('/tmp/galeria-recrear/uploads'),
   MAX_FILE_SIZE_MB: z.coerce.number().int().positive().max(500).default(500),
   MAX_VIDEO_FILE_SIZE_MB: z.coerce.number().int().positive().max(1024).default(1024),
+  MEDIA_WORKER_CONCURRENCY: z.coerce.number().int().positive().max(4).default(1),
+  MEDIA_FFMPEG_THREADS: z.coerce.number().int().positive().max(16).default(1),
   DRIVE_ROOT_FOLDER_ID: z.string().optional(),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
   GOOGLE_SERVICE_ACCOUNT_JSON: z.string().optional(),

@@ -20,6 +20,7 @@ services:
       dockerfile: Dockerfile.prod
     env_file:
       - ./backend/.env
+    cpus: "1.0"
     depends_on:
       db:
         condition: service_healthy
