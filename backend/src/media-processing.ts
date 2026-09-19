@@ -103,7 +103,7 @@ async function claimMediaJob(): Promise<MediaJob | undefined> {
       FROM media_watermark_jobs j JOIN media_assets m ON m.id=j.media_asset_id JOIN lot_versions v ON v.id=m.lot_version_id
       JOIN lots l ON l.id=v.lot_id JOIN departures d ON d.id=l.departure_id LEFT JOIN activities a ON a.id=l.activity_id
       WHERE j.status='QUEUED' AND j.available_at <= now() AND m.kind='VIDEO' AND m.drive_file_id IS NOT NULL
-      ORDER BY j.available_at,j.created_at FOR UPDATE SKIP LOCKED LIMIT 1`);
+      ORDER BY j.available_at,j.created_at FOR UPDATE OF j SKIP LOCKED LIMIT 1`);
     const job = claimed.rows[0];
     if (!job) return undefined;
     await client.query(`UPDATE media_watermark_jobs SET status='PROCESSING',attempts=attempts+1,started_at=now(),updated_at=now() WHERE id=$1`, [job.id]);
